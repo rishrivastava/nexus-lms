@@ -235,6 +235,18 @@
         </div>
     </div>
 
+    <!-- Dashboard Viewer Profile View -->
+    {% elif user.role == 'dashboard_viewer' %}
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Executive Dashboard Account</h3>
+        <p class="text-xs text-slate-600">You hold authenticated read-only access to view the Overview Dashboard, Subject Participation Dashboard, and Subject Content Dashboard.</p>
+        <div class="pt-2">
+            <a href="/department" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
+                Open Department Dashboards
+            </a>
+        </div>
+    </div>
+
     <!-- Admin Profile View -->
     {% else %}
     <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">

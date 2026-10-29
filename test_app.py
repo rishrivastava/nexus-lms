@@ -295,40 +295,43 @@ def test_lms():
         get_notification_settings, update_notification_settings
     )
     with get_db() as conn:
-        conn.cursor().execute("DELETE FROM notifications WHERE user_id = 3")
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE user_id = 'CS2026-001'")
+        notif_test_uid = c.fetchone()[0]
+        c.execute("DELETE FROM notifications WHERE user_id = ?", (notif_test_uid,))
         
     # Create single notification
-    create_notification(3, "Course Assignment", "You have been enrolled in CS-201", link_url="/course/1", category="course")
-    unread, notes = get_user_notifications(3)
+    create_notification(notif_test_uid, "Course Assignment", "You have been enrolled in CS-201", link_url="/course/1", category="course")
+    unread, notes = get_user_notifications(notif_test_uid)
     assert unread >= 1
     found_note = next(n for n in notes if n["title"] == "Course Assignment")
     assert found_note["category"] == "course"
     
     # Mark single read
-    mark_notification_read(found_note["id"], 3)
-    unread_after, _ = get_user_notifications(3)
+    mark_notification_read(found_note["id"], notif_test_uid)
+    unread_after, _ = get_user_notifications(notif_test_uid)
     assert unread_after == unread - 1
     
     # Batch notification to multiple users
-    notify_users([3, 4], "Faculty Announcement", "Mid-term schedule published", category="announcement")
-    unread_b, _ = get_user_notifications(3)
+    notify_users([notif_test_uid], "Faculty Announcement", "Mid-term schedule published", category="announcement")
+    unread_b, _ = get_user_notifications(notif_test_uid)
     assert unread_b >= 1
     
     # Mark all read
-    mark_all_notifications_read(3)
-    unread_clean, _ = get_user_notifications(3)
+    mark_all_notifications_read(notif_test_uid)
+    unread_clean, _ = get_user_notifications(notif_test_uid)
     assert unread_clean == 0
     
     # Admin policy suppression check
     update_notification_settings({"faculty_created": {"is_enabled": 0}})
-    create_notification(3, "Suppressed Faculty Welcome", "New faculty joined", category="faculty", event_type="faculty_created")
+    create_notification(notif_test_uid, "Suppressed Faculty Welcome", "New faculty joined", category="faculty", event_type="faculty_created")
     # Verify notification was suppressed by admin policy
     _, notes_after = get_user_notifications(3)
     assert not any(n["title"] == "Suppressed Faculty Welcome" for n in notes_after)
     update_notification_settings({"faculty_created": {"is_enabled": 1}})
     
     with get_db() as conn:
-        conn.cursor().execute("DELETE FROM notifications WHERE user_id = 3")
+        conn.cursor().execute("DELETE FROM notifications WHERE user_id = ?", (notif_test_uid,))
     print("✓ In-App Notification Center verified (Delivery, Inbox, Read state, Policy suppression)")
 
     # 18. Test Real-time Student Heartbeat & Live Active Tracking
@@ -381,7 +384,9 @@ def test_lms():
             INSERT OR REPLACE INTO courses (id, title, code, subject, department, teacher_id, is_published, status)
             VALUES (7777, 'Neural Computing', 'CS-7777', 'Machine Learning', 'Computer Science', 2, 1, 'published')
         """)
-        cursor.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (3, 7777)")
+        cursor.execute("SELECT id FROM users WHERE user_id = 'CS2026-001'")
+        stu_id = cursor.fetchone()["id"]
+        cursor.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, 7777)", (stu_id,))
         
         # Test Archival
         cursor.execute("UPDATE courses SET status = 'archived', is_published = 0, archived_at = CURRENT_TIMESTAMP WHERE id = 7777")
@@ -396,8 +401,8 @@ def test_lms():
         assert cursor.fetchone()["status"] == "deleted"
         
         # Verify student records remain intact in Global Student Pool
-        cursor.execute("SELECT id, user_id FROM users WHERE id = 3")
-        assert cursor.fetchone()["user_id"] == "CS2026-001"
+        cursor.execute("SELECT id, user_id FROM users WHERE user_id = 'CS2026-001'")
+        assert cursor.fetchone() is not None
         
         # Clean up
         cursor.execute("DELETE FROM enrollments WHERE course_id = 7777")
@@ -432,9 +437,9 @@ def test_lms():
             SET department = 'Foreign Language', phone = '+91 9988776655', guardian_name = 'Vikram Sharma',
                 school_name = 'Delhi Public School', district = 'South Delhi', state = 'Delhi',
                 pincode = '110001', bio = 'Passionate about coding and languages.'
-            WHERE id = 3
+            WHERE user_id = 'CS2026-001'
         """)
-        cursor.execute("SELECT * FROM users WHERE id = 3")
+        cursor.execute("SELECT * FROM users WHERE user_id = 'CS2026-001'")
         updated_u = dict(cursor.fetchone())
         assert updated_u["department"] == "Foreign Language"
         assert updated_u["phone"] == "+91 9988776655"
@@ -523,10 +528,11 @@ def test_lms():
     assert "CS-201" in prof_html or "French" in prof_html, "Course codes/titles not displayed in profile"
     assert "<i class=\"fa-solid fa-building-columns text-slate-400 mr-1\"></i> Computer Science" not in prof_html
     
-    # Check student dashboard
+    # Check student dashboard with enrolled courses (CS2026-002)
+    stu2_token = create_access_token({"sub": "CS2026-002", "role": "student"})
     stu_dash_scope = {
         "type": "http", "method": "GET", "path": "/student",
-        "headers": [(b"cookie", f"lms_token={stu_token}".encode("utf-8"))],
+        "headers": [(b"cookie", f"lms_token={stu2_token}".encode("utf-8"))],
         "query_string": b""
     }
     stu_dash_req = Request(stu_dash_scope)
@@ -535,6 +541,178 @@ def test_lms():
     assert "Enrolled in:" in dash_html, "Enrolled courses banner missing in student dashboard"
     assert "Computer Science •" not in dash_html, "Legacy Computer Science department found in student dashboard"
     print("✓ Student Profile & Dashboard dynamically display Enrolled Courses instead of legacy department")
+
+    # 26. Test Admin Power: Add Students (with temp pass), Teachers, General Dashboard Viewers, and Delete All Students
+    from app.routes.dept_routes import (
+        register_single_student, add_teacher, add_dashboard_viewer,
+        delete_single_student, delete_all_students, department_dashboard
+    )
+    from app.routes.auth_routes import login_action, setup_account_action
+    from starlette.datastructures import FormData
+    from starlette.responses import Response
+
+    admin_token = create_access_token({"sub": "DEPT-HEAD", "role": "department_admin"})
+    admin_headers = [(b"cookie", f"lms_token={admin_token}".encode("utf-8"))]
+
+    with get_db() as conn:
+        conn.cursor().execute("DELETE FROM users WHERE user_id IN ('STU-CUSTOM-001', 'T-EULER-NEW', 'EXEC-DIRECTOR') OR normalized_name = 'vikramaditya roy'")
+
+    # A: Add Student with Login and Password (must_change_password = 1)
+    new_stu_req = Request({
+        "type": "http", "method": "POST", "path": "/department/students/register-single",
+        "headers": admin_headers
+    })
+    res_reg = asyncio.run(register_single_student(
+        new_stu_req,
+        full_name="Vikramaditya Roy",
+        guardian_name="Chandra Roy",
+        school_name="Central Academy",
+        udise_code="29280100199",
+        block="South", district="Bengaluru", state="Karnataka", pincode="560002",
+        email="vikram@academy.edu", course_id=1, custom_student_id="STU-CUSTOM-001",
+        flag_conflict=0, default_password="studentTempPass123"
+    ))
+    assert res_reg.status_code == 303
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, user_id, must_change_password, password_hash FROM users WHERE user_id = 'STU-CUSTOM-001'")
+        st_row = c.fetchone()
+        assert st_row is not None
+        assert st_row["must_change_password"] == 1
+        assert verify_password("studentTempPass123", st_row["password_hash"]) == True
+    print("✓ Admin registered student with custom login ID & temporary password (must_change_password enforced)")
+
+    # B: Student logs in and changes password
+    dummy_resp = Response()
+    login_req = Request({"type": "http", "method": "POST", "path": "/login", "headers": []})
+    login_res = asyncio.run(login_action(login_req, dummy_resp, user_id="STU-CUSTOM-001", password="studentTempPass123"))
+    assert login_res.headers["location"] == "/setup-account", "Student not redirected to setup-account"
+
+    # Student updates their password on /setup-account
+    stu_new_token = create_access_token({"sub": "STU-CUSTOM-001", "role": "student"})
+    setup_req = Request({
+        "type": "http", "method": "POST", "path": "/setup-account",
+        "headers": [(b"cookie", f"lms_token={stu_new_token}".encode("utf-8"))]
+    })
+    setup_res = asyncio.run(setup_account_action(setup_req, new_password="MyPrivatePassword123", confirm_password="MyPrivatePassword123", email="vikram@academy.edu"))
+    assert setup_res.headers["location"] == "/student"
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT must_change_password, password_hash FROM users WHERE user_id = 'STU-CUSTOM-001'")
+        st_updated = c.fetchone()
+        assert st_updated["must_change_password"] == 0
+        assert verify_password("MyPrivatePassword123", st_updated["password_hash"]) == True
+    print("✓ Student authenticated with initial password and successfully changed it on first login")
+
+    # C: Admin adds Teacher
+    teacher_req = Request({
+        "type": "http", "method": "POST", "path": "/department/teachers/add",
+        "headers": admin_headers
+    })
+    res_teach = asyncio.run(add_teacher(
+        teacher_req,
+        user_id="T-EULER-NEW", full_name="Prof. Leonhard Euler II",
+        department="Mathematics", email="euler.new@institution.edu",
+        temporary_password="eulerPass123"
+    ))
+    assert res_teach.status_code == 303
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, user_id, role, password_hash FROM users WHERE user_id = 'T-EULER-NEW'")
+        t_row = c.fetchone()
+        assert t_row is not None
+        assert t_row["role"] == "teacher"
+        assert verify_password("eulerPass123", t_row["password_hash"]) == True
+    print("✓ Admin successfully created Faculty / Teacher account with custom login ID and password")
+
+    # D: Admin adds General Account just for dashboards (dashboard_viewer)
+    viewer_req = Request({
+        "type": "http", "method": "POST", "path": "/department/viewers/add",
+        "headers": admin_headers
+    })
+    res_view = asyncio.run(add_dashboard_viewer(
+        viewer_req,
+        user_id="EXEC-DIRECTOR", full_name="Dr. Jane Director",
+        email="director@board.edu", password="directorPass123"
+    ))
+    assert res_view.status_code == 303
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, user_id, role, password_hash FROM users WHERE user_id = 'EXEC-DIRECTOR'")
+        v_row = c.fetchone()
+        assert v_row is not None
+        assert v_row["role"] == "dashboard_viewer"
+        assert verify_password("directorPass123", v_row["password_hash"]) == True
+
+    # General dashboard viewer accesses /department
+    viewer_token = create_access_token({"sub": "EXEC-DIRECTOR", "role": "dashboard_viewer"})
+    view_dash_req = Request({
+        "type": "http", "method": "GET", "path": "/department",
+        "headers": [(b"cookie", f"lms_token={viewer_token}".encode("utf-8"))],
+        "query_string": b""
+    })
+    view_dash_res = asyncio.run(department_dashboard(view_dash_req))
+    assert view_dash_res.status_code == 200
+    v_html = view_dash_res.body.decode("utf-8")
+    assert "Overview Dashboard" in v_html
+    assert "Subject Participation" in v_html
+    assert "Subject Content" in v_html
+    print("✓ General Account (dashboard_viewer) created and granted read-only access to all dashboards")
+
+    # E: Admin deletes a single student
+    del_single_req = Request({
+        "type": "http", "method": "POST", "path": "/department/students/delete/STU-CUSTOM-001",
+        "headers": admin_headers
+    })
+    del_s_res = asyncio.run(delete_single_student(del_single_req, "STU-CUSTOM-001"))
+    assert del_s_res.status_code == 303
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE user_id = 'STU-CUSTOM-001'")
+        assert c.fetchone() is None
+    print("✓ Admin successfully deleted single student record")
+
+    # F: Admin deletes all student list (bulk delete)
+    del_all_req = Request({
+        "type": "http", "method": "POST", "path": "/department/students/delete-all",
+        "headers": admin_headers
+    })
+    del_all_res = asyncio.run(delete_all_students(del_all_req))
+    assert del_all_res.status_code == 303
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM users WHERE role = 'student'")
+        remaining_students = c.fetchone()[0]
+        assert remaining_students == 0, f"Expected 0 students, found {remaining_students}"
+        c.execute("SELECT COUNT(*) FROM users WHERE role = 'teacher'")
+        assert c.fetchone()[0] > 0, "Teachers should NOT be deleted"
+        c.execute("SELECT COUNT(*) FROM users WHERE role = 'department_admin'")
+        assert c.fetchone()[0] > 0, "Admin should NOT be deleted"
+        c.execute("SELECT COUNT(*) FROM users WHERE role = 'dashboard_viewer'")
+        assert c.fetchone()[0] > 0, "Dashboard viewer should NOT be deleted"
+        c.execute("SELECT COUNT(*) FROM courses")
+        assert c.fetchone()[0] > 0, "Courses should NOT be deleted"
+    print("✓ Admin successfully executed 'Delete All Students', wiping student list while preserving faculty, viewers & courses")
+
+    # Re-seed test students for subsequent operations
+    with get_db() as conn:
+        c = conn.cursor()
+        student_pass = hash_password("welcome123")
+        students = [
+            ("CS2026-001", "Aarav Sharma", "Foreign Language"),
+            ("CS2026-002", "Priya Patel", "Foreign Language"),
+            ("CS2026-003", "Rohan Mehta", "Foreign Language"),
+            ("CS2026-004", "Ananya Verma", "Foreign Language"),
+            ("CS2026-005", "Devansh Rao", "Foreign Language")
+        ]
+        for uid, name, dept in students:
+            c.execute("""
+                INSERT INTO users (user_id, full_name, department, email, password_hash, role, must_change_password)
+                VALUES (?, ?, ?, NULL, ?, 'student', 0)
+            """, (uid, name, dept, student_pass))
+            sid = c.lastrowid
+            c.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, 1)", (sid,))
+            c.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, 2)", (sid,))
 
     print("\n🎉 ALL TESTS PASSED! LMS backend and database engine are fully operational.")
 

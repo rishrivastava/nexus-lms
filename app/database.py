@@ -8,9 +8,11 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA busy_timeout = 30000;")
     try:
         yield conn
         conn.commit()
@@ -415,14 +417,21 @@ def update_dashboard_permissions(permissions: dict):
                 WHERE widget_key = ?
             """, (conf.get("allowed_roles", ""), conf.get("is_enabled", 1), key))
 
-def log_audit(user_id: int, action: str, entity_type: str, entity_id: str, details: str):
+def log_audit(user_id: int, action: str, entity_type: str, entity_id: str, details: str, conn=None):
     try:
-        with get_db() as conn:
+        if conn is not None:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
                 VALUES (?, ?, ?, ?, ?)
             """, (user_id, action, entity_type, str(entity_id), details))
+        else:
+            with get_db() as c_conn:
+                cursor = c_conn.cursor()
+                cursor.execute("""
+                    INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (user_id, action, entity_type, str(entity_id), details))
     except Exception as e:
         print(f"Error logging audit action: {e}")
 
@@ -430,9 +439,9 @@ def log_audit(user_id: int, action: str, entity_type: str, entity_id: str, detai
 # NOTIFICATION ENGINE HELPERS
 # ==========================================
 
-def create_notification(user_id: int, title: str, message: str, link_url: str = None, category: str = "general", event_type: str = None):
+def create_notification(user_id: int, title: str, message: str, link_url: str = None, category: str = "general", event_type: str = None, conn=None):
     try:
-        with get_db() as conn:
+        if conn is not None:
             cursor = conn.cursor()
             if event_type:
                 cursor.execute("SELECT is_enabled FROM notification_settings WHERE event_type = ?", (event_type,))
@@ -443,6 +452,18 @@ def create_notification(user_id: int, title: str, message: str, link_url: str = 
                 INSERT INTO notifications (user_id, title, message, link_url, category)
                 VALUES (?, ?, ?, ?, ?)
             """, (user_id, title, message, link_url, category))
+        else:
+            with get_db() as c_conn:
+                cursor = c_conn.cursor()
+                if event_type:
+                    cursor.execute("SELECT is_enabled FROM notification_settings WHERE event_type = ?", (event_type,))
+                    row = cursor.fetchone()
+                    if row and row["is_enabled"] == 0:
+                        return None  # Event notification suppressed by admin policy
+                cursor.execute("""
+                    INSERT INTO notifications (user_id, title, message, link_url, category)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (user_id, title, message, link_url, category))
     except Exception as e:
         print(f"Error creating notification: {e}")
 

@@ -27,8 +27,8 @@ def require_dept_admin_or_teacher(request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=303, headers={"Location": "/login"})
-    if user["role"] not in ["department_admin", "teacher"]:
-        raise HTTPException(status_code=403, detail="Access reserved for Department Admins and Faculty.")
+    if user["role"] not in ["department_admin", "teacher", "dashboard_viewer"]:
+        raise HTTPException(status_code=403, detail="Access reserved for Department Admins, Faculty, and Dashboard Viewers.")
     return user
 
 def require_dept_admin(request: Request):
@@ -698,6 +698,15 @@ async def department_dashboard(
         all_queries = [dict(q) for q in cursor.fetchall()]
         open_queries_count = sum(1 for q in all_queries if q["status"] == "open")
 
+        # General Dashboard Accounts (Dashboard Viewers)
+        cursor.execute("""
+            SELECT id, user_id, full_name, email, department, designation, created_at, last_active_at
+            FROM users
+            WHERE role = 'dashboard_viewer'
+            ORDER BY created_at DESC
+        """)
+        dashboard_viewers = [dict(v) for v in cursor.fetchall()]
+
     return templates.TemplateResponse("department_dashboard.html", {
         "request": request,
         "user": user,
@@ -751,6 +760,7 @@ async def department_dashboard(
         # Integrations & Governance
         "course_breakdown": course_breakdown,
         "teachers": teachers_list,
+        "dashboard_viewers": dashboard_viewers,
         "students": student_rows,
         "branding": branding,
         "dashboard_permissions": dashboard_permissions,
@@ -850,6 +860,64 @@ async def add_teacher(
             raise e
 
     return RedirectResponse(url="/department?tab=teachers&teacher_added=1", status_code=303)
+
+@router.post("/department/teachers/delete/{teacher_user_id}")
+async def delete_teacher(request: Request, teacher_user_id: str):
+    admin = require_dept_admin(request)
+    clean_uid = teacher_user_id.strip()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, full_name FROM users WHERE user_id = ? AND role = 'teacher'", (clean_uid,))
+        t = cursor.fetchone()
+        if t:
+            cursor.execute("DELETE FROM users WHERE id = ?", (t["id"],))
+            log_audit(admin["id"], "DELETE_TEACHER", "users", clean_uid, f"Deleted faculty member {t['full_name']} ({clean_uid})", conn=conn)
+    return RedirectResponse(url="/department?tab=teachers&teacher_deleted=1", status_code=303)
+
+@router.post("/department/viewers/add")
+async def add_dashboard_viewer(
+    request: Request,
+    user_id: str = Form(...),
+    full_name: str = Form(...),
+    email: str = Form(None),
+    password: str = Form("viewer123")
+):
+    admin = require_dept_admin(request)
+    clean_uid = user_id.strip()
+    clean_name = full_name.strip()
+    clean_email = email.strip() if email and email.strip() else None
+    pass_hash = hash_password(password.strip())
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM system_settings WHERE key = 'department_name'")
+        dept_row = cursor.fetchone()
+        dept_name = dept_row[0] if dept_row and dept_row[0] else "Department Administration"
+        
+        try:
+            cursor.execute("""
+                INSERT INTO users (user_id, full_name, department, email, password_hash, role, must_change_password)
+                VALUES (?, ?, ?, ?, ?, 'dashboard_viewer', 0)
+            """, (clean_uid, clean_name, dept_name, clean_email, pass_hash))
+            log_audit(admin["id"], "ADD_VIEWER", "users", clean_uid, f"Created Dashboard Viewer account {clean_name} ({clean_uid})", conn=conn)
+        except Exception as e:
+            if "UNIQUE constraint failed: users.user_id" in str(e):
+                return RedirectResponse(url=f"/department?tab=teachers&error=User+ID+'{clean_uid}'+already+exists", status_code=303)
+            if "UNIQUE constraint failed: users.email" in str(e):
+                return RedirectResponse(url=f"/department?tab=teachers&error=Email+'{clean_email}'+already+in+use", status_code=303)
+            raise e
+
+    return RedirectResponse(url="/department?tab=teachers&viewer_added=1", status_code=303)
+
+@router.post("/department/viewers/delete/{viewer_user_id}")
+async def delete_dashboard_viewer(request: Request, viewer_user_id: str):
+    admin = require_dept_admin(request)
+    clean_uid = viewer_user_id.strip()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE user_id = ? AND role = 'dashboard_viewer'", (clean_uid,))
+        log_audit(admin["id"], "DELETE_VIEWER", "users", clean_uid, f"Deleted Dashboard Viewer account {clean_uid}", conn=conn)
+    return RedirectResponse(url="/department?tab=teachers&viewer_deleted=1", status_code=303)
 
 @router.post("/department/settings/update")
 async def update_branding_settings(
@@ -1353,7 +1421,7 @@ async def import_students_csv(
 async def register_single_student(
     request: Request,
     full_name: str = Form(...),
-    guardian_name: str = Form(...),
+    guardian_name: str = Form(""),
     school_name: str = Form(""),
     udise_code: str = Form(""),
     block: str = Form(""),
@@ -1368,7 +1436,7 @@ async def register_single_student(
 ):
     """
     Workflow A & B:
-    Teacher or Admin enters student's name and guardian name.
+    Teacher or Admin enters student's name and optional guardian name.
     System checks the Global Student Pool.
     If student exists: displays existing student ID with option to enrol.
     If conflict flagged: submits for administrative conflict review.
@@ -1377,10 +1445,10 @@ async def register_single_student(
     user = require_dept_admin_or_teacher(request)
     
     clean_name = full_name.strip()
-    clean_guardian = guardian_name.strip()
+    clean_guardian = guardian_name.strip() if guardian_name and guardian_name.strip() else "Not specified"
     
-    if not clean_name or not clean_guardian:
-        return RedirectResponse(url="/department?tab=students&error=Both+Student+Name+and+Guardian+Name+are+required", status_code=303)
+    if not clean_name:
+        return RedirectResponse(url="/department?tab=students&error=Student+Full+Name+is+required", status_code=303)
         
     norm_name = normalize_name(clean_name)
     norm_guardian = normalize_name(clean_guardian)
@@ -1401,7 +1469,7 @@ async def register_single_student(
             # If user specified a course, enrol the existing student into the course
             if course_id > 0:
                 cursor.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, ?)", (existing["id"], course_id))
-                log_audit(user["id"], "ENROLL_EXISTING", "users", existing["user_id"], f"Enrolled existing student {existing['user_id']} into course ID {course_id}")
+                log_audit(user["id"], "ENROLL_EXISTING", "users", existing["user_id"], f"Enrolled existing student {existing['user_id']} into course ID {course_id}", conn=conn)
                 return RedirectResponse(
                     url=f"/department?tab=students&msg=Student+already+exists+in+Global+Pool+(ID:+{existing['user_id']}).+Successfully+added+to+selected+course.",
                     status_code=303
@@ -1420,11 +1488,17 @@ async def register_single_student(
             """, (clean_name, clean_guardian, existing["user_id"], json.dumps({
                 "school": school_name, "district": district, "course_id": course_id, "registered_by": user["full_name"]
             })))
-            log_audit(user["id"], "FLAG_CONFLICT", "student_conflicts", existing["user_id"], f"Conflict flagged for {clean_name} / {clean_guardian}")
+            log_audit(user["id"], "FLAG_CONFLICT", "student_conflicts", existing["user_id"], f"Conflict flagged for {clean_name} / {clean_guardian}", conn=conn)
             return RedirectResponse(
                 url="/department?tab=students&msg=Student+record+flagged+for+Administrative+Conflict+Review.+Department+Head+will+review.",
                 status_code=303
             )
+
+        # Check if custom_student_id is specified and already exists
+        if custom_student_id.strip():
+            cursor.execute("SELECT id FROM users WHERE user_id = ?", (custom_student_id.strip(),))
+            if cursor.fetchone():
+                return RedirectResponse(url=f"/department?tab=students&error=Student+Login+ID+'{custom_student_id.strip()}'+already+taken.+Please+choose+another.", status_code=303)
 
         # Create new student record
         new_uid = custom_student_id.strip() if custom_student_id.strip() else generate_unique_student_id(cursor)
@@ -1449,9 +1523,54 @@ async def register_single_student(
         if course_id > 0:
             cursor.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, ?)", (new_id, course_id))
             
-        log_audit(user["id"], "REGISTER_STUDENT", "users", new_uid, f"Registered new student {clean_name} (ID: {new_uid})")
+        log_audit(user["id"], "REGISTER_STUDENT", "users", new_uid, f"Registered new student {clean_name} (ID: {new_uid})", conn=conn)
 
     return RedirectResponse(url=f"/department?tab=students&registered_id={new_uid}", status_code=303)
+
+@router.post("/department/students/delete-all")
+async def delete_all_students(request: Request):
+    admin = require_dept_admin(request)
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, user_id FROM users WHERE role = 'student'")
+        students = cursor.fetchall()
+        count = len(students)
+        if count > 0:
+            student_int_ids = [s["id"] for s in students]
+            student_str_ids = [s["user_id"] for s in students]
+            int_ph = ",".join("?" for _ in student_int_ids)
+            str_ph = ",".join("?" for _ in student_str_ids)
+            
+            cursor.execute(f"DELETE FROM enrollments WHERE user_id IN ({int_ph})", student_int_ids)
+            cursor.execute(f"DELETE FROM lesson_progress WHERE user_id IN ({int_ph})", student_int_ids)
+            cursor.execute(f"DELETE FROM quiz_attempts WHERE user_id IN ({int_ph})", student_int_ids)
+            cursor.execute(f"DELETE FROM support_queries WHERE user_id IN ({str_ph})", student_str_ids)
+            cursor.execute("DELETE FROM student_conflicts")
+            cursor.execute("DELETE FROM users WHERE role = 'student'")
+            
+            log_audit(admin["id"], "DELETE_ALL_STUDENTS", "users", "ALL", f"Deleted all {count} registered students and associated learning data.", conn=conn)
+
+    return RedirectResponse(url=f"/department?tab=students&deleted_all=1&count={count}", status_code=303)
+
+@router.post("/department/students/delete/{student_user_id}")
+async def delete_single_student(request: Request, student_user_id: str):
+    admin = require_dept_admin(request)
+    clean_uid = student_user_id.strip()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, full_name FROM users WHERE user_id = ? AND role = 'student'", (clean_uid,))
+        st = cursor.fetchone()
+        if st:
+            st_id = st["id"]
+            st_name = st["full_name"]
+            cursor.execute("DELETE FROM enrollments WHERE user_id = ?", (st_id,))
+            cursor.execute("DELETE FROM lesson_progress WHERE user_id = ?", (st_id,))
+            cursor.execute("DELETE FROM quiz_attempts WHERE user_id = ?", (st_id,))
+            cursor.execute("DELETE FROM support_queries WHERE user_id = ?", (clean_uid,))
+            cursor.execute("DELETE FROM users WHERE id = ?", (st_id,))
+            log_audit(admin["id"], "DELETE_STUDENT", "users", clean_uid, f"Deleted student record {st_name} ({clean_uid})", conn=conn)
+
+    return RedirectResponse(url=f"/department?tab=students&student_deleted={clean_uid}", status_code=303)
 
 @router.get("/api/students/check-duplicate")
 async def api_check_duplicate(name: str, guardian: str):

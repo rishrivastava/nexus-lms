@@ -18,7 +18,7 @@ async def login_page(request: Request):
             return RedirectResponse(url="/setup-account", status_code=303)
         if user["role"] == "teacher":
             return RedirectResponse(url="/teacher", status_code=303)
-        elif user["role"] == "department_admin":
+        elif user["role"] in ["department_admin", "dashboard_viewer"]:
             return RedirectResponse(url="/department", status_code=303)
         return RedirectResponse(url="/student", status_code=303)
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
@@ -51,7 +51,7 @@ async def login_action(
         target_url = "/setup-account"
     elif user["role"] == "teacher":
         target_url = "/teacher"
-    elif user["role"] == "department_admin":
+    elif user["role"] in ["department_admin", "dashboard_viewer"]:
         target_url = "/department"
 
     redirect = RedirectResponse(url=target_url, status_code=303)
@@ -114,7 +114,7 @@ async def setup_account_action(
     dest = "/student"
     if user["role"] == "teacher":
         dest = "/teacher"
-    elif user["role"] == "department_admin":
+    elif user["role"] in ["department_admin", "dashboard_viewer"]:
         dest = "/department"
         
     return RedirectResponse(url=dest, status_code=303)

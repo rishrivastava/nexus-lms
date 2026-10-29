@@ -80,8 +80,8 @@
             <span>Global Student Pool ({{ students|length }})</span>
         </button>
         <button onclick="switchTab('teachers')" id="tabBtn-teachers" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
-            <i class="fa-solid fa-chalkboard-user"></i>
-            <span>Faculty ({{ teachers|length }})</span>
+            <i class="fa-solid fa-users-gear"></i>
+            <span>Faculty & Accounts ({{ teachers|length + dashboard_viewers|length }})</span>
         </button>
         <button onclick="switchTab('queries')" id="tabBtn-queries" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-headset text-indigo-600"></i>
@@ -846,6 +846,13 @@
                 <div class="flex items-center space-x-2">
                     <input type="text" id="studentSearch" onkeyup="filterStudentTable()" placeholder="Search ID, Name, School..."
                         class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    {% if user.role == 'department_admin' %}
+                    <button onclick="openDeleteAllStudentsModal()"
+                        class="px-3.5 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-600 hover:text-white transition flex items-center space-x-1.5 shadow-xs">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Delete All Students</span>
+                    </button>
+                    {% endif %}
                     <button onclick="document.getElementById('registerStudentModal').classList.remove('hidden')"
                         class="px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
                         <i class="fa-solid fa-plus mr-1"></i> Register Single
@@ -866,7 +873,7 @@
                             <th class="px-4 py-3.5 text-center">Status</th>
                             <th class="px-4 py-3.5 text-center">Lessons</th>
                             <th class="px-4 py-3.5 text-center">Avg Quiz</th>
-                            <th class="px-4 py-3.5 text-right">Assign</th>
+                            <th class="px-4 py-3.5 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -897,10 +904,17 @@
                             <td class="px-4 py-3.5 text-center font-bold {% if s.avg_quiz_score >= 70 %}text-emerald-600{% elif s.avg_quiz_score > 0 %}text-amber-600{% else %}text-slate-400{% endif %}">
                                 {{ s.avg_quiz_score }}%
                             </td>
-                            <td class="px-4 py-3.5 text-right">
-                                <button onclick="openAssignCourseModalWithStudent('{{ s.user_id }}')" class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-bold hover:bg-indigo-100 transition">
+                            <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                                <button onclick="openAssignCourseModalWithStudent('{{ s.user_id }}')" class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-bold hover:bg-indigo-100 transition mr-1">
                                     Assign
                                 </button>
+                                {% if user.role == 'department_admin' %}
+                                <form action="/department/students/delete/{{ s.user_id }}" method="POST" class="inline" onsubmit="return confirm('Permanently delete student {{ s.full_name }} ({{ s.user_id }})? This action cannot be undone.');">
+                                    <button type="submit" title="Delete Student" class="px-2 py-1 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg text-[11px] font-bold transition">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -931,14 +945,23 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for t in teachers %}
                 <div class="p-4 bg-slate-50/60 rounded-2xl border border-slate-200/80 space-y-3">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-sm">
-                            {{ t.full_name[:2]|upper }}
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-sm">
+                                {{ t.full_name[:2]|upper }}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 text-xs">{{ t.full_name }}</h4>
+                                <span class="text-[10px] font-mono text-slate-400 block">{{ t.user_id }} &bull; {{ t.designation or 'Faculty' }}</span>
+                            </div>
                         </div>
-                        <div>
-                            <h4 class="font-bold text-slate-900 text-xs">{{ t.full_name }}</h4>
-                            <span class="text-[10px] font-mono text-slate-400 block">{{ t.user_id }} &bull; {{ t.designation or 'Faculty' }}</span>
-                        </div>
+                        {% if user.role == 'department_admin' %}
+                        <form action="/department/teachers/delete/{{ t.user_id }}" method="POST" onsubmit="return confirm('Remove faculty member {{ t.full_name }} ({{ t.user_id }})?');">
+                            <button type="submit" title="Remove Faculty Member" class="text-slate-400 hover:text-red-600 transition p-1">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </form>
+                        {% endif %}
                     </div>
                     <div class="text-[11px] text-slate-600 space-y-1">
                         <div>Department: <span class="font-semibold text-slate-800">{{ t.department }}</span></div>
@@ -951,6 +974,62 @@
                 </div>
                 {% endfor %}
             </div>
+        </div>
+
+        <!-- Section 2: General Dashboard Accounts (Dashboard Viewers) -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100 gap-3">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-base flex items-center">
+                        <i class="fa-solid fa-gauge-high text-purple-600 mr-2"></i> General Dashboard Accounts ({{ dashboard_viewers|length }})
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Dedicated read-only accounts for stakeholders, directors, and evaluators to inspect dashboards without edit rights.</p>
+                </div>
+                {% if user.role == 'department_admin' %}
+                <button onclick="document.getElementById('addViewerModal').classList.remove('hidden')"
+                    class="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700 transition shadow-sm flex items-center space-x-1.5">
+                    <i class="fa-solid fa-user-plus mr-1"></i>
+                    <span>Add Dashboard Account</span>
+                </button>
+                {% endif %}
+            </div>
+
+            {% if dashboard_viewers %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for v in dashboard_viewers %}
+                <div class="p-4 bg-purple-50/40 rounded-2xl border border-purple-100 space-y-3 relative group">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+                                {{ v.full_name[:2]|upper }}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 text-xs">{{ v.full_name }}</h4>
+                                <span class="text-[10px] font-mono text-purple-700 block font-bold">Login ID: {{ v.user_id }}</span>
+                            </div>
+                        </div>
+                        {% if user.role == 'department_admin' %}
+                        <form action="/department/viewers/delete/{{ v.user_id }}" method="POST" onsubmit="return confirm('Delete dashboard account {{ v.full_name }} ({{ v.user_id }})?');">
+                            <button type="submit" title="Delete Account" class="text-slate-400 hover:text-red-600 transition p-1">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    <div class="text-[11px] text-slate-600 space-y-1">
+                        <div>Role Scope: <span class="font-semibold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full text-[10px]">Read-Only Dashboards</span></div>
+                        <div>Email: <span class="font-mono text-slate-700">{{ v.email or 'N/A' }}</span></div>
+                        <div class="text-[10px] text-slate-400">Created: {{ v.created_at }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-slate-100">
+                <i class="fa-solid fa-id-card-clip text-2xl block mb-2 text-slate-300"></i>
+                No general dashboard accounts created yet. Department Admin can create dedicated accounts with login and password for dashboard viewing.
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -1937,6 +2016,29 @@ in
 
         <form action="/department/students/register-single" method="POST" id="singleStudentForm" class="space-y-3">
             <input type="hidden" name="flag_conflict" id="flagConflictInput" value="0">
+            
+            <!-- Account Credentials for Student -->
+            <div class="p-3 bg-indigo-50/70 border border-indigo-100 rounded-2xl space-y-2">
+                <div class="flex items-center space-x-1.5 text-indigo-900 font-bold text-xs">
+                    <i class="fa-solid fa-key text-indigo-600"></i>
+                    <span>Login Credentials (Student can change password later)</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Student Login ID</label>
+                        <input type="text" name="custom_student_id" placeholder="Auto-generated if empty"
+                            class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono uppercase bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <span class="text-[10px] text-slate-400 block mt-0.5">e.g. STU-2026-001</span>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Initial Password</label>
+                        <input type="text" name="default_password" value="welcome123" required
+                            class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <span class="text-[10px] text-indigo-600 block mt-0.5">Student will change on 1st login</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Student Full Name *</label>
@@ -1944,8 +2046,8 @@ in
                         class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Father's / Guardian Name *</label>
-                    <input type="text" name="guardian_name" id="regGuardianName" required placeholder="e.g. Amit Kumar" onblur="checkDuplicateStudent()"
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Father's / Guardian Name (Optional)</label>
+                    <input type="text" name="guardian_name" id="regGuardianName" placeholder="e.g. Amit Kumar" onblur="checkDuplicateStudent()"
                         class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
             </div>
@@ -2132,6 +2234,107 @@ in
     </div>
 </div>
 
+<!-- Modal: Add General Dashboard Account -->
+<div id="addViewerModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-gauge-high text-purple-600 mr-2"></i> Add General Dashboard Account
+            </h3>
+            <button onclick="document.getElementById('addViewerModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="p-3 bg-purple-50 border border-purple-100 rounded-xl text-xs text-purple-800 space-y-1">
+            <div class="font-bold flex items-center"><i class="fa-solid fa-circle-info mr-1.5 text-purple-600"></i> Read-Only Dashboard Account</div>
+            <p class="text-[11px] text-purple-700 leading-snug">
+                This account can log in and view the Overview, Subject Participation, and Subject Content dashboards without access to edit courses, delete students, or alter branding.
+            </p>
+        </div>
+
+        <form action="/department/viewers/add" method="POST" class="space-y-3">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Account / Login ID *</label>
+                <input type="text" name="user_id" required placeholder="e.g. VIEWER-01, DIRECTOR, AUDITOR"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs uppercase font-mono focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Full Name / Stakeholder Title *</label>
+                <input type="text" name="full_name" required placeholder="e.g. Dean of Academic Quality"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Email Address (Optional)</label>
+                <input type="email" name="email" placeholder="director@organization.edu"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Login Password *</label>
+                <input type="text" name="password" value="viewer123" required
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('addViewerModal').classList.add('hidden')"
+                    class="px-3.5 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700 transition">
+                    Create Dashboard Account
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Delete All Students Confirmation -->
+<div id="deleteAllStudentsModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-100 space-y-4">
+        <div class="flex items-center space-x-3 text-red-600">
+            <div class="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-xl shrink-0">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 text-base">Delete All Students?</h4>
+                <p class="text-xs text-red-600 font-semibold">Irreversible Administrative Action</p>
+            </div>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">
+            This will permanently remove <strong>all registered students ({{ students|length }})</strong> from the Global Student Pool along with their enrolled courses, quiz attempts, and learning progress.
+        </p>
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1">
+            <div class="flex items-center text-emerald-700 font-semibold"><i class="fa-solid fa-check mr-2"></i> Faculty accounts preserved</div>
+            <div class="flex items-center text-emerald-700 font-semibold"><i class="fa-solid fa-check mr-2"></i> Department courses & lessons preserved</div>
+            <div class="flex items-center text-emerald-700 font-semibold"><i class="fa-solid fa-check mr-2"></i> Admin & governance settings preserved</div>
+        </div>
+
+        <form action="/department/students/delete-all" method="POST" class="space-y-3 pt-2">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">
+                    To confirm, please type <code class="bg-red-50 text-red-700 px-1 py-0.5 rounded font-mono">DELETE ALL</code> below:
+                </label>
+                <input type="text" id="confirmDeleteAllInput" oninput="checkConfirmDeleteAll()" placeholder="DELETE ALL" required
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-red-500 focus:outline-none">
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2">
+                <button type="button" onclick="closeDeleteAllStudentsModal()"
+                    class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" id="confirmDeleteAllBtn" disabled
+                    class="px-5 py-2 bg-red-600 text-white rounded-xl text-xs font-bold opacity-50 cursor-not-allowed hover:bg-red-700 transition">
+                    Permanently Delete All Students
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 // Tab Switching
 function switchTab(tabId) {
@@ -2208,6 +2411,60 @@ if (urlParams.has('teacher_added')) {
     if (duplicates > 0) msg += `, <strong>${duplicates}</strong> duplicates skipped`;
     if (rejected > 0) msg += ` &bull; <a href="/department/download-rejected-report" class="underline font-bold text-red-700 ml-1">Download Rejected Report</a>`;
     alertText.innerHTML = msg;
+} else if (urlParams.has('deleted_all')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-red-50 border-red-200 text-xs text-red-800 flex items-center justify-between";
+    alertText.innerHTML = `<i class="fa-solid fa-trash-can mr-2 text-red-600"></i> Successfully deleted all <strong>${urlParams.get('count') || ''}</strong> student records and learning data from Global Student Pool.`;
+} else if (urlParams.has('student_deleted')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-slate-50 border-slate-200 text-xs text-slate-800 flex items-center justify-between";
+    alertText.innerHTML = `<i class="fa-solid fa-trash-can mr-2 text-slate-600"></i> Student account <strong>${urlParams.get('student_deleted')}</strong> was successfully removed.`;
+} else if (urlParams.has('viewer_added')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-purple-50 border-purple-200 text-xs text-purple-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-purple-600"></i> General Dashboard Account created successfully!';
+} else if (urlParams.has('viewer_deleted')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-slate-50 border-slate-200 text-xs text-slate-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-trash-can mr-2 text-slate-600"></i> Dashboard viewer account was removed.';
+} else if (urlParams.has('teacher_deleted')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-slate-50 border-slate-200 text-xs text-slate-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-trash-can mr-2 text-slate-600"></i> Faculty member was removed.';
+} else if (urlParams.has('error')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-red-50 border-red-200 text-xs text-red-800 flex items-center justify-between";
+    alertText.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2 text-red-600"></i> ${urlParams.get('error')}`;
+}
+
+// Delete All Students Modal Controls
+function openDeleteAllStudentsModal() {
+    const input = document.getElementById('confirmDeleteAllInput');
+    if (input) input.value = '';
+    const btn = document.getElementById('confirmDeleteAllBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+    const modal = document.getElementById('deleteAllStudentsModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeDeleteAllStudentsModal() {
+    const modal = document.getElementById('deleteAllStudentsModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function checkConfirmDeleteAll() {
+    const val = document.getElementById('confirmDeleteAllInput').value.trim();
+    const btn = document.getElementById('confirmDeleteAllBtn');
+    if (val === 'DELETE ALL') {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
 }
 
 // Live Duplicate Student Check
