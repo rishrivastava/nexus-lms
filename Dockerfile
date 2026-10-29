@@ -15,5 +15,5 @@ COPY . .
 # Expose standard port
 EXPOSE 8000
 
-# Run FastAPI with uvicorn bound to 0.0.0.0
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run FastAPI with uvicorn bound to dynamic PORT or 8000
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

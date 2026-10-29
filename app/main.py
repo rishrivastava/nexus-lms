@@ -49,3 +49,8 @@ async def root(request: Request):
         return RedirectResponse(url="/department", status_code=303)
     else:
         return RedirectResponse(url="/student", status_code=303)
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
