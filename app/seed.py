@@ -33,11 +33,11 @@ def seed_data():
         # 3. Insert Students (with default temporary passwords and must_change_password = 1)
         student_pass = hash_password("welcome123")
         students = [
-            ("CS2026-001", "Aarav Sharma", "Computer Science"),
-            ("CS2026-002", "Priya Patel", "Computer Science"),
-            ("CS2026-003", "Rohan Mehta", "Computer Science"),
-            ("CS2026-004", "Ananya Verma", "Computer Science"),
-            ("CS2026-005", "Devansh Rao", "Computer Science")
+            ("CS2026-001", "Aarav Sharma", "Foreign Language"),
+            ("CS2026-002", "Priya Patel", "Foreign Language"),
+            ("CS2026-003", "Rohan Mehta", "Foreign Language"),
+            ("CS2026-004", "Ananya Verma", "Foreign Language"),
+            ("CS2026-005", "Devansh Rao", "Foreign Language")
         ]
         
         student_ids = []

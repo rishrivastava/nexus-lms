@@ -58,6 +58,19 @@ def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
             user_dict = dict(user)
             # Remove sensitive password hash from session user object
             user_dict.pop("password_hash", None)
+            
+            if user_dict.get("role") == "student":
+                cursor.execute("""
+                    SELECT c.id, c.code, c.title
+                    FROM enrollments e
+                    JOIN courses c ON e.course_id = c.id
+                    WHERE e.user_id = ? AND c.status != 'deleted'
+                    ORDER BY e.enrolled_at DESC
+                """, (user_dict["id"],))
+                courses = [dict(c) for c in cursor.fetchall()]
+                user_dict["enrolled_courses"] = courses
+                user_dict["enrolled_courses_summary"] = ", ".join(c["title"] for c in courses) if courses else ""
+                
             return user_dict
     return None
 

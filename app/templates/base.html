@@ -134,7 +134,7 @@
                             <a href="/profile" class="flex items-center space-x-2 hover:opacity-85 transition group" title="View Profile">
                                 <div class="text-right hidden md:block">
                                     <p class="text-xs sm:text-sm font-bold text-slate-900 leading-tight group-hover:text-indigo-600 transition">{{ user.full_name }}</p>
-                                    <p class="text-[11px] text-slate-500 font-medium">ID: {{ user.user_id }} &bull; <span class="capitalize font-semibold {% if user.role == 'department_admin' %}text-indigo-600{% elif user.role == 'teacher' %}text-sky-600{% else %}text-slate-600{% endif %}">{{ user.designation or user.role.replace('_', ' ') }}</span></p>
+                                    <p class="text-[11px] text-slate-500 font-medium">ID: {{ user.user_id }} &bull; <span class="capitalize font-semibold {% if user.role == 'department_admin' %}text-indigo-600{% elif user.role == 'teacher' %}text-sky-600{% else %}text-slate-600{% endif %}">{{ user.designation or user.role.replace('_', ' ') }}</span>{% if user.role == 'student' and user.enrolled_courses_summary %} &bull; <span class="text-indigo-600 font-medium hidden xl:inline" title="Enrolled: {{ user.enrolled_courses_summary }}">{{ user.enrolled_courses_summary }}</span>{% endif %}</p>
                                 </div>
                                 <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs sm:text-sm group-hover:border-indigo-300 transition">
                                     {{ user.full_name[0] }}

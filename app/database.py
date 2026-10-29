@@ -377,11 +377,11 @@ def init_db():
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (k, v))
 
-        # Ensure admin user department matches current department_name if available
+        # Ensure user department matches current department_name where still default Computer Science or NULL
         cursor.execute("SELECT value FROM system_settings WHERE key = 'department_name'")
         dept_row = cursor.fetchone()
         if dept_row and dept_row[0]:
-            cursor.execute("UPDATE users SET department = ? WHERE role = 'department_admin' AND (department = 'Computer Science' OR department IS NULL)", (dept_row[0],))
+            cursor.execute("UPDATE users SET department = ? WHERE department = 'Computer Science' OR department IS NULL", (dept_row[0],))
 
 def get_system_settings() -> dict:
     with get_db() as conn:

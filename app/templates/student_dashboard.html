@@ -9,8 +9,17 @@
     <div class="bg-gradient-to-r from-indigo-700 via-indigo-800 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl mb-8 relative overflow-hidden">
         <div class="relative z-10 max-w-3xl">
             <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/30 text-indigo-200 text-xs font-semibold backdrop-blur-sm mb-3">
-                <i class="fa-solid fa-building-columns"></i>
-                <span>{{ user.department }} &bull; {{ brand.institution_name }}</span>
+                <i class="fa-solid fa-graduation-cap"></i>
+                <span>
+                    {% if courses %}
+                        Enrolled in: {{ courses|map(attribute='title')|join(', ') }}
+                    {% elif user.enrolled_courses_summary %}
+                        Enrolled in: {{ user.enrolled_courses_summary }}
+                    {% else %}
+                        {{ brand.department_name }}
+                    {% endif %}
+                    &bull; {{ brand.institution_name }}
+                </span>
             </div>
             <h1 class="text-3xl font-bold tracking-tight">Welcome back, {{ user.full_name }}!</h1>
             <p class="mt-2 text-indigo-100 text-sm sm:text-base">
