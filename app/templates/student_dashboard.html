@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}My Learning Dashboard - {{ get_branding()['platform_name'] }}{% endblock %}
+
+{% block content %}
+{% set brand = get_branding() %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Welcome Header -->
+    <div class="bg-gradient-to-r from-indigo-700 via-indigo-800 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl mb-8 relative overflow-hidden">
+        <div class="relative z-10 max-w-3xl">
+            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/30 text-indigo-200 text-xs font-semibold backdrop-blur-sm mb-3">
+                <i class="fa-solid fa-building-columns"></i>
+                <span>{{ user.department }} &bull; {{ brand.institution_name }}</span>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight">Welcome back, {{ user.full_name }}!</h1>
+            <p class="mt-2 text-indigo-100 text-sm sm:text-base">
+                {{ brand.welcome_message }}
+            </p>
+        </div>
+        <!-- Decorative bg circle -->
+        <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/20 rounded-full blur-2xl"></div>
+    </div>
+
+    <!-- Courses Section -->
+    <div class="mb-6 flex justify-between items-center">
+        <div>
+            <h2 class="text-xl font-bold text-slate-900">Enrolled Courses</h2>
+            <p class="text-xs text-slate-500">Self-paced modules assigned to your department</p>
+        </div>
+        <span class="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+            {{ courses|length }} Course{{ 's' if courses|length != 1 else '' }}
+        </span>
+    </div>
+
+    {% if courses %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for course in courses %}
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition flex flex-col">
+                <div class="h-44 w-full bg-slate-100 relative overflow-hidden">
+                    <img src="{{ course.thumbnail_url }}" alt="{{ course.title }}" class="w-full h-full object-cover">
+                    <span class="absolute top-3 left-3 px-2.5 py-1 bg-slate-900/80 backdrop-blur-sm text-white font-mono text-xs font-bold rounded-md">
+                        {{ course.code }}
+                    </span>
+                    {% if course.progress_percent == 100 %}
+                    <span class="absolute top-3 right-3 px-2.5 py-1 bg-emerald-500 text-white text-xs font-bold rounded-md shadow-sm">
+                        <i class="fa-solid fa-circle-check mr-1"></i> Completed
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-indigo-600 mb-1">Instructor: {{ course.teacher_name }}</p>
+                        <h3 class="text-lg font-bold text-slate-900 leading-snug line-clamp-2 mb-2">{{ course.title }}</h3>
+                        <p class="text-xs text-slate-500 line-clamp-2 mb-4">{{ course.description }}</p>
+                    </div>
+
+                    <div>
+                        <!-- Progress Bar -->
+                        <div class="space-y-1.5 mb-4">
+                            <div class="flex justify-between text-xs font-medium text-slate-600">
+                                <span>Progress</span>
+                                <span class="font-bold text-slate-900">{{ course.progress_percent }}%</span>
+                            </div>
+                            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-indigo-600 rounded-full transition-all duration-500" style="width: {{ course.progress_percent }}%"></div>
+                            </div>
+                            <p class="text-[11px] text-slate-400">
+                                {{ course.completed_lessons }} of {{ course.total_lessons }} lessons finished
+                            </p>
+                        </div>
+
+                        <!-- Action Button -->
+                        <a href="/course/{{ course.id }}" class="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition shadow-sm {% if course.progress_percent == 100 %}bg-slate-100 text-slate-700 hover:bg-slate-200{% else %}bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100{% endif %}">
+                            <span>{% if course.progress_percent == 0 %}Start Course{% elif course.progress_percent == 100 %}Review Course{% else %}Continue Learning{% endif %}</span>
+                            <i class="fa-solid fa-arrow-right text-xs"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto">
+            <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="fa-solid fa-book text-xl"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 text-base">No Enrolled Courses Yet</h3>
+            <p class="text-xs text-slate-500 mt-1">Your department administrator or teacher will assign courses to your batch shortly.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

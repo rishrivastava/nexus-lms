@@ -1,0 +1,33 @@
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+
+# IDE configurations
+.idea/
+.vscode/
+
+# SQLite journal & temporary files
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Static uploads directory (keep .gitkeep)
+app/static/uploads/*
+!app/static/uploads/.gitkeep

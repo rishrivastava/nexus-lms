@@ -1,0 +1,2037 @@
+{% extends "base.html" %}
+
+{% block title %}Admin & Department Command Center - {{ branding.platform_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <!-- Top Action & Navigation Banner -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+        <div>
+            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
+                <i class="fa-solid fa-building-columns"></i>
+                <span>{{ branding.institution_name }} &bull; Department Governance</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight" style="font-family: var(--font-heading)">
+                {{ branding.department_name or branding.platform_name }}
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+                Centralised Department Administration, 3-Tier Academic Analytics, Curriculum Control & Power BI Integration.
+            </p>
+        </div>
+
+        <!-- Quick Actions Bar -->
+        <div class="flex flex-wrap items-center gap-2">
+            {% if user.role == 'department_admin' %}
+            <button onclick="document.getElementById('registerStudentModal').classList.remove('hidden')"
+                class="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-indigo-300 shadow-sm transition">
+                <i class="fa-solid fa-user-plus text-indigo-600"></i>
+                <span>Add Student</span>
+            </button>
+            <button onclick="document.getElementById('importStudentsModal').classList.remove('hidden')"
+                class="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-indigo-300 shadow-sm transition">
+                <i class="fa-solid fa-file-arrow-up text-sky-600"></i>
+                <span>Import CSV / Excel</span>
+            </button>
+            <button onclick="document.getElementById('addTeacherModal').classList.remove('hidden')"
+                class="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-indigo-300 shadow-sm transition">
+                <i class="fa-solid fa-chalkboard-user text-emerald-600"></i>
+                <span>Add Faculty</span>
+            </button>
+            <button onclick="switchTab('governance')"
+                class="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm transition">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Governance & Branding</span>
+            </button>
+            {% endif %}
+            <a href="/department/export-csv?department={{ selected_dept or 'all' }}"
+                class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition">
+                <i class="fa-solid fa-download"></i>
+                <span>Export Roster (CSV)</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Feedback & Status Notification Banner -->
+    <div id="statusAlert" class="hidden p-4 rounded-2xl border text-xs flex items-center justify-between">
+        <span id="statusAlertText"></span>
+        <button onclick="document.getElementById('statusAlert').classList.add('hidden')" class="font-bold text-base">&times;</button>
+    </div>
+
+    <!-- Main Navigation Tabs Bar -->
+    <div class="border-b border-slate-200 flex overflow-x-auto space-x-2 sm:space-x-4 text-xs font-bold scrollbar-none">
+        <button onclick="switchTab('overview')" id="tabBtn-overview" class="tab-btn pb-3 px-2.5 border-b-2 border-indigo-600 text-indigo-600 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-chart-pie"></i>
+            <span>Overview Dashboard</span>
+        </button>
+        <button onclick="switchTab('participation')" id="tabBtn-participation" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-users-viewfinder"></i>
+            <span>Subject Participation</span>
+        </button>
+        <button onclick="switchTab('content')" id="tabBtn-content" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>Subject Content</span>
+        </button>
+        <button onclick="switchTab('courses')" id="tabBtn-courses" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-book-bookmark"></i>
+            <span>Course Management</span>
+        </button>
+        <button onclick="switchTab('students')" id="tabBtn-students" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-database"></i>
+            <span>Global Student Pool ({{ students|length }})</span>
+        </button>
+        <button onclick="switchTab('teachers')" id="tabBtn-teachers" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-chalkboard-user"></i>
+            <span>Faculty ({{ teachers|length }})</span>
+        </button>
+        {% if user.role == 'department_admin' %}
+        <button onclick="switchTab('integrations')" id="tabBtn-integrations" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-chart-line text-amber-500"></i>
+            <span>Power BI & Integrations</span>
+        </button>
+        <button onclick="switchTab('governance')" id="tabBtn-governance" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-sliders text-amber-500"></i>
+            <span>Governance & Branding</span>
+        </button>
+        <button onclick="switchTab('conflicts')" id="tabBtn-conflicts" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-user-shield"></i>
+            <span>Conflicts {% if student_conflicts %}<span class="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px]">{{ student_conflicts|length }}</span>{% endif %}</span>
+        </button>
+        <button onclick="switchTab('audit')" id="tabBtn-audit" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            <span>Audit Trail</span>
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- DASHBOARD 1: OVERVIEW DASHBOARD (12 KPI CARDS & TRENDS)   -->
+    <!-- ========================================================= -->
+    <div id="tab-overview" class="tab-content space-y-6">
+        <!-- Filter Bar -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-filter text-indigo-600"></i>
+                <span class="font-bold text-slate-700">Filter Scope:</span>
+                <select onchange="location.href='/department?tab=overview&department=' + this.value" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-indigo-500">
+                    <option value="all">All Districts & Schools (Global)</option>
+                    {% for d in districts %}
+                    <option value="{{ d }}" {% if selected_dept == d %}selected{% endif %}>District: {{ d }}</option>
+                    {% endfor %}
+                    {% for s in schools %}
+                    <option value="{{ s }}" {% if selected_dept == s %}selected{% endif %}>School: {{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center space-x-2 text-slate-500 text-[11px]">
+                <span>Real-time DB Sync</span>
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-mono text-emerald-700 font-bold">Live Activity Engine</span>
+            </div>
+        </div>
+
+        <!-- 12 Primary KPI Metric Cards Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <!-- 1. Total Registered Students -->
+            <div onclick="switchTab('students')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-indigo-600">Total Registered</span>
+                    <i class="fa-solid fa-id-card text-indigo-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_total_students }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Global Student Pool</p>
+            </div>
+
+            <!-- 2. Active Student Accounts -->
+            <div onclick="switchTab('students')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-emerald-600">Active Accounts</span>
+                    <i class="fa-solid fa-user-check text-emerald-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_active_accounts }}</p>
+                <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">Password activated</p>
+            </div>
+
+            <!-- 3. Total Enrolled Students -->
+            <div onclick="switchTab('participation')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-sky-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-sky-600">Enrolled Learners</span>
+                    <i class="fa-solid fa-graduation-cap text-sky-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_enrolled_students }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Assigned to courses</p>
+            </div>
+
+            <!-- 4. Total Teachers -->
+            <div onclick="switchTab('teachers')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-purple-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-purple-600">Faculty / Teachers</span>
+                    <i class="fa-solid fa-chalkboard-user text-purple-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_total_teachers }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Course authors</p>
+            </div>
+
+            <!-- 5. Total Subjects -->
+            <div onclick="switchTab('participation')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-amber-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-amber-600">Total Subjects</span>
+                    <i class="fa-solid fa-shapes text-amber-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_total_subjects }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Academic streams</p>
+            </div>
+
+            <!-- 6. Total Courses -->
+            <div onclick="switchTab('courses')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-indigo-600">Total Courses</span>
+                    <i class="fa-solid fa-book text-indigo-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_total_courses }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Published curricula</p>
+            </div>
+
+            <!-- 7. Total Course Enrolments -->
+            <div onclick="switchTab('courses')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-teal-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-teal-600">Course Enrolments</span>
+                    <i class="fa-solid fa-rectangle-list text-teal-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_total_enrollments }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Total seat allocations</p>
+            </div>
+
+            <!-- 8. Average Quiz Score -->
+            <div onclick="switchTab('participation')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-indigo-600">Avg Quiz Score</span>
+                    <i class="fa-solid fa-chart-line text-indigo-600"></i>
+                </div>
+                <p class="text-2xl font-black {% if kpi_avg_quiz_score >= 70 %}text-emerald-600{% elif kpi_avg_quiz_score > 0 %}text-amber-600{% else %}text-slate-900{% endif %}">
+                    {{ kpi_avg_quiz_score }}%
+                </p>
+                <p class="text-[10px] text-slate-400 mt-0.5">{{ quiz_total_attempts }} total attempts</p>
+            </div>
+
+            <!-- 9. Average Time Spent -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500">Avg Time on LMS</span>
+                    <i class="fa-regular fa-clock text-amber-500"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_avg_time_spent }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Per active student</p>
+            </div>
+
+            <!-- 10. Total Learning Resources -->
+            <div onclick="switchTab('content')" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-sky-300 cursor-pointer transition group">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500 group-hover:text-sky-600">Learning Resources</span>
+                    <i class="fa-solid fa-photo-film text-sky-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_total_resources }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">PDFs, Videos & Quizzes</p>
+            </div>
+
+            <!-- 11. Overall Course Completion Rate -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between text-slate-400 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-500">Completion Rate</span>
+                    <i class="fa-solid fa-award text-purple-600"></i>
+                </div>
+                <p class="text-2xl font-black text-slate-900">{{ kpi_completion_rate }}%</p>
+                <p class="text-[10px] text-purple-600 font-semibold mt-0.5">{{ total_course_completions }} courses finished</p>
+            </div>
+
+            <!-- 12. Students Active Right Now -->
+            <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-2xl text-white shadow-sm relative overflow-hidden">
+                <div class="flex items-center justify-between text-emerald-100 mb-1.5">
+                    <span class="text-[11px] font-semibold">Active Right Now</span>
+                    <span class="flex h-2.5 w-2.5 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                    </span>
+                </div>
+                <p class="text-3xl font-black tracking-tight text-white">{{ kpi_live_students_now }}</p>
+                <p class="text-[10px] text-emerald-100 mt-0.5">&le; 5 min heartbeat</p>
+            </div>
+        </div>
+
+        <!-- Academic Health, Trends & Subject Performance Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Top Performing & Attention Subjects -->
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center justify-between">
+                    <span class="flex items-center"><i class="fa-solid fa-trophy text-amber-500 mr-2"></i> Top Performing Subjects</span>
+                    <span class="text-[11px] text-slate-400">By Avg Score</span>
+                </h3>
+                <div class="space-y-2.5">
+                    {% for subj in top_performing_subjects %}
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <span class="font-bold text-xs text-slate-800 block">{{ subj.subject_name }}</span>
+                            <span class="text-[11px] text-slate-400">{{ subj.unique_students }} students &bull; {{ subj.courses_count }} courses</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-extrabold text-sm text-emerald-600">{{ subj.avg_quiz_score }}%</span>
+                            <span class="block text-[10px] text-slate-400">{{ subj.completion_rate }}% finished</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="pt-3 border-t border-slate-100">
+                    <h4 class="font-bold text-slate-800 text-xs flex items-center mb-2.5 text-amber-800">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-500 mr-1.5"></i> Subjects Requiring Academic Attention
+                    </h4>
+                    <div class="space-y-2">
+                        {% for subj in attention_subjects %}
+                        <div class="p-2.5 bg-amber-50/60 rounded-xl border border-amber-200/60 flex items-center justify-between text-xs">
+                            <span class="font-semibold text-slate-800">{{ subj.subject_name }}</span>
+                            <div class="text-right text-[11px]">
+                                <span class="font-bold text-amber-700">{{ subj.avg_quiz_score }}% score</span>
+                                <span class="text-slate-500 ml-1">({{ subj.not_started_count }} not started)</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student Registration & Account Activation Trends -->
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center justify-between">
+                    <span class="flex items-center"><i class="fa-solid fa-chart-column text-indigo-600 mr-2"></i> Registration Trends</span>
+                    <span class="text-[11px] text-slate-400">Monthly</span>
+                </h3>
+                
+                <div class="space-y-3">
+                    {% for trend in registration_trends %}
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold mb-1">
+                            <span class="text-slate-600 font-mono">{{ trend.month_label or 'Current' }}</span>
+                            <span class="text-indigo-600 font-bold">{{ trend.reg_count }} Registered</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            {% set pct = ((trend.reg_count / kpi_total_students * 100)|round) if kpi_total_students > 0 else 0 %}
+                            <div class="h-full bg-indigo-600 rounded-full" style="width: {{ pct }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="pt-4 border-t border-slate-100">
+                    <div class="p-3 bg-indigo-50/60 rounded-2xl border border-indigo-100 space-y-1.5 text-xs">
+                        <div class="flex justify-between font-bold text-slate-800">
+                            <span>Account Activation Health</span>
+                            <span class="text-indigo-600">
+                                {% set act_rate = ((kpi_active_accounts / kpi_total_students * 100)|round) if kpi_total_students > 0 else 0 %}
+                                {{ act_rate }}%
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-slate-500">
+                            {{ kpi_active_accounts }} out of {{ kpi_total_students }} learners have securely reset their temporary password and activated their accounts.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Academic Activity Stream -->
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center justify-between">
+                    <span class="flex items-center"><i class="fa-solid fa-bolt text-indigo-600 mr-2"></i> Recent Activity Stream</span>
+                    <button onclick="switchTab('audit')" class="text-[11px] text-indigo-600 hover:underline">View All</button>
+                </h3>
+                <div class="space-y-3 overflow-y-auto max-h-72 pr-1">
+                    {% for a in audit_logs[:6] %}
+                    <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                        <div class="flex justify-between items-center mb-0.5">
+                            <span class="font-bold text-slate-800">{{ a.action }}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">{{ a.created_at[:16] }}</span>
+                        </div>
+                        <p class="text-slate-500 text-[11px] line-clamp-1">{{ a.details }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- DASHBOARD 2: SUBJECT PARTICIPATION DASHBOARD (TABLE & DRILL-DOWN)   -->
+    <!-- =================================================================== -->
+    <div id="tab-participation" class="tab-content hidden space-y-6">
+        <!-- Subject Participation Table & Controls -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-base flex items-center">
+                        <i class="fa-solid fa-users-viewfinder text-indigo-600 mr-2"></i> Subject Enrolment & Performance Matrix
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Real database metrics comparing engagement, active students, and quiz pass rates across subjects.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <a href="/department/export-subject-csv?subject=all" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition">
+                        <i class="fa-solid fa-file-csv text-indigo-600"></i>
+                        <span>Export Subject CSV</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                    <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <tr>
+                            <th class="px-5 py-3.5">Subject</th>
+                            <th class="px-4 py-3.5 text-center">Courses</th>
+                            <th class="px-4 py-3.5 text-center">Unique Students</th>
+                            <th class="px-4 py-3.5 text-center">Total Enrolments</th>
+                            <th class="px-4 py-3.5 text-center">Live (&le; 5m)</th>
+                            <th class="px-4 py-3.5 text-center">Active (24h)</th>
+                            <th class="px-4 py-3.5 text-center">Avg Quiz</th>
+                            <th class="px-4 py-3.5 text-center">Avg Time</th>
+                            <th class="px-4 py-3.5 text-center">Completion Rate</th>
+                            <th class="px-4 py-3.5 text-center">Not Started</th>
+                            <th class="px-4 py-3.5 text-right">Drill-Down</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for row in subject_participation_table %}
+                        <tr class="hover:bg-slate-50/80 transition {% if row.subject_name == active_subject %}bg-indigo-50/40{% endif %}">
+                            <td class="px-5 py-3.5 font-bold text-slate-900 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
+                                <span>{{ row.subject_name }}</span>
+                            </td>
+                            <td class="px-4 py-3.5 text-center font-bold text-slate-700">{{ row.courses_count }}</td>
+                            <td class="px-4 py-3.5 text-center font-bold text-slate-900 bg-slate-50/60">{{ row.unique_students }}</td>
+                            <td class="px-4 py-3.5 text-center text-slate-600">{{ row.total_enrollments }}</td>
+                            <td class="px-4 py-3.5 text-center">
+                                <span class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-bold {% if row.live_students_now > 0 %}bg-emerald-50 text-emerald-700 border border-emerald-200{% else %}bg-slate-50 text-slate-400{% endif %}">
+                                    <span class="w-1.5 h-1.5 rounded-full {% if row.live_students_now > 0 %}bg-emerald-500 animate-pulse{% else %}bg-slate-300{% endif %}"></span>
+                                    <span>{{ row.live_students_now }}</span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5 text-center text-slate-700 font-semibold">{{ row.active_period_students }}</td>
+                            <td class="px-4 py-3.5 text-center font-bold {% if row.avg_quiz_score >= 70 %}text-emerald-600{% elif row.avg_quiz_score > 0 %}text-amber-600{% else %}text-slate-400{% endif %}">
+                                {{ row.avg_quiz_score }}%
+                            </td>
+                            <td class="px-4 py-3.5 text-center font-bold text-indigo-600">{{ row.avg_time_str }}</td>
+                            <td class="px-4 py-3.5 text-center">
+                                <span class="px-2 py-0.5 rounded-lg font-bold text-xs bg-slate-100 text-slate-800">{{ row.completion_rate }}%</span>
+                            </td>
+                            <td class="px-4 py-3.5 text-center">
+                                <span class="text-amber-700 font-semibold">{{ row.not_started_count }}</span>
+                            </td>
+                            <td class="px-4 py-3.5 text-right">
+                                <a href="/department?tab=participation&subject={{ row.subject_name }}"
+                                    class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold {% if row.subject_name == active_subject %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700{% endif %} transition">
+                                    <span>Inspect</span>
+                                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Dedicated Subject Drill-Down Header -->
+        <div class="bg-gradient-to-r from-slate-900 to-indigo-950 p-6 rounded-3xl text-white shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <span class="px-2.5 py-0.5 rounded-full bg-white/20 text-white font-mono text-[11px] font-bold uppercase">
+                    Subject Drill-Down
+                </span>
+                <h3 class="text-xl font-black mt-1">{{ active_subject }}</h3>
+                <p class="text-xs text-slate-300 mt-0.5">Top 10 and Bottom 10 Ranked Students (Filtered for minimum 1 attempt requirement).</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <a href="/department/export-subject-csv?subject={{ active_subject }}" class="px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold text-white transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                    <span>Export {{ active_subject }} CSV</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Top 10 & Bottom 10 Students Ranking Tables -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Top 10 Students Ranking Table -->
+            <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+                <div class="p-4 bg-emerald-50/70 border-b border-emerald-100 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-xs">
+                            <i class="fa-solid fa-arrow-trend-up"></i>
+                        </span>
+                        <div>
+                            <h4 class="font-bold text-emerald-950 text-xs">Top 10 Ranked Students</h4>
+                            <p class="text-[10px] text-emerald-700">Minimum 1 quiz attempt requirement satisfied</p>
+                        </div>
+                    </div>
+                    <span class="text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md">{{ top_10_students|length }} Learners</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-100 text-left text-xs">
+                        <thead class="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            <tr>
+                                <th class="px-4 py-2.5">Rank</th>
+                                <th class="px-4 py-2.5">Student</th>
+                                <th class="px-4 py-2.5 text-center">Avg Score</th>
+                                <th class="px-4 py-2.5 text-center">Completion</th>
+                                <th class="px-4 py-2.5 text-right">Time Spent</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for st in top_10_students %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2.5 font-bold font-mono text-emerald-600">#{{ st.rank }}</td>
+                                <td class="px-4 py-2.5">
+                                    <span class="font-bold text-slate-900 block">{{ st.full_name }}</span>
+                                    <span class="text-[10px] font-mono text-slate-400">{{ st.user_id }} &bull; {{ st.guardian_name or 'Guardian N/A' }}</span>
+                                </td>
+                                <td class="px-4 py-2.5 text-center font-black text-emerald-600">{{ st.avg_score }}%</td>
+                                <td class="px-4 py-2.5 text-center font-semibold text-slate-700">{{ st.completion_rate }}%</td>
+                                <td class="px-4 py-2.5 text-right font-mono text-slate-500">{{ st.time_spent_str }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="px-4 py-6 text-center text-slate-400 text-xs">
+                                    No students have attempted quizzes in this subject yet.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Bottom 10 Students Ranking Table -->
+            <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+                <div class="p-4 bg-amber-50/70 border-b border-amber-100 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-xs">
+                            <i class="fa-solid fa-arrow-trend-down"></i>
+                        </span>
+                        <div>
+                            <h4 class="font-bold text-amber-950 text-xs">Bottom 10 Students (Attention Needed)</h4>
+                            <p class="text-[10px] text-amber-700">Minimum 1 quiz attempt requirement satisfied</p>
+                        </div>
+                    </div>
+                    <span class="text-[11px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md">{{ bottom_10_students|length }} Learners</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-100 text-left text-xs">
+                        <thead class="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            <tr>
+                                <th class="px-4 py-2.5">Rank</th>
+                                <th class="px-4 py-2.5">Student</th>
+                                <th class="px-4 py-2.5 text-center">Avg Score</th>
+                                <th class="px-4 py-2.5 text-center">Completion</th>
+                                <th class="px-4 py-2.5 text-right">Time Spent</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for st in bottom_10_students %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2.5 font-bold font-mono text-amber-600">#{{ st.rank }}</td>
+                                <td class="px-4 py-2.5">
+                                    <span class="font-bold text-slate-900 block">{{ st.full_name }}</span>
+                                    <span class="text-[10px] font-mono text-slate-400">{{ st.user_id }} &bull; {{ st.guardian_name or 'Guardian N/A' }}</span>
+                                </td>
+                                <td class="px-4 py-2.5 text-center font-black text-amber-600">{{ st.avg_score }}%</td>
+                                <td class="px-4 py-2.5 text-center font-semibold text-slate-700">{{ st.completion_rate }}%</td>
+                                <td class="px-4 py-2.5 text-right font-mono text-slate-500">{{ st.time_spent_str }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="px-4 py-6 text-center text-slate-400 text-xs">
+                                    No students have attempted quizzes in this subject yet.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unattempted & Not Started Students Lists -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Unattempted Students (0 Quiz Attempts) -->
+            <div class="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h4 class="font-bold text-slate-900 text-xs flex items-center">
+                        <i class="fa-solid fa-hourglass-half text-indigo-600 mr-2"></i>
+                        <span>Unattempted Students (0 Quiz Attempts in {{ active_subject }})</span>
+                    </h4>
+                    <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">{{ unattempted_students|length }} Listed</span>
+                </div>
+                <div class="overflow-y-auto max-h-56 divide-y divide-slate-100 text-xs">
+                    {% for st in unattempted_students %}
+                    <div class="py-2 flex items-center justify-between">
+                        <div>
+                            <span class="font-bold text-slate-800">{{ st.full_name }}</span>
+                            <span class="text-[10px] font-mono text-slate-400 ml-1">({{ st.user_id }})</span>
+                        </div>
+                        <span class="text-[11px] text-slate-400">{{ st.school_name or st.district or 'General' }}</span>
+                    </div>
+                    {% else %}
+                    <p class="text-slate-400 py-4 text-center">All enrolled students have attempted at least one quiz.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Not Started Students (0 Lessons Finished & 0 Quizzes) -->
+            <div class="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h4 class="font-bold text-slate-900 text-xs flex items-center">
+                        <i class="fa-solid fa-circle-pause text-amber-500 mr-2"></i>
+                        <span>Not Started Students (0 Progress in {{ active_subject }})</span>
+                    </h4>
+                    <span class="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">{{ not_started_students|length }} Listed</span>
+                </div>
+                <div class="overflow-y-auto max-h-56 divide-y divide-slate-100 text-xs">
+                    {% for st in not_started_students %}
+                    <div class="py-2 flex items-center justify-between">
+                        <div>
+                            <span class="font-bold text-slate-800">{{ st.full_name }}</span>
+                            <span class="text-[10px] font-mono text-slate-400 ml-1">({{ st.user_id }})</span>
+                        </div>
+                        <span class="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-semibold">Zero Activity</span>
+                    </div>
+                    {% else %}
+                    <p class="text-slate-400 py-4 text-center">All enrolled students have begun course activities.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- DASHBOARD 3: SUBJECT CONTENT DASHBOARD (CURRICULUM OVERVIEW)        -->
+    <!-- =================================================================== -->
+    <div id="tab-content" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
+            <div class="border-b border-slate-100 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-base flex items-center">
+                        <i class="fa-solid fa-layer-group text-indigo-600 mr-2"></i> Subject Learning Content & Curricula Matrix
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Hierarchical breakdown of subjects, courses, lessons, PDFs, YouTube video lectures, and timed quizzes.</p>
+                </div>
+                <a href="/teacher" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Create New Course</span>
+                </a>
+            </div>
+
+            <!-- Subject Cards Matrix -->
+            <div class="space-y-6">
+                {% for subj_name, data in subject_content_tree.items() %}
+                <div class="p-5 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-4">
+                    <!-- Subject Header Badge -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200/60 pb-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
+                                {{ loop.index }}
+                            </span>
+                            <div>
+                                <h4 class="font-black text-slate-900 text-sm">{{ subj_name }}</h4>
+                                <span class="text-[11px] text-slate-400 font-semibold">{{ data.courses_count }} Course(s) &bull; {{ data.duration_str }} Total Learning Duration</span>
+                            </div>
+                        </div>
+
+                        <!-- Summary Pills -->
+                        <div class="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                            <span class="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg">
+                                <i class="fa-solid fa-folder text-indigo-500 mr-1"></i> {{ data.modules_count }} Modules
+                            </span>
+                            <span class="px-2.5 py-1 bg-white border border-slate-200 text-red-600 rounded-lg">
+                                <i class="fa-brands fa-youtube mr-1"></i> {{ data.video_count }} Videos
+                            </span>
+                            <span class="px-2.5 py-1 bg-white border border-slate-200 text-sky-600 rounded-lg">
+                                <i class="fa-solid fa-file-pdf mr-1"></i> {{ data.pdf_count }} PDFs
+                            </span>
+                            <span class="px-2.5 py-1 bg-white border border-slate-200 text-purple-600 rounded-lg">
+                                <i class="fa-solid fa-clipboard-question mr-1"></i> {{ data.quiz_count }} Quizzes ({{ data.questions_count }} Qs)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Courses Under This Subject -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {% for c in data.courses %}
+                        <div class="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ c.code }}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {% if c.status == 'archived' %}bg-slate-100 text-slate-700{% elif c.is_published %}bg-emerald-50 text-emerald-700 border border-emerald-200{% else %}bg-amber-50 text-amber-700{% endif %}">
+                                    {{ c.status|upper }}
+                                </span>
+                            </div>
+
+                            <h5 class="font-bold text-slate-900 text-xs line-clamp-1">{{ c.title }}</h5>
+                            <p class="text-[11px] text-slate-400">Instructor: <span class="font-semibold text-slate-600">{{ c.teacher_name }}</span></p>
+
+                            <div class="grid grid-cols-4 gap-1 text-center py-1.5 px-2 bg-slate-50 rounded-lg text-[10px] font-bold text-slate-600">
+                                <div><span class="block text-slate-900">{{ c.modules_count }}</span> Mod</div>
+                                <div><span class="block text-red-600">{{ c.video_count }}</span> Vid</div>
+                                <div><span class="block text-sky-600">{{ c.pdf_count }}</span> PDF</div>
+                                <div><span class="block text-purple-600">{{ c.quiz_count }}</span> Quiz</div>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                                <a href="/course/{{ c.id }}" target="_blank" class="text-indigo-600 hover:underline font-bold text-[11px] flex items-center space-x-1">
+                                    <i class="fa-solid fa-eye"></i> <span>Preview Student View</span>
+                                </a>
+                                <div class="flex items-center space-x-1.5">
+                                    <a href="/teacher/course/{{ c.id }}" class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-bold hover:bg-indigo-100 transition">
+                                        Edit Content
+                                    </a>
+                                    <button onclick="openCourseDeleteModal({{ c.id }}, '{{ c.title|replace('\'', '\\\'') }}', '{{ c.code }}')"
+                                        class="px-2 py-1 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg text-[11px] font-bold transition">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-slate-400 text-xs col-span-2">No courses registered under {{ subj_name }} yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 4: COURSE COHORTS & MANAGEMENT (PREVIOUS FULL FUNCTIONALITY)   -->
+    <!-- =================================================================== -->
+    <div id="tab-courses" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm">Course Cohorts & Performance Analytics</h3>
+                    <p class="text-xs text-slate-500">Live active learners, enrollment counts, and average learning time per course</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="openAssignCourseModal()" class="inline-flex items-center space-x-2 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
+                        <i class="fa-solid fa-user-check"></i>
+                        <span>Assign Course to Students</span>
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                    <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <tr>
+                            <th class="px-5 py-3.5">Code</th>
+                            <th class="px-5 py-3.5">Course Title</th>
+                            <th class="px-5 py-3.5">Subject</th>
+                            <th class="px-5 py-3.5">Instructor</th>
+                            <th class="px-5 py-3.5 text-center">Enrolled</th>
+                            <th class="px-5 py-3.5 text-center">Live (&le; 5m)</th>
+                            <th class="px-5 py-3.5 text-center">Avg Learning Time</th>
+                            <th class="px-5 py-3.5">Completion Rate</th>
+                            <th class="px-5 py-3.5 text-center">Avg Quiz</th>
+                            <th class="px-5 py-3.5 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for c in course_breakdown %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-5 py-3.5 font-mono font-bold text-indigo-600">{{ c.code }}</td>
+                            <td class="px-5 py-3.5 font-bold text-slate-900">
+                                <a href="/course/{{ c.id }}" target="_blank" class="hover:underline flex items-center">
+                                    {{ c.title }}
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-slate-400 ml-1.5"></i>
+                                </a>
+                            </td>
+                            <td class="px-5 py-3.5 text-slate-600 font-semibold">{{ c.subject }}</td>
+                            <td class="px-5 py-3.5 text-slate-600">{{ c.teacher_name }}</td>
+                            <td class="px-5 py-3.5 text-center">
+                                <span class="font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">{{ c.enrolled_count }}</span>
+                            </td>
+                            <td class="px-5 py-3.5 text-center">
+                                <span class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold {% if c.live_students_count > 0 %}bg-emerald-50 text-emerald-700 border border-emerald-200{% else %}bg-slate-50 text-slate-400{% endif %}">
+                                    <span class="w-1.5 h-1.5 rounded-full {% if c.live_students_count > 0 %}bg-emerald-500 animate-pulse{% else %}bg-slate-300{% endif %}"></span>
+                                    <span>{{ c.live_students_count }}</span>
+                                </span>
+                            </td>
+                            <td class="px-5 py-3.5 text-center font-bold text-indigo-600">
+                                <i class="fa-regular fa-clock mr-1 text-[11px] text-slate-400"></i>{{ c.avg_learning_time }}
+                            </td>
+                            <td class="px-5 py-3.5">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full bg-indigo-600 rounded-full" style="width: {{ c.completion_rate }}%"></div>
+                                    </div>
+                                    <span class="font-bold text-[11px] text-slate-700">{{ c.completion_rate }}%</span>
+                                </div>
+                            </td>
+                            <td class="px-5 py-3.5 text-center font-bold {% if c.avg_quiz_score >= 70 %}text-emerald-600{% elif c.avg_quiz_score > 0 %}text-amber-600{% else %}text-slate-400{% endif %}">
+                                {{ c.avg_quiz_score }}%
+                            </td>
+                            <td class="px-5 py-3.5 text-center">
+                                <div class="flex items-center justify-center space-x-1.5">
+                                    <button onclick="openAssignCourseModal({{ c.id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs" title="Assign Students">
+                                        <i class="fa-solid fa-user-plus"></i>
+                                    </button>
+                                    <button onclick="toggleCohortDrawer({{ c.id }})" class="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg text-xs" title="View Group Students">
+                                        <i class="fa-solid fa-users"></i>
+                                    </button>
+                                    <button onclick="openCourseDeleteModal({{ c.id }}, '{{ c.title|replace('\'', '\\\'') }}', '{{ c.code }}')" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg text-xs" title="Archive / Delete Course">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Collapsible Cohort Members Row -->
+                        <tr id="cohortRow_{{ c.id }}" class="hidden bg-slate-50/70">
+                            <td colspan="10" class="p-4">
+                                <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <h4 class="font-bold text-slate-800 text-xs">
+                                            Enrolled Students in Cohort ({{ c.group_students|length }})
+                                        </h4>
+                                        <span class="text-[11px] text-slate-400">Students only see this specific curriculum upon login</span>
+                                    </div>
+
+                                    {% if c.group_students %}
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        {% for st in c.group_students %}
+                                        <div class="p-2.5 rounded-lg border border-slate-100 bg-slate-50/60 flex items-center justify-between text-xs">
+                                            <div>
+                                                <span class="font-bold text-slate-800 block">{{ st.full_name }}</span>
+                                                <span class="text-[10px] font-mono text-slate-400">{{ st.user_id }}</span>
+                                            </div>
+                                            <form action="/department/courses/unassign" method="POST" onsubmit="return confirm('Remove student from course cohort?');">
+                                                <input type="hidden" name="course_id" value="{{ c.id }}">
+                                                <input type="hidden" name="user_id" value="{{ st.user_id_int }}">
+                                                <button type="submit" class="text-slate-400 hover:text-red-600 p-1" title="Unassign">
+                                                    <i class="fa-solid fa-user-xmark"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <p class="text-xs text-slate-400 py-2">No students assigned to this course yet. Click 'Assign' to enrol students from the Global Pool.</p>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 5: GLOBAL STUDENT POOL (PRESERVED COMPLETE SPECIFICATION)        -->
+    <!-- =================================================================== -->
+    <div id="tab-students" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm">Centralised Global Student Pool ({{ students|length }})</h3>
+                    <p class="text-xs text-slate-500">Master database of all registered students with duplicate detection by Student Name + Guardian Name.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="studentSearch" onkeyup="filterStudentTable()" placeholder="Search ID, Name, School..."
+                        class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <button onclick="document.getElementById('registerStudentModal').classList.remove('hidden')"
+                        class="px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                        <i class="fa-solid fa-plus mr-1"></i> Register Single
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-left text-xs" id="studentsTable">
+                    <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3.5">Serial No. (ID)</th>
+                            <th class="px-4 py-3.5">Student Name</th>
+                            <th class="px-4 py-3.5">Father / Guardian</th>
+                            <th class="px-4 py-3.5">School / UDISE</th>
+                            <th class="px-4 py-3.5">District / State</th>
+                            <th class="px-4 py-3.5">Assigned Courses</th>
+                            <th class="px-4 py-3.5 text-center">Status</th>
+                            <th class="px-4 py-3.5 text-center">Lessons</th>
+                            <th class="px-4 py-3.5 text-center">Avg Quiz</th>
+                            <th class="px-4 py-3.5 text-right">Assign</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for s in students %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-4 py-3.5 font-mono font-bold text-indigo-600 whitespace-nowrap">{{ s.user_id }}</td>
+                            <td class="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap">{{ s.full_name }}</td>
+                            <td class="px-4 py-3.5 text-slate-600 whitespace-nowrap">{{ s.guardian_name or '-' }}</td>
+                            <td class="px-4 py-3.5 text-slate-600">
+                                <span class="font-semibold block text-slate-800">{{ s.school_name or '-' }}</span>
+                                {% if s.udise_code %}<span class="text-[10px] font-mono text-slate-400">UDISE: {{ s.udise_code }}</span>{% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-slate-600 whitespace-nowrap">
+                                <span>{{ s.district or '-' }}</span>
+                                {% if s.state %}<span class="text-slate-400">, {{ s.state }}</span>{% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 font-mono text-[11px] text-indigo-700">
+                                {{ s.assigned_course_codes or 'None' }}
+                            </td>
+                            <td class="px-4 py-3.5 text-center">
+                                {% if s.must_change_password %}
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Temp Pass</span>
+                                {% else %}
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-center font-bold text-slate-700">{{ s.completed_lessons_count }}</td>
+                            <td class="px-4 py-3.5 text-center font-bold {% if s.avg_quiz_score >= 70 %}text-emerald-600{% elif s.avg_quiz_score > 0 %}text-amber-600{% else %}text-slate-400{% endif %}">
+                                {{ s.avg_quiz_score }}%
+                            </td>
+                            <td class="px-4 py-3.5 text-right">
+                                <button onclick="openAssignCourseModalWithStudent('{{ s.user_id }}')" class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-bold hover:bg-indigo-100 transition">
+                                    Assign
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 6: FACULTY & TEACHERS                                           -->
+    <!-- =================================================================== -->
+    <div id="tab-teachers" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100 mb-6 gap-3">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-base flex items-center">
+                        <i class="fa-solid fa-chalkboard-user text-sky-600 mr-2"></i> Faculty & Content Authors ({{ teachers|length }})
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Faculty members who author curricula, publish resources, and monitor student progress.</p>
+                </div>
+                <button onclick="document.getElementById('addTeacherModal').classList.remove('hidden')"
+                    class="px-4 py-2 bg-sky-600 text-white rounded-xl text-xs font-bold hover:bg-sky-700 transition shadow-sm">
+                    <i class="fa-solid fa-user-plus mr-1"></i> Add Faculty Member
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for t in teachers %}
+                <div class="p-4 bg-slate-50/60 rounded-2xl border border-slate-200/80 space-y-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-sm">
+                            {{ t.full_name[:2]|upper }}
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-xs">{{ t.full_name }}</h4>
+                            <span class="text-[10px] font-mono text-slate-400 block">{{ t.user_id }} &bull; {{ t.designation or 'Faculty' }}</span>
+                        </div>
+                    </div>
+                    <div class="text-[11px] text-slate-600 space-y-1">
+                        <div>Department: <span class="font-semibold text-slate-800">{{ t.department }}</span></div>
+                        <div>Email: <span class="font-mono text-slate-700">{{ t.email or 'N/A' }}</span></div>
+                    </div>
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] font-bold text-slate-700">
+                        <span>{{ t.courses_count }} Course(s)</span>
+                        <span class="text-indigo-600">{{ t.total_students_taught }} Students Taught</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 7: POWER BI & REST API INTEGRATIONS                             -->
+    <!-- =================================================================== -->
+    {% if user.role == 'department_admin' %}
+    <div id="tab-integrations" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-6">
+            <div class="border-b border-slate-100 pb-4">
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-semibold mb-2">
+                    <i class="fa-solid fa-chart-line text-amber-500"></i>
+                    <span>Power BI & External Data Pipeline</span>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900">Integrations and Data Export Hub</h3>
+                <p class="text-xs text-slate-500 mt-1">Connect Microsoft Power BI, Tableau, Python, and external dashboards via authenticated REST endpoints.</p>
+            </div>
+
+            <!-- Live Status & API Key Manager Card -->
+            <div class="p-5 bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl text-white space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <span class="text-xs text-indigo-300 font-bold block uppercase tracking-wider">REST API Access Key</span>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <span class="font-mono text-xs bg-black/40 px-3 py-1.5 rounded-lg border border-white/10 select-all">
+                                {{ branding.powerbi_api_key or 'No API key issued yet' }}
+                            </span>
+                        </div>
+                    </div>
+                    <form action="/department/powerbi/generate-key" method="POST" onsubmit="return confirm('Generate or rotate Power BI API Key? Any existing external connector must be updated with the new key.');">
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                            <i class="fa-solid fa-rotate mr-1"></i> Rotate API Key
+                        </button>
+                    </form>
+                </div>
+                <div class="flex items-center space-x-4 text-xs text-slate-300 pt-2 border-t border-white/10">
+                    <div>Last External Sync: <span class="font-mono text-emerald-400 font-bold">{{ branding.powerbi_last_sync_at or 'Never' }}</span></div>
+                    <div>&bull;</div>
+                    <div>Status: <span class="text-emerald-400 font-bold">Active & Ready</span></div>
+                </div>
+            </div>
+
+            <!-- Power BI M Query Connector Guide -->
+            <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                <h4 class="font-bold text-slate-900 text-xs flex items-center">
+                    <i class="fa-solid fa-code text-indigo-600 mr-2"></i> Power BI / Power Query (M Query) Snippet
+                </h4>
+                <p class="text-[11px] text-slate-500">In Power BI Desktop: Click <strong>Get Data &gt; Blank Query &gt; Advanced Editor</strong>, and paste the code below:</p>
+                <pre class="p-3 bg-slate-900 text-indigo-200 rounded-xl text-[11px] font-mono overflow-x-auto">let
+    Source = Json.Document(Web.Contents("http://127.0.0.1:8000/api/v1/reporting/students", [
+        Headers=[#"X-API-Key"="{{ branding.powerbi_api_key or 'YOUR_API_KEY' }}"]
+    ])),
+    data = Source[data],
+    table = Table.FromRecords(data)
+in
+    table</pre>
+            </div>
+
+            <!-- REST Endpoints Catalog -->
+            <div class="space-y-3">
+                <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider text-slate-400">Available External REST Reporting Endpoints</h4>
+                <div class="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden text-xs">
+                    <div class="p-3 bg-white flex items-center justify-between">
+                        <div>
+                            <span class="font-mono font-bold text-indigo-600 mr-2">GET</span>
+                            <span class="font-mono text-slate-800">/api/v1/reporting/students</span>
+                            <span class="block text-[11px] text-slate-400 mt-0.5">Paginated student roster, demographics, UDISE codes, and academic progress</span>
+                        </div>
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">JSON</span>
+                    </div>
+                    <div class="p-3 bg-white flex items-center justify-between">
+                        <div>
+                            <span class="font-mono font-bold text-indigo-600 mr-2">GET</span>
+                            <span class="font-mono text-slate-800">/api/v1/reporting/subjects</span>
+                            <span class="block text-[11px] text-slate-400 mt-0.5">Aggregated subject metrics, unique enrollments, quiz averages, and completion rates</span>
+                        </div>
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">JSON</span>
+                    </div>
+                    <div class="p-3 bg-white flex items-center justify-between">
+                        <div>
+                            <span class="font-mono font-bold text-indigo-600 mr-2">GET</span>
+                            <span class="font-mono text-slate-800">/api/v1/reporting/courses</span>
+                            <span class="block text-[11px] text-slate-400 mt-0.5">Course catalogue, teacher assignments, and module counts</span>
+                        </div>
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">JSON</span>
+                    </div>
+                    <div class="p-3 bg-white flex items-center justify-between">
+                        <div>
+                            <span class="font-mono font-bold text-indigo-600 mr-2">GET</span>
+                            <span class="font-mono text-slate-800">/api/v1/reporting/quiz-attempts</span>
+                            <span class="block text-[11px] text-slate-400 mt-0.5">Detailed assessment log, scores, timestamps, and pass/fail states</span>
+                        </div>
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">JSON</span>
+                    </div>
+                    <div class="p-3 bg-white flex items-center justify-between">
+                        <div>
+                            <span class="font-mono font-bold text-indigo-600 mr-2">GET</span>
+                            <span class="font-mono text-slate-800">/api/v1/reporting/engagement</span>
+                            <span class="block text-[11px] text-slate-400 mt-0.5">Watch times, lesson completions, and active participation aggregates</span>
+                        </div>
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">JSON</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notification Settings Manager -->
+            <div class="pt-6 border-t border-slate-100 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm">System Notification Delivery Settings</h4>
+                        <p class="text-xs text-slate-500 mt-0.5">Configure event triggers that dispatch in-app notifications to learners and faculty.</p>
+                    </div>
+                </div>
+
+                <form action="/department/notifications/settings" method="POST" class="space-y-3">
+                    <div class="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden">
+                        {% for n in notification_settings %}
+                        <div class="p-3.5 bg-white flex items-center justify-between text-xs">
+                            <div>
+                                <label for="notify_{{ n.event_type }}" class="font-bold text-slate-800 cursor-pointer block">
+                                    {{ n.event_type|replace('_', ' ')|title }}
+                                </label>
+                                <span class="text-[11px] text-slate-400">{{ n.description }}</span>
+                            </div>
+                            <input type="checkbox" name="notify_{{ n.event_type }}" id="notify_{{ n.event_type }}" value="1" {% if n.is_enabled %}checked{% endif %}
+                                class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="flex justify-end pt-2">
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                            Save Notification Rules
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- =================================================================== -->
+    <!-- TAB 8: GOVERNANCE, INSTITUTIONAL BRANDING & PROFILE                 -->
+    <!-- =================================================================== -->
+    {% if user.role == 'department_admin' %}
+    <div id="tab-governance" class="tab-content hidden space-y-6">
+
+        <!-- Live Institutional Header Preview Card -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-xl border border-indigo-900/50 space-y-4">
+            <div class="flex items-center justify-between border-b border-indigo-800/60 pb-3">
+                <div class="flex items-center space-x-2 text-xs font-bold text-amber-400">
+                    <i class="fa-solid fa-eye"></i>
+                    <span class="uppercase tracking-wider">Live Institutional Header Preview</span>
+                </div>
+                <span class="text-[11px] text-slate-300 font-medium">Rendered across all platform pages to students & faculty</span>
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-300">
+                    <span class="px-2.5 py-0.5 rounded-md bg-white/10 text-white font-semibold">{{ branding.institution_name }}</span>
+                    <span>&bull;</span>
+                    <span class="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center space-x-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>{{ branding.accreditation_badge or 'Accredited Academic Portal' }}</span>
+                    </span>
+                    <span>&bull;</span>
+                    <span class="text-slate-300 capitalize">{{ branding.platform_name }}</span>
+                </div>
+
+                <h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight" style="font-family: var(--font-heading)">
+                    {{ branding.department_name or branding.platform_name }}
+                </h2>
+
+                <p class="text-xs sm:text-sm text-slate-300 max-w-3xl">
+                    {{ branding.department_tagline or branding.platform_tagline }}
+                </p>
+
+                <div class="pt-3 border-t border-indigo-800/40 flex flex-wrap items-center gap-3 text-xs text-slate-300">
+                    <div class="flex items-center space-x-1.5 bg-white/10 px-3 py-1 rounded-full border border-white/15">
+                        <i class="fa-solid fa-user-shield text-amber-400"></i>
+                        <span class="text-slate-400">Department Head:</span>
+                        <span class="font-bold text-white">{{ admin_profile.full_name }}</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 bg-white/10 px-3 py-1 rounded-full border border-white/15">
+                        <i class="fa-solid fa-award text-indigo-400"></i>
+                        <span class="text-slate-400">Designation:</span>
+                        <span class="font-bold text-white capitalize">{{ admin_profile.designation or 'department head' }}</span>
+                    </div>
+                    {% if admin_profile.email %}
+                    <div class="flex items-center space-x-1.5 bg-white/10 px-3 py-1 rounded-full border border-white/15">
+                        <i class="fa-solid fa-envelope text-sky-400"></i>
+                        <span class="font-bold text-white">{{ admin_profile.email }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. Department Identity & Branding Settings Form -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-6">
+            <div class="border-b border-slate-100 pb-4">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center">
+                    <i class="fa-solid fa-sliders text-amber-500 mr-2"></i>
+                    <span>Department Governance, Accreditation & Institutional Branding</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-1">
+                    Customise institution credentials, accreditation badge, department name & tagline, platform short name, and administrator identity without modifying application code or database foreign keys.
+                </p>
+            </div>
+
+            <form action="/department/settings/update" method="POST" enctype="multipart/form-data" class="space-y-6">
+                <!-- Section A: Institutional Identity & Accreditation -->
+                <div class="space-y-4">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-building-columns text-indigo-600"></i>
+                        <span>Institutional Identity & Accreditation</span>
+                    </h4>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Institution / University Name *</label>
+                            <input type="text" name="institution_name" value="{{ branding.institution_name }}" required
+                                placeholder="e.g. Indian Institute of Science & Technology"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <p class="text-[11px] text-slate-400 mt-1">Displays as parent academic entity across all pages, banners, and reports.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Accreditation / Portal Badge *</label>
+                            <input type="text" name="accreditation_badge" value="{{ branding.accreditation_badge or 'Accredited Academic Portal' }}" required
+                                placeholder="e.g. Accredited Academic Portal, NAAC A++, Autonomous"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <p class="text-[11px] text-slate-400 mt-1">Status badge displayed in top banner alongside institution name.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Department Display Name *</label>
+                            <input type="text" name="department_name" value="{{ branding.department_name or branding.platform_name }}" required
+                                placeholder="e.g. Department of Computer Science & Engineering"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <p class="text-[11px] text-slate-400 mt-1">Displayed in large typography in header without changing underlying foreign keys.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">LMS Platform Short Name *</label>
+                            <input type="text" name="platform_name" value="{{ branding.platform_name }}" required
+                                placeholder="e.g. Nexus LMS"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <p class="text-[11px] text-slate-400 mt-1">Brand identifier in navigation bar, login pages, and notifications.</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Department Tagline / Academic Motto</label>
+                        <input type="text" name="department_tagline" value="{{ branding.department_tagline or branding.platform_tagline }}"
+                            placeholder="e.g. Pioneering Innovation and Computational Excellence"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <p class="text-[11px] text-slate-400 mt-1">Appears directly beneath the department name in the prominent header banner.</p>
+                    </div>
+                </div>
+
+                <!-- Section B: Department Administrator Credentials -->
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-user-shield text-indigo-600"></i>
+                        <span>Department Administrator & Head Identity</span>
+                    </h4>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Administrator Full Name *</label>
+                            <input type="text" name="admin_full_name" value="{{ admin_profile.full_name }}" required
+                                placeholder="e.g. Dr. Margaret Hamilton"
+                                class="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Designation / Role Title *</label>
+                            <input type="text" name="admin_designation" value="{{ admin_profile.designation or 'department head' }}" required
+                                placeholder="e.g. department head, Head of Department"
+                                class="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Official Administrator Email</label>
+                            <input type="email" name="admin_email" value="{{ admin_profile.email or '' }}"
+                                placeholder="e.g. head.cs@institution.edu"
+                                class="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section C: Typography & Font Selector -->
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <label class="block text-xs font-bold text-slate-800">
+                        <i class="fa-solid fa-font text-indigo-600 mr-1.5"></i> Curated Institutional Typography Preset
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <select name="font_family" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                                <option value="Outfit" {% if branding.font_family == 'Outfit' %}selected{% endif %}>Outfit (Modern Geometric - Default)</option>
+                                <option value="Poppins" {% if branding.font_family == 'Poppins' %}selected{% endif %}>Poppins (Clean & Academic)</option>
+                                <option value="Inter" {% if branding.font_family == 'Inter' %}selected{% endif %}>Inter (Enterprise Standard)</option>
+                                <option value="Noto Sans Devanagari" {% if branding.font_family == 'Noto Sans Devanagari' %}selected{% endif %}>Noto Sans Devanagari (Hindi & Bilingual Support)</option>
+                                <option value="Merriweather" {% if branding.font_family == 'Merriweather' %}selected{% endif %}>Merriweather (Classic Editorial Serif)</option>
+                            </select>
+                        </div>
+                        <div class="text-[11px] text-slate-500 flex items-center">
+                            Supports English and Hindi text with consistent visual hierarchy and Devanagari font rendering.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section D: Brand Colours: Primary & Secondary -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Primary Brand Colour (Hex)</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="color" name="brand_color" value="{{ branding.brand_color or '#4f46e5' }}"
+                                class="w-10 h-9 p-0.5 border border-slate-300 rounded-lg cursor-pointer">
+                            <input type="text" value="{{ branding.brand_color or '#4f46e5' }}" readonly
+                                class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Secondary Brand Colour (Hex)</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="color" name="secondary_brand_color" value="{{ branding.secondary_brand_color or '#0ea5e9' }}"
+                                class="w-10 h-9 p-0.5 border border-slate-300 rounded-lg cursor-pointer">
+                            <input type="text" value="{{ branding.secondary_brand_color or '#0ea5e9' }}" readonly
+                                class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section E: Logo, Icon & Banner Uploads -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                        <label class="block text-xs font-bold text-slate-800">Department / LMS Logo</label>
+                        {% if branding.logo_image_url %}
+                        <div class="flex items-center space-x-3 bg-white p-2 rounded-xl border border-slate-200">
+                            <img src="{{ branding.logo_image_url }}" alt="Logo" class="h-8 max-w-[120px] object-contain">
+                            <span class="text-[11px] text-emerald-600 font-semibold"><i class="fa-solid fa-check mr-1"></i> Custom Logo Active</span>
+                        </div>
+                        {% else %}
+                        <div class="flex items-center space-x-3 bg-white p-2 rounded-xl border border-slate-200 text-xs text-slate-500">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                <i class="fa-solid {{ branding.logo_icon or 'fa-graduation-cap' }}"></i>
+                            </div>
+                            <span>Using FontAwesome Icon: <code>{{ branding.logo_icon or 'fa-graduation-cap' }}</code></span>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Upload New Logo (PNG, SVG, JPG, WebP)</label>
+                            <input type="file" name="logo_file" accept=".png,.jpg,.jpeg,.svg,.webp"
+                                class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-indigo-50 file:text-indigo-700">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Fallback FontAwesome Icon Class</label>
+                            <input type="text" name="logo_icon" value="{{ branding.logo_icon or 'fa-graduation-cap' }}"
+                                placeholder="fa-graduation-cap"
+                                class="w-full px-3 py-1.5 border border-slate-300 bg-white rounded-lg text-xs font-mono">
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                        <label class="block text-xs font-bold text-slate-800">Department Banner / Cover Image</label>
+                        {% if branding.department_banner_url %}
+                        <div class="relative bg-white p-2 rounded-xl border border-slate-200">
+                            <img src="{{ branding.department_banner_url }}" alt="Banner" class="h-12 w-full object-cover rounded-lg">
+                            <span class="block text-[10px] text-emerald-600 font-semibold mt-1"><i class="fa-solid fa-check mr-1"></i> Custom Banner Active</span>
+                        </div>
+                        {% else %}
+                        <div class="h-12 bg-gradient-to-r from-slate-800 to-indigo-900 rounded-lg flex items-center justify-center text-xs text-indigo-200">
+                            Default Gradient Banner Active
+                        </div>
+                        {% endif %}
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Upload New Banner Image</label>
+                            <input type="file" name="banner_file" accept=".png,.jpg,.jpeg,.svg,.webp"
+                                class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-indigo-50 file:text-indigo-700">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section F: Contact Information -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Contact Email</label>
+                        <input type="email" name="contact_email" value="{{ branding.contact_email or '' }}" placeholder="hod@department.edu"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Contact Phone</label>
+                        <input type="text" name="contact_phone" value="{{ branding.contact_phone or '' }}" placeholder="+91 80 2345 6789"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Office Location</label>
+                        <input type="text" name="contact_office" value="{{ branding.contact_office or '' }}" placeholder="Admin Block, 3rd Floor"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Department Welcome / Announcement Text</label>
+                    <textarea name="welcome_message" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">{{ branding.welcome_message }}</textarea>
+                </div>
+
+                <!-- Confirmation Toggle as required in PRD Section 1 -->
+                <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center space-x-2 text-xs">
+                    <input type="checkbox" name="confirm_identity" value="1" id="confirmIdent" required class="rounded text-indigo-600 focus:ring-indigo-500">
+                    <label for="confirmIdent" class="font-bold text-amber-900 cursor-pointer">
+                        I confirm these identity changes reflect official departmental governance. (Logged in Security Audit Trail)
+                    </label>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex justify-end">
+                    <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-md shadow-indigo-100 flex items-center space-x-2">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Save Governance & Branding Settings</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 2. Admin Personal Profile Form -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-4">
+            <div class="border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-900 flex items-center">
+                    <i class="fa-solid fa-user-gear text-indigo-600 mr-2"></i>
+                    <span>Department Administrator Personal Profile & Avatar</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Edit your name, designation, official email, and personal avatar photo.</p>
+            </div>
+
+            <form action="/department/profile/update" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
+                        <input type="text" name="full_name" value="{{ admin_profile.full_name }}" required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Designation / Role Title</label>
+                        <input type="text" name="designation" value="{{ admin_profile.designation or 'Head of Department' }}"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Official Email</label>
+                        <input type="email" name="email" value="{{ admin_profile.email or '' }}"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Profile Photo Upload</label>
+                        <input type="file" name="avatar_file" accept=".png,.jpg,.jpeg,.webp"
+                            class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-indigo-50 file:text-indigo-700">
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button type="submit" class="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition">
+                        Update Personal Profile
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 3. Dashboard Permissions Manager -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-4">
+            <div class="border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-900 flex items-center">
+                    <i class="fa-solid fa-sliders text-indigo-600 mr-2"></i>
+                    <span>Dashboard Widgets & Permissions Governance</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Control which widgets are active without code modifications.</p>
+            </div>
+
+            <form action="/department/permissions/update" method="POST" class="space-y-4">
+                <div class="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden">
+                    {% for w in dashboard_permissions %}
+                    <div class="p-3.5 bg-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" name="enable_{{ w.widget_key }}" value="1" id="en_{{ w.widget_key }}" {% if w.is_enabled %}checked{% endif %}
+                                class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+                            <label for="en_{{ w.widget_key }}" class="font-bold text-slate-800 cursor-pointer">
+                                {{ w.widget_title }}
+                                <span class="block text-[10px] font-mono text-slate-400 font-normal">{{ w.widget_key }}</span>
+                            </label>
+                        </div>
+                        <div class="flex items-center space-x-3 text-xs">
+                            <label class="inline-flex items-center space-x-1 cursor-pointer">
+                                <input type="checkbox" name="roles_{{ w.widget_key }}" value="department_admin" {% if 'department_admin' in w.allowed_roles %}checked{% endif %} class="text-indigo-600 rounded">
+                                <span class="text-[11px] text-slate-700">Admin</span>
+                            </label>
+                            <label class="inline-flex items-center space-x-1 cursor-pointer">
+                                <input type="checkbox" name="roles_{{ w.widget_key }}" value="teacher" {% if 'teacher' in w.allowed_roles %}checked{% endif %} class="text-indigo-600 rounded">
+                                <span class="text-[11px] text-slate-700">Faculty</span>
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                        Update Widget Permissions
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- =================================================================== -->
+    <!-- TAB 9: AUDIT TRAIL                                                  -->
+    <!-- =================================================================== -->
+    {% if user.role == 'department_admin' %}
+    <div id="tab-audit" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2"></i>
+                <span>Platform Governance & Security Audit Trail</span>
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                        <tr>
+                            <th class="px-4 py-3">Timestamp</th>
+                            <th class="px-4 py-3">Action</th>
+                            <th class="px-4 py-3">Operator</th>
+                            <th class="px-4 py-3">Entity</th>
+                            <th class="px-4 py-3">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for a in audit_logs %}
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 text-slate-500 font-mono text-[11px]">{{ a.created_at }}</td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-0.5 rounded font-mono font-bold text-[10px] uppercase bg-slate-100 text-slate-700">
+                                    {{ a.action }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 font-semibold text-slate-800">{{ a.user_name or 'System' }}</td>
+                            <td class="px-4 py-3 font-mono text-slate-600">{{ a.entity_type }}{% if a.entity_id %}: {{ a.entity_id }}{% endif %}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ a.details }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- =================================================================== -->
+    <!-- TAB 10: DUPLICATE CONFLICTS REVIEW                                  -->
+    <!-- =================================================================== -->
+    {% if user.role == 'department_admin' %}
+    <div id="tab-conflicts" class="tab-content hidden space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-user-shield text-amber-600 mr-2"></i>
+                <span>Administrative Duplicate Conflicts Review</span>
+            </h3>
+            <p class="text-xs text-slate-500">When two students share identical names and guardian names, verify their distinct identity here.</p>
+
+            {% if student_conflicts %}
+            <div class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                {% for c in student_conflicts %}
+                <div class="p-4 bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-xs text-slate-900">{{ c.student_name }}</span>
+                            <span class="text-xs text-slate-600">&bull; Guardian: <strong>{{ c.guardian_name }}</strong></span>
+                        </div>
+                        <p class="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block font-mono">
+                            Conflicts with Existing Student: {{ c.existing_user_id }} ({{ c.existing_name }})
+                        </p>
+                    </div>
+
+                    <form action="/department/conflicts/resolve" method="POST" class="flex items-center space-x-2">
+                        <input type="hidden" name="conflict_id" value="{{ c.id }}">
+                        <button type="submit" name="action" value="approve" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition">
+                            Approve Distinct Student
+                        </button>
+                        <button type="submit" name="action" value="reject" class="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition">
+                            Reject & Merge
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-slate-400 text-xs">
+                <i class="fa-solid fa-circle-check text-emerald-500 text-2xl block mb-2"></i>
+                No pending duplicate identity conflicts. All student records are properly deduplicated.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ========================================================= -->
+<!-- MODALS                                                    -->
+<!-- ========================================================= -->
+
+<!-- Modal: Course Deletion & Archival (PRD Section 4: 3 Choices) -->
+<div id="courseDeleteModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-triangle-exclamation text-amber-600 mr-2"></i> Course Modification & Deletion
+            </h3>
+            <button onclick="document.getElementById('courseDeleteModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Enrolled Student Warning Banner -->
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-1">
+            <div class="flex items-center space-x-2 text-amber-900 font-bold text-xs">
+                <i class="fa-solid fa-users"></i>
+                <span id="delModalCourseTitle">Selected Course</span>
+            </div>
+            <p class="text-xs text-amber-800" id="delModalStudentWarning">
+                Checking enrolled learners...
+            </p>
+        </div>
+
+        <p class="text-xs text-slate-600">
+            Please choose how you wish to process this curriculum. <strong>Student records in the Global Student Pool will remain safe and permanent.</strong>
+        </p>
+
+        <form id="courseDeleteForm" method="POST" class="space-y-3">
+            <input type="hidden" name="course_id" id="delModalCourseId" value="">
+
+            <div class="space-y-2 text-xs">
+                <!-- Choice 1: Archive (Preferred) -->
+                <label class="p-3 border-2 border-indigo-200 rounded-2xl flex items-start space-x-3 cursor-pointer hover:bg-indigo-50/50 transition">
+                    <input type="radio" name="action_type" value="archive" checked class="mt-0.5 text-indigo-600">
+                    <div>
+                        <span class="font-bold text-slate-900 block">Archive Course (Recommended)</span>
+                        <span class="text-slate-500 text-[11px]">Hides course from student dashboards, preserves all student quiz scores, learning logs, and audit trail.</span>
+                    </div>
+                </label>
+
+                <!-- Choice 2: Unpublish -->
+                <label class="p-3 border border-slate-200 rounded-2xl flex items-start space-x-3 cursor-pointer hover:bg-slate-50 transition">
+                    <input type="radio" name="action_type" value="unpublish" class="mt-0.5 text-slate-600">
+                    <div>
+                        <span class="font-bold text-slate-900 block">Unpublish Course</span>
+                        <span class="text-slate-500 text-[11px]">Reverts course to draft status. Students cannot access it until republished.</span>
+                    </div>
+                </label>
+
+                <!-- Choice 3: Delete (Soft Delete) -->
+                <label class="p-3 border border-red-200 rounded-2xl flex items-start space-x-3 cursor-pointer hover:bg-red-50/50 transition">
+                    <input type="radio" name="action_type" value="delete" class="mt-0.5 text-red-600">
+                    <div>
+                        <span class="font-bold text-red-900 block">Permanently Delete Course</span>
+                        <span class="text-slate-500 text-[11px]">Soft deletes course while safely keeping student profiles in Global Student Pool intact.</span>
+                    </div>
+                </label>
+            </div>
+
+            <div class="pt-2">
+                <label class="inline-flex items-center space-x-2 text-xs text-slate-700">
+                    <input type="checkbox" name="notify_students" value="1" checked class="rounded text-indigo-600">
+                    <span>Send in-app notification to all enrolled students</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('courseDeleteModal').classList.add('hidden')"
+                    class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                    Confirm Action
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Register Single Student -->
+<div id="registerStudentModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 my-8 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-user-plus text-indigo-600 mr-2"></i> Register Student to Global Pool
+            </h3>
+            <button onclick="document.getElementById('registerStudentModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Live Duplicate Warning Alert Box -->
+        <div id="duplicateAlertBox" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-2">
+            <div class="flex items-start space-x-2">
+                <i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5 text-sm"></i>
+                <div class="flex-1">
+                    <h5 class="font-bold">Student Already Exists in Global Student Pool</h5>
+                    <p id="duplicateAlertMsg" class="mt-0.5 text-slate-700"></p>
+                </div>
+            </div>
+            <div class="pt-2 border-t border-amber-200 flex justify-end gap-2">
+                <button type="button" onclick="submitEnrolExisting()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[11px]">
+                    Enrol Existing Student in Course
+                </button>
+                <button type="button" onclick="enableConflictReview()" class="px-3 py-1.5 bg-white border border-amber-300 text-amber-800 rounded-lg font-semibold text-[11px]">
+                    Flag for Review
+                </button>
+            </div>
+        </div>
+
+        <form action="/department/students/register-single" method="POST" id="singleStudentForm" class="space-y-3">
+            <input type="hidden" name="flag_conflict" id="flagConflictInput" value="0">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Student Full Name *</label>
+                    <input type="text" name="full_name" id="regStudentName" required placeholder="e.g. Rahul Kumar" onblur="checkDuplicateStudent()"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Father's / Guardian Name *</label>
+                    <input type="text" name="guardian_name" id="regGuardianName" required placeholder="e.g. Amit Kumar" onblur="checkDuplicateStudent()"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">School / Institution</label>
+                    <input type="text" name="school_name" placeholder="e.g. Govt Model High School"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">UDISE Code</label>
+                    <input type="text" name="udise_code" placeholder="e.g. 29280100101"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-700 mb-1">Block</label>
+                    <input type="text" name="block" placeholder="North" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-700 mb-1">District</label>
+                    <input type="text" name="district" placeholder="Bengaluru" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-700 mb-1">PIN Code</label>
+                    <input type="text" name="pincode" placeholder="560001" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs">
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Assign to Course (Optional)</label>
+                <select name="course_id" id="regCourseSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <option value="0">-- None (Register in Global Pool only) --</option>
+                    {% for c in all_courses %}
+                    <option value="{{ c.id }}">{{ c.code }} - {{ c.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('registerStudentModal').classList.add('hidden')"
+                    class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" id="regSubmitBtn"
+                    class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                    Register Student
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: CSV / Excel Bulk Import -->
+<div id="importStudentsModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-file-csv text-indigo-600 mr-2"></i> Bulk Provision Students (CSV / Excel)
+            </h3>
+            <button onclick="document.getElementById('importStudentsModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <p class="text-xs text-slate-500">
+            Upload student spreadsheet with columns: <strong>Serial NO. (UNIQUE NO.), STUDENT NAME, FATHER'/GUARDIAN, NAME, SCHOOL NAME, UDISE CODE, BLOCK, DISTRICT, STATE, PINCODE, COURSE</strong>.
+        </p>
+
+        <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+            <span class="text-slate-600 font-semibold">Need official template?</span>
+            <a href="/department/download-sample-csv" download class="font-bold text-indigo-600 hover:underline">
+                <i class="fa-solid fa-download mr-1"></i> Download CSV Template
+            </a>
+        </div>
+
+        <form action="/department/import-students" method="POST" enctype="multipart/form-data" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Select CSV or Excel (.xlsx) File</label>
+                <input type="file" name="file" accept=".csv,.xlsx,.xls,.tsv,.txt" required
+                    class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Default Temporary Password</label>
+                <input type="text" name="default_password" value="welcome123" required
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('importStudentsModal').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">Import Batch</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Assign Course to Students -->
+<div id="assignCourseModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-user-check text-indigo-600 mr-2"></i> Assign Course to Students
+            </h3>
+            <button onclick="document.getElementById('assignCourseModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form action="/department/courses/assign" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Target Course</label>
+                <select name="course_id" id="assignModalCourseSelect" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    {% for c in all_courses %}
+                    <option value="{{ c.id }}">{{ c.code }} - {{ c.title }} ({{ c.subject or c.department }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Student Serial Numbers / IDs</label>
+                <textarea name="student_ids" rows="3" placeholder="KA-2026-101, KA-2026-102"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('assignCourseModal').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">Assign Course</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add Faculty Member -->
+<div id="addTeacherModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-chalkboard-user text-emerald-600 mr-2"></i> Add Faculty Member
+            </h3>
+            <button onclick="document.getElementById('addTeacherModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form action="/department/teachers/add" method="POST" class="space-y-3">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
+                <input type="text" name="full_name" required placeholder="e.g. Dr. Grace Hopper"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Faculty / Employee ID *</label>
+                    <input type="text" name="user_id" required placeholder="e.g. T-HOPPER"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Department</label>
+                    <input type="text" name="department" value="{{ selected_dept or user.department }}" required
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Official Email</label>
+                <input type="email" name="email" placeholder="grace.hopper@institution.edu"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Temporary Password</label>
+                <input type="text" name="temporary_password" value="teacher123" required
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('addTeacherModal').classList.add('hidden')" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700">Add Faculty</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Tab Switching
+function switchTab(tabId) {
+    if (tabId === 'settings') tabId = 'governance';
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-indigo-600', 'text-indigo-600');
+        btn.classList.add('border-transparent', 'text-slate-500');
+    });
+
+    const activeEl = document.getElementById(`tab-${tabId}`);
+    const activeBtn = document.getElementById(`tabBtn-${tabId}`);
+    if (activeEl && activeBtn) {
+        activeEl.classList.remove('hidden');
+        activeBtn.classList.remove('border-transparent', 'text-slate-500');
+        activeBtn.classList.add('border-indigo-600', 'text-indigo-600');
+    }
+}
+
+// Initial Tab from URL parameter
+const urlParams = new URLSearchParams(window.location.search);
+const initialTab = urlParams.get('tab') || 'overview';
+switchTab(initialTab);
+
+// Status Alerts Handler
+const alertBox = document.getElementById('statusAlert');
+const alertText = document.getElementById('statusAlertText');
+
+if (urlParams.has('teacher_added')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-xs text-emerald-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-emerald-600"></i> New faculty member created successfully!';
+} else if (urlParams.has('registered_id')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-xs text-emerald-800 flex items-center justify-between";
+    alertText.innerHTML = `<i class="fa-solid fa-circle-check mr-2 text-emerald-600"></i> Successfully registered new student in Global Pool with Permanent ID: <strong>${urlParams.get('registered_id')}</strong>!`;
+} else if (urlParams.has('saved')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-indigo-50 border-indigo-200 text-xs text-indigo-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-indigo-600"></i> Department governance, institutional branding & administrator credentials updated successfully!';
+} else if (urlParams.has('permissions_saved')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-xs text-emerald-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-sliders mr-2 text-emerald-600"></i> Dashboard widget permissions updated successfully!';
+} else if (urlParams.has('profile_saved')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-xs text-emerald-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-emerald-600"></i> Admin personal profile updated successfully!';
+} else if (urlParams.has('key_generated')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-xs text-emerald-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-key mr-2 text-emerald-600"></i> New Power BI & External Analytics API Key generated and recorded in audit log!';
+} else if (urlParams.has('notifications_saved')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-xs text-emerald-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-bell mr-2 text-emerald-600"></i> System-wide notification triggers and preferences saved!';
+} else if (urlParams.has('assigned')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-xs text-emerald-800 flex items-center justify-between";
+    alertText.innerHTML = `<i class="fa-solid fa-circle-check mr-2 text-emerald-600"></i> Successfully assigned course to <strong>${urlParams.get('assigned')}</strong> student(s)!`;
+} else if (urlParams.has('unassigned')) {
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-slate-50 border-slate-200 text-xs text-slate-800 flex items-center justify-between";
+    alertText.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-slate-600"></i> Student removed from course cohort.';
+} else if (urlParams.has('imported')) {
+    const imp = parseInt(urlParams.get('imported') || '0');
+    const existing = parseInt(urlParams.get('existing') || '0');
+    const duplicates = parseInt(urlParams.get('duplicates') || '0');
+    const rejected = parseInt(urlParams.get('rejected') || '0');
+    alertBox.classList.remove('hidden');
+    alertBox.className = "mb-6 p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-xs text-emerald-900 flex items-center justify-between";
+    let msg = `<i class="fa-solid fa-circle-check mr-2 text-emerald-600"></i> Import Complete: <strong>${imp}</strong> new student(s) registered`;
+    if (existing > 0) msg += `, <strong>${existing}</strong> auto-enrolled in designated courses`;
+    if (duplicates > 0) msg += `, <strong>${duplicates}</strong> duplicates skipped`;
+    if (rejected > 0) msg += ` &bull; <a href="/department/download-rejected-report" class="underline font-bold text-red-700 ml-1">Download Rejected Report</a>`;
+    alertText.innerHTML = msg;
+}
+
+// Live Duplicate Student Check
+async function checkDuplicateStudent() {
+    const name = document.getElementById('regStudentName').value.trim();
+    const guardian = document.getElementById('regGuardianName').value.trim();
+    const alertBox = document.getElementById('duplicateAlertBox');
+    const alertMsg = document.getElementById('duplicateAlertMsg');
+
+    if (!name || !guardian) {
+        if (alertBox) alertBox.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/students/check-duplicate?name=${encodeURIComponent(name)}&guardian=${encodeURIComponent(guardian)}`);
+        const data = await res.json();
+        if (data.exists && data.student) {
+            alertBox.classList.remove('hidden');
+            alertMsg.innerHTML = `Student already exists in Global Pool: <strong>${data.student.user_id}</strong> (${data.student.full_name}). Guardian: <em>${data.student.guardian_name}</em>.`;
+        } else {
+            if (alertBox) alertBox.classList.add('hidden');
+        }
+    } catch (err) {
+        console.error("Duplicate check error:", err);
+    }
+}
+
+function submitEnrolExisting() {
+    const courseSelect = document.getElementById('regCourseSelect');
+    if (!courseSelect || courseSelect.value === "0") {
+        alert("Please select a target course from the dropdown below to enrol this existing student.");
+        courseSelect.focus();
+        return;
+    }
+    document.getElementById('singleStudentForm').submit();
+}
+
+function enableConflictReview() {
+    document.getElementById('flagConflictInput').value = "1";
+    document.getElementById('singleStudentForm').submit();
+}
+
+// Course Assignment & Modal Helpers
+function openAssignCourseModal(courseId) {
+    if (courseId) {
+        const select = document.getElementById('assignModalCourseSelect');
+        if (select) select.value = courseId;
+    }
+    document.getElementById('assignCourseModal').classList.remove('hidden');
+}
+
+function openAssignCourseModalWithStudent(userId) {
+    const modal = document.getElementById('assignCourseModal');
+    if (modal) {
+        const txt = modal.querySelector('textarea[name="student_ids"]');
+        if (txt) txt.value = userId;
+        modal.classList.remove('hidden');
+    }
+}
+
+function toggleCohortDrawer(courseId) {
+    const row = document.getElementById(`cohortRow_${courseId}`);
+    if (row) row.classList.toggle('hidden');
+}
+
+// Course Deletion Modal Helper
+async function openCourseDeleteModal(courseId, title, code) {
+    document.getElementById('delModalCourseTitle').innerText = `${code} - ${title}`;
+    document.getElementById('delModalCourseId').value = courseId;
+    document.getElementById('courseDeleteForm').action = `/teacher/course/${courseId}/delete`;
+    
+    // Fetch enrolled count
+    try {
+        const res = await fetch(`/api/course/${courseId}/enrolled-count`);
+        const data = await res.json();
+        document.getElementById('delModalStudentWarning').innerHTML = `Currently <strong>${data.enrolled_count}</strong> student(s) enrolled in this course.`;
+    } catch (e) {
+        document.getElementById('delModalStudentWarning').innerText = 'Warning: Enrolled students will be affected.';
+    }
+    document.getElementById('courseDeleteModal').classList.remove('hidden');
+}
+
+// Filter Student Table
+function filterStudentTable() {
+    const input = document.getElementById("studentSearch");
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById("studentsTable");
+    const tr = table.getElementsByTagName("tr");
+    for (let i = 1; i < tr.length; i++) {
+        const txt = tr[i].textContent.toUpperCase();
+        tr[i].style.display = txt.indexOf(filter) > -1 ? "" : "none";
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}User Profile - {{ user.full_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    
+    <!-- Alerts & Feedback -->
+    {% if saved %}
+    <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center space-x-2 text-xs font-semibold">
+        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+        <span>Profile updated successfully.</span>
+    </div>
+    {% endif %}
+    {% if error %}
+    <div class="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center space-x-2 text-xs font-semibold">
+        <i class="fa-solid fa-circle-exclamation text-red-500"></i>
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Profile Header Card -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
+        <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-2xl shadow-lg shadow-indigo-100 shrink-0">
+            {{ user.full_name[:2].upper() }}
+        </div>
+        
+        <div class="flex-1 text-center sm:text-left space-y-1">
+            <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <h1 class="text-2xl font-bold text-slate-900">{{ user.full_name }}</h1>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider
+                    {% if user.role == 'department_admin' %}bg-purple-100 text-purple-800
+                    {% elif user.role == 'teacher' %}bg-indigo-100 text-indigo-800
+                    {% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                    {{ user.role.replace('_', ' ') }}
+                </span>
+            </div>
+            
+            <p class="text-xs font-mono font-bold text-slate-500">
+                <i class="fa-solid fa-id-badge text-slate-400 mr-1"></i> Unique ID: {{ user.user_id }}
+            </p>
+            
+            <p class="text-xs text-slate-500">
+                <i class="fa-solid fa-building-columns text-slate-400 mr-1"></i> {{ user.department }}
+                {% if user.email %} • <i class="fa-solid fa-envelope text-slate-400 mr-1"></i> {{ user.email }}{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Student Specific Profile View -->
+    {% if user.role == 'student' %}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Identity & Institutional Details -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Institutional Data</h3>
+            
+            <div class="space-y-3 text-xs">
+                <div>
+                    <span class="text-slate-400 block text-[11px]">Father / Guardian Name</span>
+                    <span class="font-bold text-slate-800">{{ user.guardian_name or 'Not specified' }}</span>
+                </div>
+                <div>
+                    <span class="text-slate-400 block text-[11px]">School / Institution</span>
+                    <span class="font-bold text-slate-800">{{ user.school_name or user.department }}</span>
+                </div>
+                {% if user.udise_code %}
+                <div>
+                    <span class="text-slate-400 block text-[11px]">UDISE Code</span>
+                    <span class="font-mono font-bold text-slate-800">{{ user.udise_code }}</span>
+                </div>
+                {% endif %}
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">Block</span>
+                        <span class="font-semibold text-slate-700">{{ user.block or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">District</span>
+                        <span class="font-semibold text-slate-700">{{ user.district or '—' }}</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">State</span>
+                        <span class="font-semibold text-slate-700">{{ user.state or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">PIN Code</span>
+                        <span class="font-semibold text-slate-700">{{ user.pincode or '—' }}</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-slate-400 block text-[11px]">Account Created</span>
+                    <span class="font-medium text-slate-600">{{ user.created_at }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enrolled Courses & Progress -->
+        <div class="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Assigned Curriculum & Progress</h3>
+            
+            {% if enrolled_courses %}
+            <div class="divide-y divide-slate-100">
+                {% for c in enrolled_courses %}
+                <div class="py-3.5 flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-700">{{ c.code }}</span>
+                            <h4 class="font-bold text-xs text-slate-900">{{ c.title }}</h4>
+                        </div>
+                        <span class="text-[11px] text-slate-400">Enrolled: {{ c.enrolled_at }}</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3">
+                        <div class="text-right">
+                            <span class="text-xs font-bold text-indigo-600">{{ c.progress_percent }}%</span>
+                            <span class="block text-[10px] text-slate-400">{{ c.completed_lessons }}/{{ c.total_lessons }} lessons</span>
+                        </div>
+                        <a href="/course/{{ c.id }}" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition">
+                            Learn
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-slate-400 py-4">No courses assigned yet. Contact your department or faculty.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Quiz History -->
+    {% if quiz_history %}
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Assessment Performance</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                    <tr>
+                        <th class="p-3">Course</th>
+                        <th class="p-3">Assessment Lesson</th>
+                        <th class="p-3">Score</th>
+                        <th class="p-3">Status</th>
+                        <th class="p-3">Attempted At</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for q in quiz_history %}
+                    <tr>
+                        <td class="p-3 font-semibold text-slate-700">{{ q.course_code }}</td>
+                        <td class="p-3 font-bold text-slate-900">{{ q.lesson_title }}</td>
+                        <td class="p-3 font-bold text-indigo-600">{{ q.score_percent }}%</td>
+                        <td class="p-3">
+                            {% if q.passed %}
+                            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px]">Passed</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-bold text-[11px]">Failed</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-3 text-slate-500">{{ q.attempted_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Teacher Profile View -->
+    {% elif user.role == 'teacher' %}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Faculty Statistics</h3>
+            <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-center">
+                <span class="block text-2xl font-black text-indigo-700">{{ teacher_stats.unique_students }}</span>
+                <span class="text-xs text-indigo-900 font-semibold">Total Unique Students Taught</span>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                <span class="block text-2xl font-black text-slate-800">{{ teacher_stats.total_courses }}</span>
+                <span class="text-xs text-slate-600 font-semibold">Active Authored Courses</span>
+            </div>
+        </div>
+
+        <div class="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Authored Courses & Enrollment</h3>
+            <div class="divide-y divide-slate-100">
+                {% for tc in teacher_courses %}
+                <div class="py-3 flex items-center justify-between">
+                    <div>
+                        <span class="px-2 py-0.5 rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-700">{{ tc.code }}</span>
+                        <h4 class="font-bold text-xs text-slate-900 mt-1">{{ tc.title }}</h4>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xs font-bold text-slate-700">{{ tc.enrolled_count }} students</span>
+                        <a href="/teacher/course/{{ tc.id }}" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition">
+                            Edit Course
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Profile View -->
+    {% else %}
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Department Administration Privileges</h3>
+        <p class="text-xs text-slate-600">You hold executive Head of Department / Administrator authority over curriculum, global student pool, faculty permissions, and branding governance.</p>
+        <div class="pt-2 flex space-x-3">
+            <a href="/department" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
+                Open Department Command Dashboard
+            </a>
+            <a href="/department?tab=governance" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition">
+                Governance & Branding
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Account Settings / Security Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Account Credentials & Contact Update</h3>
+        
+        <form action="/profile/update" method="POST" class="max-w-xl space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+                    <input type="text" name="full_name" value="{{ user.full_name }}" required
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Designation / Role Title</label>
+                    <input type="text" name="designation" value="{{ user.designation or '' }}" placeholder="e.g. Department Head"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                <input type="email" name="email" value="{{ user.email or '' }}" placeholder="student@example.edu"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <span class="text-[11px] text-slate-400 mt-0.5 block">Connect your email for account recovery and notifications.</span>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 space-y-3">
+                <h4 class="text-xs font-bold text-slate-800">Change Password (Optional)</h4>
+                
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Current Password</label>
+                    <input type="password" name="current_password" placeholder="••••••••"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">New Password</label>
+                    <input type="password" name="new_password" placeholder="At least 6 characters"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
+                Save Profile Changes
+            </button>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

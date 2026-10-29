@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+
+{% block title %}{{ active_lesson.title if active_lesson else course.title }} - Nexus LMS{% endblock %}
+
+{% block head %}
+<!-- YouTube IFrame Player API -->
+<script src="https://www.youtube.com/iframe_api"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Top breadcrumb / navigation bar -->
+    <div class="flex items-center justify-between mb-4">
+        <a href="/student" class="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-indigo-600 transition">
+            <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Dashboard
+        </a>
+        <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                {{ course.code }}
+            </span>
+            <h1 class="text-sm font-bold text-slate-800 hidden sm:inline">{{ course.title }}</h1>
+        </div>
+    </div>
+
+    <!-- Main Player Grid (Sidebar + Viewport) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left: Lesson Content Viewport (8 Cols) -->
+        <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            
+            {% if active_lesson %}
+                <!-- Lesson Header Info -->
+                <div class="p-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                        <div class="flex items-center space-x-2 mb-1">
+                            {% if active_lesson.content_type == 'youtube' %}
+                                <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-red-50 text-red-600 border border-red-100">
+                                    <i class="fa-brands fa-youtube mr-1"></i> Video Lecture
+                                </span>
+                            {% elif active_lesson.content_type == 'pdf' %}
+                                <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-sky-50 text-sky-600 border border-sky-100">
+                                    <i class="fa-solid fa-file-pdf mr-1"></i> Document
+                                </span>
+                            {% elif active_lesson.content_type == 'quiz' %}
+                                <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-600 border border-purple-100">
+                                    <i class="fa-solid fa-clipboard-question mr-1"></i> Assessment
+                                </span>
+                            {% endif %}
+                            <span class="text-xs text-slate-400">&bull; {{ active_lesson.duration_minutes }} mins</span>
+                        </div>
+                        <h2 class="text-xl font-bold text-slate-900">{{ active_lesson.title }}</h2>
+                    </div>
+
+                    <!-- Complete Button / Status -->
+                    <div>
+                        {% if active_lesson.content_type != 'quiz' %}
+                            <button id="markCompleteBtn" onclick="markLessonComplete({{ active_lesson.id }})"
+                                class="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm {% if active_lesson.is_completed %}bg-emerald-50 text-emerald-700 border border-emerald-200{% else %}bg-indigo-600 text-white hover:bg-indigo-700{% endif %}">
+                                <i class="fa-solid {% if active_lesson.is_completed %}fa-circle-check{% else %}fa-check{% endif %}"></i>
+                                <span id="markCompleteText">{% if active_lesson.is_completed %}Completed{% else %}Mark Complete{% endif %}</span>
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Main Lesson Body Viewport -->
+                <div class="p-6">
+                    <!-- 1. YOUTUBE VIDEO PLAYER -->
+                    {% if active_lesson.content_type == 'youtube' %}
+                        {% if youtube_id %}
+                            <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black shadow-md">
+                                <div id="ytplayer" class="w-full h-full"></div>
+                            </div>
+                            <div class="mt-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-600">
+                                <span class="flex items-center space-x-2">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-indigo-500"></i>
+                                    <span>Automatic Tracking: Finishing this video will automatically mark it as completed!</span>
+                                </span>
+                                <span id="ytStatus" class="font-semibold text-slate-700">Ready</span>
+                            </div>
+                        {% else %}
+                            <div class="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                                <p class="text-sm text-slate-500">Video source URL: {{ active_lesson.content_value }}</p>
+                                <a href="{{ active_lesson.content_value }}" target="_blank" class="mt-3 inline-flex items-center text-xs font-semibold text-indigo-600 hover:underline">
+                                    Open directly on YouTube <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
+                                </a>
+                            </div>
+                        {% endif %}
+
+                    <!-- 2. PDF VIEWER -->
+                    {% elif active_lesson.content_type == 'pdf' %}
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                <div class="flex items-center space-x-2 text-xs font-semibold text-slate-700">
+                                    <i class="fa-solid fa-file-pdf text-red-500 text-base"></i>
+                                    <span>{{ active_lesson.content_value }}</span>
+                                </div>
+                                <a href="/static/uploads/{{ active_lesson.content_value }}" download class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-lg text-xs font-semibold text-slate-700 hover:text-indigo-600 transition shadow-sm">
+                                    <i class="fa-solid fa-download"></i>
+                                    <span>Download PDF</span>
+                                </a>
+                            </div>
+
+                            <div class="w-full h-[600px] rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shadow-inner">
+                                <iframe src="/static/uploads/{{ active_lesson.content_value }}#toolbar=1" class="w-full h-full border-none"></iframe>
+                            </div>
+                        </div>
+
+                    <!-- 3. INTERACTIVE QUIZ -->
+                    {% elif active_lesson.content_type == 'quiz' %}
+                        {% if quiz_data and quiz_data.questions %}
+                            <div id="quizContainer" class="space-y-6">
+                                <div class="p-4 bg-purple-50 border border-purple-100 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs text-purple-900">
+                                    <div class="space-y-0.5">
+                                        <div><span class="font-bold">Passing Score:</span> {{ quiz_data.passing_score }}% required to pass</div>
+                                        <div class="text-slate-500">{{ quiz_data.questions|length }} Question{{ 's' if quiz_data.questions|length != 1 else '' }}</div>
+                                    </div>
+                                    
+                                    <!-- Timed Assessment Engine Banner -->
+                                    <div class="flex items-center space-x-2">
+                                        <div class="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-semibold flex items-center space-x-1">
+                                            <i class="fa-solid fa-stopwatch text-amber-600"></i>
+                                            <span>Limit: {{ quiz_data.time_limit_minutes or 10 }}m</span>
+                                        </div>
+                                        <div id="quizTimerBox" class="px-3 py-1 bg-indigo-600 text-white font-mono font-bold rounded-lg shadow-sm flex items-center space-x-1.5">
+                                            <i class="fa-regular fa-clock text-indigo-200 text-xs"></i>
+                                            <span id="quizTimerDisplay">--:--</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Result Banner (Hidden initially) -->
+                                <div id="quizResultBanner" class="hidden p-5 rounded-2xl border text-sm transition-all duration-300"></div>
+
+                                <!-- Questions Form -->
+                                <form id="quizForm" onsubmit="submitQuiz(event, {{ quiz_data.id }})" class="space-y-6">
+                                    {% for q in quiz_data.questions %}
+                                    <div class="p-5 rounded-xl border border-slate-200 bg-white space-y-3" id="qBox_{{ q.id }}">
+                                        <p class="font-bold text-slate-900 text-sm">
+                                            <span class="text-indigo-600 mr-1.5">{{ loop.index }}.</span> {{ q.question_text }}
+                                        </p>
+
+                                        <div class="space-y-2 text-xs">
+                                            {% for opt_key, opt_text in [('A', q.option_a), ('B', q.option_b), ('C', q.option_c), ('D', q.option_d)] %}
+                                            <label class="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+                                                <input type="radio" name="q_{{ q.id }}" value="{{ opt_key }}" required class="text-indigo-600 focus:ring-indigo-500">
+                                                <span class="font-semibold text-slate-600">{{ opt_key }}.</span>
+                                                <span class="text-slate-800">{{ opt_text }}</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+
+                                        <div id="feedback_{{ q.id }}" class="hidden text-xs p-3 rounded-lg mt-2"></div>
+                                    </div>
+                                    {% endfor %}
+
+                                    <button type="submit" id="submitQuizBtn"
+                                        class="w-full py-3 px-4 rounded-xl font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition">
+                                        Submit Timed Assessment
+                                    </button>
+                                </form>
+
+                                <!-- Attempt History -->
+                                {% if quiz_data.attempts %}
+                                <div class="mt-8 pt-6 border-t border-slate-200">
+                                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Your Assessment History</h4>
+                                    <div class="overflow-hidden rounded-xl border border-slate-200">
+                                        <table class="w-full text-left text-xs">
+                                            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                                                <tr>
+                                                    <th class="p-3">Attempt Date</th>
+                                                    <th class="p-3">Score</th>
+                                                    <th class="p-3">Result</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100 bg-white">
+                                                {% for att in quiz_data.attempts %}
+                                                <tr>
+                                                    <td class="p-3 text-slate-600">{{ att.attempted_at }}</td>
+                                                    <td class="p-3 font-bold text-slate-900">{{ att.score_percent }}%</td>
+                                                    <td class="p-3">
+                                                        {% if att.passed %}
+                                                            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px]">Passed</span>
+                                                        {% else %}
+                                                            <span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-bold text-[11px]">Needs Review</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="p-8 text-center text-slate-500 text-xs">
+                                No questions have been published for this quiz yet. Check back soon!
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+            {% else %}
+                <div class="p-12 text-center text-slate-500 text-sm">
+                    Select a lesson from the curriculum sidebar on the right to start learning.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Right: Syllabus Curriculum Sidebar (4 Cols) -->
+        <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">
+            <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                <h3 class="font-bold text-slate-900 text-sm">Course Syllabus</h3>
+                <p class="text-xs text-slate-400">Step-by-step learning modules</p>
+            </div>
+
+            <div class="divide-y divide-slate-100 max-h-[75vh] overflow-y-auto">
+                {% for mod in modules %}
+                <div class="p-3">
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+                        {{ mod.title }}
+                    </h4>
+                    
+                    <div class="space-y-1">
+                        {% for les in mod.lessons %}
+                        <a href="/course/{{ course.id }}?lesson_id={{ les.id }}"
+                            class="flex items-center justify-between p-2.5 rounded-xl text-xs transition {% if active_lesson and active_lesson.id == les.id %}bg-indigo-50 text-indigo-900 font-bold border border-indigo-100{% else %}text-slate-700 hover:bg-slate-50{% endif %}">
+                            <div class="flex items-center space-x-2.5 truncate">
+                                <!-- Type Icon -->
+                                <span class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 {% if les.content_type == 'youtube' %}bg-red-50 text-red-500{% elif les.content_type == 'pdf' %}bg-sky-50 text-sky-500{% else %}bg-purple-50 text-purple-500{% endif %}">
+                                    {% if les.content_type == 'youtube' %}
+                                        <i class="fa-brands fa-youtube text-[10px]"></i>
+                                    {% elif les.content_type == 'pdf' %}
+                                        <i class="fa-solid fa-file-pdf text-[10px]"></i>
+                                    {% else %}
+                                        <i class="fa-solid fa-question text-[10px]"></i>
+                                    {% endif %}
+                                </span>
+                                <span class="truncate">{{ les.title }}</span>
+                            </div>
+
+                            <!-- Completion Status Checkmark -->
+                            <span class="shrink-0 ml-2" id="status_icon_{{ les.id }}">
+                                {% if les.is_completed %}
+                                    <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
+                                {% else %}
+                                    <i class="fa-regular fa-circle text-slate-300 text-sm"></i>
+                                {% endif %}
+                            </span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Mark Lesson Complete API
+async function markLessonComplete(lessonId) {
+    try {
+        const res = await fetch(`/api/lesson/${lessonId}/complete`, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            const btn = document.getElementById('markCompleteBtn');
+            const text = document.getElementById('markCompleteText');
+            if (btn && text) {
+                btn.className = "inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-200";
+                btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> <span>Completed</span>';
+            }
+            const icon = document.getElementById(`status_icon_${lessonId}`);
+            if (icon) {
+                icon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>';
+            }
+        }
+    } catch (e) {
+        console.error("Failed to complete lesson", e);
+    }
+}
+
+// YouTube Player API
+let player;
+const youtubeId = "{{ youtube_id or '' }}";
+const activeLessonId = {{ active_lesson.id if active_lesson else 0 }};
+
+function onYouTubeIframeAPIReady() {
+    if (!youtubeId || !document.getElementById('ytplayer')) return;
+    
+    player = new YT.Player('ytplayer', {
+        videoId: youtubeId,
+        playerVars: {
+            'playsinline': 1,
+            'rel': 0,
+            'modestbranding': 1
+        },
+        events: {
+            'onStateChange': onPlayerStateChange
+        }
+    });
+}
+
+function onPlayerStateChange(event) {
+    const statusEl = document.getElementById('ytStatus');
+    if (event.data === YT.PlayerState.PLAYING) {
+        if (statusEl) statusEl.innerText = "Playing...";
+    } else if (event.data === YT.PlayerState.PAUSED) {
+        if (statusEl) statusEl.innerText = "Paused";
+    } else if (event.data === YT.PlayerState.ENDED) {
+        if (statusEl) statusEl.innerText = "Finished! Marked Complete 🎉";
+        markLessonComplete(activeLessonId);
+    }
+}
+
+// Timed Quiz Engine (Backend-enforced timer)
+const quizId = {{ quiz_data.id if quiz_data else 0 }};
+const quizDurationMinutes = {{ quiz_data.time_limit_minutes if (quiz_data and quiz_data.time_limit_minutes) else 10 }};
+let quizSecondsRemaining = quizDurationMinutes * 60;
+let quizTimerInterval = null;
+let quizStartTimeEpoch = Math.floor(Date.now() / 1000);
+
+function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+function initQuizTimer() {
+    const timerDisplay = document.getElementById('quizTimerDisplay');
+    if (!timerDisplay || !quizId) return;
+
+    timerDisplay.innerText = formatTime(quizSecondsRemaining);
+
+    quizTimerInterval = setInterval(() => {
+        quizSecondsRemaining--;
+        if (timerDisplay) {
+            timerDisplay.innerText = formatTime(Math.max(0, quizSecondsRemaining));
+        }
+
+        // Warning when under 1 minute
+        if (quizSecondsRemaining <= 60 && quizSecondsRemaining > 0) {
+            const timerBox = document.getElementById('quizTimerBox');
+            if (timerBox) {
+                timerBox.className = "px-3 py-1 bg-red-600 text-white font-mono font-bold rounded-lg shadow-sm flex items-center space-x-1.5 animate-pulse";
+            }
+        }
+
+        // Time expired: Auto-submit
+        if (quizSecondsRemaining <= 0) {
+            clearInterval(quizTimerInterval);
+            const banner = document.getElementById('quizResultBanner');
+            if (banner) {
+                banner.classList.remove('hidden');
+                banner.className = "p-4 rounded-xl border bg-amber-50 border-amber-300 text-amber-900 text-xs font-bold mb-4";
+                banner.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-1.5 text-amber-600"></i> Time expired! Automatically submitting your answers to the assessment engine...';
+            }
+            submitQuiz(null, quizId, true);
+        }
+    }, 1000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initQuizTimer();
+});
+
+// Quiz Submission
+async function submitQuiz(e, quizId, isAutoSubmit = false) {
+    if (e) e.preventDefault();
+    if (quizTimerInterval) clearInterval(quizTimerInterval);
+
+    const form = document.getElementById('quizForm');
+    const formData = form ? new FormData(form) : new FormData();
+    const answers = {};
+
+    for (let [key, val] of formData.entries()) {
+        if (key.startsWith('q_')) {
+            const qId = key.replace('q_', '');
+            answers[qId] = val;
+        }
+    }
+
+    const timeTakenSeconds = Math.max(1, (quizDurationMinutes * 60) - Math.max(0, quizSecondsRemaining));
+    const submitBtn = document.getElementById('submitQuizBtn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Evaluating Assessment Answers...";
+    }
+
+    try {
+        const res = await fetch(`/api/quiz/${quizId}/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                answers,
+                start_time: quizStartTimeEpoch,
+                time_taken_seconds: timeTakenSeconds
+            })
+        });
+        const result = await res.json();
+
+        const banner = document.getElementById('quizResultBanner');
+        banner.classList.remove('hidden');
+
+        if (result.passed) {
+            banner.className = "p-5 rounded-2xl border bg-emerald-50 border-emerald-200 text-emerald-900";
+            banner.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-lg">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-base">Congratulations, You Passed!</h4>
+                        <p class="text-xs text-emerald-700">You scored <strong>${result.score_percent}%</strong> (${result.correct_count} of ${result.total_questions} correct) in <strong>${Math.round(timeTakenSeconds/60)}m ${timeTakenSeconds%60}s</strong>. Minimum required was ${result.passing_score}%.</p>
+                    </div>
+                </div>
+            `;
+            const icon = document.getElementById(`status_icon_${activeLessonId}`);
+            if (icon) {
+                icon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>';
+            }
+        } else {
+            banner.className = "p-5 rounded-2xl border bg-red-50 border-red-200 text-red-900";
+            banner.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-red-500 text-white flex items-center justify-center font-bold text-lg">
+                        <i class="fa-solid fa-xmark"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-base">${result.timed_out ? 'Assessment Time Limit Expired' : 'You did not meet the passing score'}</h4>
+                        <p class="text-xs text-red-700">You scored <strong>${result.score_percent}%</strong> in ${Math.round(timeTakenSeconds/60)}m ${timeTakenSeconds%60}s. You need ${result.passing_score}% to pass. Review feedback below and attempt again!</p>
+                    </div>
+                </div>
+            `;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Retake Assessment";
+            }
+        }
+
+        // Show feedback on individual questions
+        if (result.review) {
+            for (let [qId, rev] of Object.entries(result.review)) {
+                const feed = document.getElementById(`feedback_${qId}`);
+                if (feed) {
+                    feed.classList.remove('hidden');
+                    if (rev.correct) {
+                        feed.className = "text-xs p-2.5 rounded-lg mt-2 bg-emerald-50 text-emerald-800 border border-emerald-100";
+                        feed.innerHTML = `<i class="fa-solid fa-check text-emerald-500 mr-1"></i> Correct! ${rev.explanation || ''}`;
+                    } else {
+                        feed.className = "text-xs p-2.5 rounded-lg mt-2 bg-red-50 text-red-800 border border-red-100";
+                        feed.innerHTML = `<i class="fa-solid fa-xmark text-red-500 mr-1"></i> Incorrect. Correct option is <strong>${rev.correct_option}</strong>. ${rev.explanation || ''}`;
+                    }
+                }
+            }
+        }
+
+    } catch (err) {
+        console.error(err);
+        alert("Error evaluating quiz. Please try again.");
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Submit Assessment";
+        }
+    }
+}
+</script>
+{% endblock %}

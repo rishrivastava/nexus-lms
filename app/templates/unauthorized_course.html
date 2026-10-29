@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Course Not Assigned - {{ get_branding()['platform_name'] }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-16 text-center">
+    <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
+        <i class="fa-solid fa-lock"></i>
+    </div>
+    <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-slate-100 text-slate-700 mb-2 inline-block">
+        {{ course.code }}
+    </span>
+    <h1 class="text-2xl font-bold text-slate-900 tracking-tight">{{ course.title }}</h1>
+    
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mt-6 text-left space-y-3">
+        <div class="flex items-start space-x-3 text-amber-800 text-xs">
+            <i class="fa-solid fa-circle-exclamation text-amber-500 mt-0.5 text-sm"></i>
+            <div>
+                <p class="font-bold">Access Restricted: You are not enrolled in this course.</p>
+                <p class="text-slate-600 mt-1">
+                    Your account has not been assigned to this course group. Only courses assigned by your teacher, school, or department administrator can be accessed.
+                </p>
+            </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 text-xs text-slate-500 flex justify-between items-center">
+            <span>Course Instructor: <strong>{{ course.teacher_name }}</strong></span>
+            <span>Department: <strong>{{ course.department }}</strong></span>
+        </div>
+    </div>
+
+    <div class="mt-8 flex justify-center space-x-4">
+        <a href="/student" class="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition">
+            <i class="fa-solid fa-arrow-left"></i>
+            <span>Return to My Assigned Courses</span>
+        </a>
+    </div>
+</div>
+{% endblock %}

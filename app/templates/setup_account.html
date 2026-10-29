@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Activate Your Account - Nexus LMS{% endblock %}
+
+{% block content %}
+<div class="min-h-[80vh] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 mb-4 shadow-inner">
+            <i class="fa-solid fa-key text-2xl"></i>
+        </div>
+        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Activate Your Account</h2>
+        <p class="mt-2 text-sm text-slate-500">
+            Welcome, <strong class="text-slate-800">{{ user.full_name }}</strong> (ID: {{ user.user_id }}). Please secure your account by choosing a permanent password.
+        </p>
+    </div>
+
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
+        <div class="bg-white py-8 px-6 shadow-xl shadow-slate-100 rounded-2xl border border-slate-200 sm:px-10">
+            {% if error %}
+            <div class="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-center space-x-2.5">
+                <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <form class="space-y-5" action="/setup-account" method="POST">
+                <div>
+                    <label for="new_password" class="block text-sm font-semibold text-slate-700">New Permanent Password</label>
+                    <div class="mt-1.5 relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <input id="new_password" name="new_password" type="password" required minlength="6" placeholder="At least 6 characters"
+                            class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="confirm_password" class="block text-sm font-semibold text-slate-700">Confirm New Password</label>
+                    <div class="mt-1.5 relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-check-double"></i>
+                        </div>
+                        <input id="confirm_password" name="confirm_password" type="password" required minlength="6" placeholder="Repeat your new password"
+                            class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100">
+                    <label for="email" class="block text-sm font-semibold text-slate-700">
+                        Link Your Personal Email <span class="text-slate-400 font-normal">(Optional but recommended)</span>
+                    </label>
+                    <div class="mt-1.5 relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-regular fa-envelope"></i>
+                        </div>
+                        <input id="email" name="email" type="email" placeholder="e.g. yourname@gmail.com"
+                            class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                    </div>
+                    <p class="mt-1.5 text-xs text-slate-400">Allows you to receive course updates and certificate notifications.</p>
+                </div>
+
+                <div>
+                    <button type="submit"
+                        class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
+                        Save Password & Enter LMS
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

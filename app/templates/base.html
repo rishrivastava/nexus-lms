@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% set brand = get_branding() %}
+    <title>{% block title %}{{ brand.department_name or brand.platform_name }}{% endblock %}</title>
+    <!-- Google Fonts: Outfit, Poppins, Inter, Noto Sans Devanagari, Merriweather -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '{{ brand.brand_color or "#4f46e5" }}',
+                        brandsec: '{{ brand.secondary_brand_color or "#06b6d4" }}'
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --brand-theme: {{ brand.brand_color or "#4f46e5" }};
+            --brand-secondary: {{ brand.secondary_brand_color or "#06b6d4" }};
+            {% if brand.font_family == 'merriweather' %}
+                --font-heading: 'Merriweather', 'Noto Sans Devanagari', serif;
+                --font-body: 'Inter', 'Noto Sans Devanagari', sans-serif;
+            {% elif brand.font_family == 'poppins' %}
+                --font-heading: 'Poppins', 'Noto Sans Devanagari', sans-serif;
+                --font-body: 'Inter', 'Noto Sans Devanagari', sans-serif;
+            {% elif brand.font_family == 'noto_devanagari' %}
+                --font-heading: 'Noto Sans Devanagari', 'Outfit', sans-serif;
+                --font-body: 'Noto Sans Devanagari', 'Inter', sans-serif;
+            {% elif brand.font_family == 'inter' %}
+                --font-heading: 'Inter', 'Noto Sans Devanagari', sans-serif;
+                --font-body: 'Inter', 'Noto Sans Devanagari', sans-serif;
+            {% else %}
+                --font-heading: 'Outfit', 'Noto Sans Devanagari', sans-serif;
+                --font-body: 'Inter', 'Noto Sans Devanagari', sans-serif;
+            {% endif %}
+        }
+        body { font-family: var(--font-body); }
+        h1, h2, h3, h4, .brand-font { font-family: var(--font-heading); }
+        .theme-bg { background-color: var(--brand-theme) !important; }
+        .theme-text { color: var(--brand-theme) !important; }
+        .theme-border { border-color: var(--brand-theme) !important; }
+        .theme-sec-bg { background-color: var(--brand-secondary) !important; }
+        .theme-sec-text { color: var(--brand-secondary) !important; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+    {% set brand = get_branding() %}
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Logo & Brand Header -->
+                <div class="flex items-center space-x-3">
+                    <a href="/" class="flex items-center space-x-2.5">
+                        {% if brand.logo_image_url %}
+                            <img src="{{ brand.logo_image_url }}" alt="Logo" class="h-10 max-w-[160px] object-contain">
+                        {% else %}
+                            <div class="w-10 h-10 rounded-xl theme-bg flex items-center justify-center text-white shadow-md shadow-indigo-100">
+                                <i class="fa-solid {{ brand.logo_icon or 'fa-graduation-cap' }} text-lg"></i>
+                            </div>
+                        {% endif %}
+                        <div>
+                            <span class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-none block">{{ brand.platform_name }}</span>
+                            <span class="text-[11px] block text-slate-400 font-medium mt-0.5">{{ brand.institution_name }}</span>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Nav Links & User Context -->
+                <nav class="flex items-center space-x-2 sm:space-x-3">
+                    {% if user %}
+                        {% if user.role == 'student' %}
+                            <a href="/student" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition">
+                                <i class="fa-solid fa-book-open mr-1 text-slate-400"></i> My Courses
+                            </a>
+                        {% endif %}
+                        
+                        {% if user.role in ['teacher', 'department_admin'] %}
+                            <a href="/teacher" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition">
+                                <i class="fa-solid fa-chalkboard-user mr-1 text-slate-400"></i> Studio
+                            </a>
+                            <a href="/department" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition">
+                                <i class="fa-solid fa-chart-pie mr-1 text-slate-400"></i> Department Dashboards
+                            </a>
+                        {% endif %}
+
+                        <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+                        <!-- Notification Bell Button -->
+                        <div class="relative">
+                            <button onclick="toggleNotificationCenter()" id="notifBellBtn" title="Notifications"
+                                class="relative text-slate-500 hover:text-indigo-600 p-2 rounded-xl hover:bg-slate-100 transition focus:outline-none">
+                                <i class="fa-regular fa-bell text-base"></i>
+                                <span id="notifUnreadBadge" class="hidden absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white font-bold text-[9px] flex items-center justify-center">0</span>
+                            </button>
+
+                            <!-- Notification Dropdown Menu -->
+                            <div id="notifDropdown" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-fadeIn">
+                                <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                                    <div class="flex items-center space-x-2">
+                                        <i class="fa-solid fa-bell text-indigo-600 text-xs"></i>
+                                        <span class="text-xs font-bold text-slate-900">Notifications</span>
+                                        <span id="notifDropdownCount" class="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold">0</span>
+                                    </div>
+                                    <button onclick="markAllNotificationsRead()" class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition">
+                                        Mark all read
+                                    </button>
+                                </div>
+                                <div id="notifList" class="divide-y divide-slate-100 max-h-80 overflow-y-auto text-xs">
+                                    <div class="p-6 text-center text-slate-400 text-xs">
+                                        <i class="fa-regular fa-bell-slash text-xl block mb-1"></i>
+                                        No notifications yet
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- User Profile Pill -->
+                        <div class="flex items-center space-x-2 pl-1">
+                            <a href="/profile" class="flex items-center space-x-2 hover:opacity-85 transition group" title="View Profile">
+                                <div class="text-right hidden md:block">
+                                    <p class="text-xs sm:text-sm font-bold text-slate-900 leading-tight group-hover:text-indigo-600 transition">{{ user.full_name }}</p>
+                                    <p class="text-[11px] text-slate-500 font-medium">ID: {{ user.user_id }} &bull; <span class="capitalize font-semibold {% if user.role == 'department_admin' %}text-indigo-600{% elif user.role == 'teacher' %}text-sky-600{% else %}text-slate-600{% endif %}">{{ user.designation or user.role.replace('_', ' ') }}</span></p>
+                                </div>
+                                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs sm:text-sm group-hover:border-indigo-300 transition">
+                                    {{ user.full_name[0] }}
+                                </div>
+                            </a>
+                            <a href="/logout" title="Sign Out" class="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition">
+                                <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                            </a>
+                        </div>
+                    {% else %}
+                        <a href="/login" class="inline-flex items-center px-4 py-2 text-xs sm:text-sm font-bold rounded-xl text-white theme-bg shadow-sm transition">
+                            Sign In
+                        </a>
+                    {% endif %}
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Prominent Department Branding Header Banner (Requirement 1) -->
+    <div class="relative bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white overflow-hidden shadow-inner border-b border-indigo-950/40">
+        {% if brand.department_banner_url %}
+        <div class="absolute inset-0 z-0 opacity-20 bg-cover bg-center" style="background-image: url('{{ brand.department_banner_url }}');"></div>
+        {% endif %}
+        <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="space-y-1 max-w-3xl">
+                    <div class="flex items-center space-x-2 text-[11px] font-bold uppercase tracking-wider text-indigo-300">
+                        <span>{{ brand.institution_name }}</span>
+                        <span>&bull;</span>
+                        <span class="text-emerald-400 flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span>{{ brand.accreditation_badge or 'Accredited Academic Portal' }}</span>
+                        </span>
+                        {% if user and user.role == 'department_admin' %}
+                        <a href="/department?tab=governance" class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white text-[10px] font-semibold transition border border-white/20">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                            <span>Edit Governance & Branding</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                    <h1 class="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white leading-tight">
+                        {{ brand.department_name }}
+                    </h1>
+                    {% if brand.department_tagline %}
+                    <p class="text-xs sm:text-sm text-slate-300 font-medium">
+                        {{ brand.department_tagline }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Department Contact Info Chips -->
+                <div class="flex flex-wrap md:flex-col md:items-end gap-2 text-[11px] text-slate-300 shrink-0">
+                    {% if brand.contact_email %}
+                    <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur-xs border border-white/10">
+                        <i class="fa-regular fa-envelope text-indigo-300 text-[10px]"></i>
+                        <span>{{ brand.contact_email }}</span>
+                    </span>
+                    {% endif %}
+                    {% if brand.contact_phone %}
+                    <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur-xs border border-white/10">
+                        <i class="fa-solid fa-phone text-indigo-300 text-[10px]"></i>
+                        <span>{{ brand.contact_phone }}</span>
+                    </span>
+                    {% endif %}
+                    {% if brand.contact_office %}
+                    <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur-xs border border-white/10">
+                        <i class="fa-solid fa-location-dot text-indigo-300 text-[10px]"></i>
+                        <span>{{ brand.contact_office }}</span>
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 mt-12">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+            <p>&copy; 2026 {{ brand.department_name }} &bull; {{ brand.institution_name }}</p>
+            <p class="text-[11px] text-slate-400">Powered by {{ brand.platform_name }} Enterprise Engine</p>
+        </div>
+    </footer>
+
+    <!-- Global Notification & Heartbeat Scripts -->
+    <script>
+    // Live Student Heartbeat & Notification Fetcher
+    async function sendHeartbeat() {
+        try {
+            await fetch('/api/activity/heartbeat', { method: 'POST' });
+        } catch(e) {}
+    }
+
+    async function loadNotifications() {
+        try {
+            const res = await fetch('/api/notifications');
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            const badge = document.getElementById('notifUnreadBadge');
+            const dropCount = document.getElementById('notifDropdownCount');
+            const list = document.getElementById('notifList');
+
+            if (badge && dropCount) {
+                if (data.unread_count > 0) {
+                    badge.classList.remove('hidden');
+                    badge.innerText = data.unread_count;
+                    dropCount.innerText = data.unread_count + ' new';
+                } else {
+                    badge.classList.add('hidden');
+                    dropCount.innerText = '0';
+                }
+            }
+
+            if (list && data.notifications) {
+                if (data.notifications.length === 0) {
+                    list.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs"><i class="fa-regular fa-bell-slash text-xl block mb-1"></i>No notifications yet</div>';
+                } else {
+                    list.innerHTML = data.notifications.map(n => `
+                        <div class="p-3 hover:bg-slate-50 transition flex items-start space-x-2.5 ${n.is_read ? 'opacity-70' : 'bg-indigo-50/40'}">
+                            <span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-[10px] mt-0.5">
+                                <i class="fa-solid ${n.category === 'quiz' ? 'fa-circle-question' : (n.category === 'course' ? 'fa-book' : 'fa-bell')}"></i>
+                            </span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between">
+                                    <h5 class="font-bold text-slate-900 text-xs truncate">${n.title}</h5>
+                                    <span class="text-[10px] text-slate-400">${n.created_at.substring(11, 16)}</span>
+                                </div>
+                                <p class="text-[11px] text-slate-600 line-clamp-2 mt-0.5">${n.message}</p>
+                                ${n.link_url ? `<a href="${n.link_url}" class="text-[10px] text-indigo-600 hover:underline font-bold mt-1 inline-block">View details &rarr;</a>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        } catch(e) {}
+    }
+
+    function toggleNotificationCenter() {
+        const drop = document.getElementById('notifDropdown');
+        if (drop) {
+            drop.classList.toggle('hidden');
+            if (!drop.classList.contains('hidden')) {
+                loadNotifications();
+            }
+        }
+    }
+
+    async function markAllNotificationsRead() {
+        try {
+            await fetch('/api/notifications/read-all', { method: 'POST' });
+            loadNotifications();
+        } catch(e) {}
+    }
+
+    // Initialize intervals
+    {% if user %}
+    document.addEventListener('DOMContentLoaded', () => {
+        loadNotifications();
+        sendHeartbeat();
+        setInterval(sendHeartbeat, 60000); // 60s heartbeat
+        setInterval(loadNotifications, 45000); // 45s notification poll
+    });
+    {% endif %}
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
