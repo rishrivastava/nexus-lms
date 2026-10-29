@@ -257,3 +257,281 @@ async def reporting_engagement(request: Request):
         engagement = [dict(r) for r in cursor.fetchall()]
 
     return JSONResponse({"status": "success", "count": len(engagement), "data": engagement})
+
+# ==========================================
+# 4. CHATBOT, SUPPORT QUERIES & HELP DESK API
+# ==========================================
+
+from app.gemini_service import answer_support_query, test_gemini_connection
+from app.database import create_notification, log_audit
+import uuid
+
+@router.post("/api/queries/create")
+async def create_query(request: Request):
+    """
+    Submits a new query from Student or Teacher Chatbot.
+    Rules:
+      - Student queries: visibility = 'teachers_and_admin' (visible to Teachers and Admin)
+      - Teacher queries: visibility = 'admin_only' (visible ONLY to Admin)
+    """
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Please log in to submit a query.")
+
+    try:
+        body = await request.json()
+    except Exception:
+        form = await request.form()
+        body = dict(form)
+
+    subject = str(body.get("subject", "")).strip()
+    message = str(body.get("message", "")).strip()
+    category = str(body.get("category", "General Query")).strip()
+    course_id = body.get("course_id")
+    course_title = str(body.get("course_title", "")).strip() if body.get("course_title") else None
+
+    if not subject or not message:
+        raise HTTPException(status_code=400, detail="Both Subject and Query Message are required.")
+
+    # Determine visibility based on user role as required
+    if user["role"] == "teacher":
+        visibility = "admin_only"
+    else:
+        visibility = "teachers_and_admin"
+
+    ticket_id = f"TKT-{datetime.now().strftime('%y%m')}-{uuid.uuid4().hex[:4].upper()}"
+
+    # Generate Gemini AI answer
+    ai_response = answer_support_query(
+        ticket_id=ticket_id,
+        user_name=user["full_name"],
+        user_role=user["role"],
+        subject=subject,
+        message=message,
+        course_title=course_title
+    )
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO support_queries (
+                ticket_id, user_id, user_role, user_name, user_email,
+                course_id, course_title, subject, category, message,
+                ai_response, status, visibility
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
+        """, (
+            ticket_id, user["user_id"], user["role"], user["full_name"], user.get("email"),
+            course_id, course_title, subject, category, message,
+            ai_response, visibility
+        ))
+
+        # Collect Admin IDs
+        cursor.execute("SELECT id FROM users WHERE role = 'department_admin'")
+        admin_ids = [a["id"] for a in cursor.fetchall()]
+
+        # If student query, collect course teacher ID
+        teacher_id = None
+        if user["role"] == "student" and course_id:
+            cursor.execute("SELECT teacher_id FROM courses WHERE id = ?", (course_id,))
+            t_row = cursor.fetchone()
+            if t_row:
+                teacher_id = t_row["teacher_id"]
+
+    # Alert Admin (outside first connection)
+    for aid in admin_ids:
+        create_notification(
+            aid,
+            f"New {user['role'].capitalize()} Query #{ticket_id}",
+            f"{user['full_name']} raised: '{subject}'. Immediate Gemini AI answer delivered.",
+            "/department?tab=queries",
+            "system"
+        )
+
+    # Alert Course Teacher if applicable
+    if teacher_id:
+        create_notification(
+            teacher_id,
+            f"Student Query #{ticket_id} ({course_title or 'Course'})",
+            f"{user['full_name']} asked: '{subject}'.",
+            "/teacher",
+            "course"
+        )
+
+    return JSONResponse({
+        "status": "success",
+        "ticket_id": ticket_id,
+        "ai_response": ai_response,
+        "visibility": visibility,
+        "message": "Query registered successfully."
+    })
+
+@router.get("/api/queries/my")
+async def get_my_queries(request: Request):
+    """Returns queries raised by the logged in student or teacher."""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM support_queries 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 50
+        """, (user["user_id"],))
+        rows = [dict(r) for r in cursor.fetchall()]
+
+    return JSONResponse({"status": "success", "count": len(rows), "data": rows})
+
+@router.get("/api/queries/feed")
+async def get_queries_feed(request: Request, status_filter: str = Query("all")):
+    """
+    Returns queries based on strict role authorization:
+      - Admin: Sees ALL queries (both student & teacher).
+      - Teacher: Sees ONLY student queries (visibility == 'teachers_and_admin') and their own.
+      - Student: Sees ONLY their own.
+    """
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        query_sql = "SELECT * FROM support_queries WHERE "
+        params = []
+
+        if user["role"] == "department_admin":
+            query_sql += "1=1 "
+        elif user["role"] == "teacher":
+            query_sql += "(visibility = 'teachers_and_admin' OR user_id = ?) "
+            params.append(user["user_id"])
+        else:
+            query_sql += "user_id = ? "
+            params.append(user["user_id"])
+
+        if status_filter in ["open", "replied", "resolved"]:
+            query_sql += "AND status = ? "
+            params.append(status_filter)
+
+        query_sql += "ORDER BY created_at DESC LIMIT 100"
+        cursor.execute(query_sql, tuple(params))
+        queries = [dict(r) for r in cursor.fetchall()]
+
+    return JSONResponse({"status": "success", "count": len(queries), "data": queries})
+
+@router.post("/api/queries/reply")
+async def reply_to_query(request: Request):
+    """
+    Allows Admin to reply to any query, and Teachers to reply to student queries.
+    """
+    user = get_current_user(request)
+    if not user or user["role"] not in ["department_admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Unauthorized to reply to queries.")
+
+    try:
+        body = await request.json()
+    except Exception:
+        form = await request.form()
+        body = dict(form)
+
+    ticket_id = str(body.get("ticket_id", "")).strip()
+    reply_text = str(body.get("reply_text", "")).strip()
+    new_status = str(body.get("status", "replied")).strip()
+
+    if not ticket_id or not reply_text:
+        raise HTTPException(status_code=400, detail="Ticket ID and Reply Text are required.")
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM support_queries WHERE ticket_id = ?", (ticket_id,))
+        ticket = cursor.fetchone()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found.")
+
+        # Teacher cannot reply to teacher private queries
+        if user["role"] == "teacher" and ticket["visibility"] == "admin_only":
+            raise HTTPException(status_code=403, detail="Teacher queries are private to the Administrator.")
+
+        cursor.execute("""
+            UPDATE support_queries 
+            SET admin_reply = ?, replied_by = ?, replied_at = CURRENT_TIMESTAMP, status = ?
+            WHERE ticket_id = ?
+        """, (reply_text, f"{user['full_name']} ({user['role'].replace('_', ' ')})", new_status, ticket_id))
+
+        # Retrieve submitter ID
+        cursor.execute("SELECT id FROM users WHERE user_id = ?", (ticket["user_id"],))
+        sub_user = cursor.fetchone()
+        sub_id = sub_user["id"] if sub_user else None
+
+    # Notify outside transaction
+    if sub_id:
+        create_notification(
+            sub_id,
+            f"Reply to Ticket #{ticket_id}",
+            f"{user['full_name']} responded: '{reply_text[:80]}...'",
+            "/profile",
+            "system"
+        )
+
+    return JSONResponse({
+        "status": "success",
+        "message": "Official reply submitted successfully.",
+        "ticket_id": ticket_id
+    })
+
+# ==========================================
+# 5. GEMINI AI CONFIGURATION & TESTING API
+# ==========================================
+
+@router.post("/api/gemini/save-settings")
+async def save_gemini_settings(request: Request):
+    """Saves Gemini AI configuration from Governance / Settings."""
+    user = get_current_user(request)
+    if not user or user["role"] != "department_admin":
+        raise HTTPException(status_code=403, detail="Only Department Admin can configure Gemini AI.")
+
+    try:
+        body = await request.json()
+    except Exception:
+        form = await request.form()
+        body = dict(form)
+
+    api_key = str(body.get("gemini_api_key", "")).strip()
+    model = str(body.get("gemini_model", "gemini-2.5-flash")).strip()
+    auto_reply = "1" if body.get("gemini_auto_reply") in [True, "1", "true", "on"] else "0"
+    enabled = "1" if body.get("gemini_enabled") in [True, "1", "true", "on"] else "0"
+
+    settings = {
+        "gemini_api_key": api_key,
+        "gemini_model": model,
+        "gemini_auto_reply": auto_reply,
+        "gemini_enabled": enabled
+    }
+    update_system_settings(settings)
+    log_audit(user["id"], "UPDATE_GEMINI_SETTINGS", "system_settings", "gemini", f"Updated Gemini AI settings: model={model}, enabled={enabled}")
+
+    return JSONResponse({"status": "success", "message": "Gemini AI settings saved successfully."})
+
+@router.post("/api/gemini/test")
+async def test_gemini(request: Request):
+    """Tests Gemini connection with provided or saved API key."""
+    user = get_current_user(request)
+    if not user or user["role"] != "department_admin":
+        raise HTTPException(status_code=403, detail="Unauthorized.")
+
+    try:
+        body = await request.json()
+    except Exception:
+        form = await request.form()
+        body = dict(form)
+
+    api_key = str(body.get("api_key", "")).strip()
+    model = str(body.get("model", "gemini-2.5-flash")).strip()
+
+    if not api_key:
+        curr_settings = get_system_settings()
+        api_key = curr_settings.get("gemini_api_key", "").strip()
+
+    res = test_gemini_connection(api_key, model=model)
+    return JSONResponse(res)

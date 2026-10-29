@@ -47,10 +47,22 @@ async def teacher_dashboard(request: Request):
             
         courses = [dict(c) for c in cursor.fetchall()]
 
+        # Student queries visible to teachers (visibility == 'teachers_and_admin')
+        cursor.execute("""
+            SELECT * FROM support_queries 
+            WHERE visibility = 'teachers_and_admin' 
+            ORDER BY created_at DESC 
+            LIMIT 50
+        """)
+        student_queries = [dict(q) for q in cursor.fetchall()]
+        open_student_queries = sum(1 for q in student_queries if q["status"] == "open")
+
     return templates.TemplateResponse("teacher_dashboard.html", {
         "request": request,
         "user": user,
-        "courses": courses
+        "courses": courses,
+        "student_queries": student_queries,
+        "open_student_queries": open_student_queries
     })
 
 @router.post("/teacher/course/create")

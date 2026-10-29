@@ -693,6 +693,11 @@ async def department_dashboard(
         """)
         student_conflicts = [dict(c) for c in cursor.fetchall()]
 
+        # Support & Chatbot Queries
+        cursor.execute("SELECT * FROM support_queries ORDER BY created_at DESC LIMIT 100")
+        all_queries = [dict(q) for q in cursor.fetchall()]
+        open_queries_count = sum(1 for q in all_queries if q["status"] == "open")
+
     return templates.TemplateResponse("department_dashboard.html", {
         "request": request,
         "user": user,
@@ -752,6 +757,8 @@ async def department_dashboard(
         "notification_settings": notification_settings,
         "audit_logs": audit_logs,
         "student_conflicts": student_conflicts,
+        "all_queries": all_queries,
+        "open_queries_count": open_queries_count,
         "last_rejected_count": len(LAST_IMPORT_REJECTED)
     })
 

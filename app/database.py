@@ -63,6 +63,8 @@ def init_db():
             "normalized_guardian": "TEXT",
             "designation": "TEXT",
             "avatar_url": "TEXT",
+            "phone": "TEXT",
+            "bio": "TEXT",
             "last_active_at": "TIMESTAMP"
         }
         for col, col_type in new_cols.items():
@@ -319,6 +321,33 @@ def init_db():
         );
         """)
 
+        # 16. Support Queries & Chatbot Tickets Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS support_queries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id TEXT UNIQUE NOT NULL,             -- e.g. TKT-2026-0001
+            user_id TEXT NOT NULL,                      -- student or teacher user_id
+            user_role TEXT NOT NULL,                    -- 'student' or 'teacher'
+            user_name TEXT NOT NULL,
+            user_email TEXT,
+            course_id INTEGER,                          -- optional, course context
+            course_title TEXT,                          -- optional
+            subject TEXT NOT NULL,                      -- query subject/topic
+            category TEXT DEFAULT 'General',            -- 'Academic', 'Technical', 'General'
+            message TEXT NOT NULL,                      -- original query text
+            ai_response TEXT,                           -- instant Gemini AI response
+            admin_reply TEXT,                           -- reply from admin or teacher
+            replied_by TEXT,                            -- name/id of replier
+            replied_at TIMESTAMP,
+            status TEXT DEFAULT 'open',                 -- 'open', 'replied', 'resolved'
+            visibility TEXT NOT NULL,                   -- 'teachers_and_admin' (for students), 'admin_only' (for teachers)
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_user ON support_queries(user_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_status ON support_queries(status);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_visibility ON support_queries(visibility);")
+
         # Default system branding and settings
         default_settings = {
             "platform_name": "Nexus LMS",
@@ -339,10 +368,20 @@ def init_db():
             "font_family": "outfit",
             "powerbi_api_key": "pbi_live_9a7f82b3d1e4c5a6b7c8d9e0f1a2b3c4",
             "powerbi_last_sync_at": "",
-            "live_inactivity_minutes": "5"
+            "live_inactivity_minutes": "5",
+            "gemini_api_key": "",
+            "gemini_model": "gemini-2.5-flash",
+            "gemini_auto_reply": "1",
+            "gemini_enabled": "1"
         }
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (k, v))
+
+        # Ensure admin user department matches current department_name if available
+        cursor.execute("SELECT value FROM system_settings WHERE key = 'department_name'")
+        dept_row = cursor.fetchone()
+        if dept_row and dept_row[0]:
+            cursor.execute("UPDATE users SET department = ? WHERE role = 'department_admin' AND (department = 'Computer Science' OR department IS NULL)", (dept_row[0],))
 
 def get_system_settings() -> dict:
     with get_db() as conn:

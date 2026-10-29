@@ -21,9 +21,13 @@
 
     <!-- Profile Header Card -->
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
+        {% if user.avatar_url %}
+        <img src="{{ user.avatar_url }}" alt="Profile Avatar" class="w-20 h-20 rounded-2xl object-cover shadow-lg shadow-indigo-100 shrink-0 border border-slate-200">
+        {% else %}
         <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-2xl shadow-lg shadow-indigo-100 shrink-0">
             {{ user.full_name[:2].upper() }}
         </div>
+        {% endif %}
         
         <div class="flex-1 text-center sm:text-left space-y-1">
             <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
@@ -32,7 +36,7 @@
                     {% if user.role == 'department_admin' %}bg-purple-100 text-purple-800
                     {% elif user.role == 'teacher' %}bg-indigo-100 text-indigo-800
                     {% else %}bg-emerald-100 text-emerald-800{% endif %}">
-                    {{ user.role.replace('_', ' ') }}
+                    {{ user.designation or user.role.replace('_', ' ') }}
                 </span>
             </div>
             
@@ -41,8 +45,9 @@
             </p>
             
             <p class="text-xs text-slate-500">
-                <i class="fa-solid fa-building-columns text-slate-400 mr-1"></i> {{ user.department }}
+                <i class="fa-solid fa-building-columns text-slate-400 mr-1"></i> {{ user.department or brand.department_name }}
                 {% if user.email %} • <i class="fa-solid fa-envelope text-slate-400 mr-1"></i> {{ user.email }}{% endif %}
+                {% if user.phone %} • <i class="fa-solid fa-phone text-slate-400 mr-1"></i> {{ user.phone }}{% endif %}
             </p>
         </div>
     </div>
@@ -219,50 +224,153 @@
     </div>
     {% endif %}
 
-    <!-- Account Settings / Security Card -->
-    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Account Credentials & Contact Update</h3>
+    <!-- Account Settings & Complete Profile Editor -->
+    <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+        <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 flex items-center">
+                    <i class="fa-solid fa-user-pen text-indigo-600 mr-2"></i>
+                    <span>Edit Profile & Account Credentials</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Customize your personal profile, institutional affiliations, avatar photo, and contact details.</p>
+            </div>
+            <span class="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold uppercase">
+                {{ user.role.replace('_', ' ') }}
+            </span>
+        </div>
         
-        <form action="/profile/update" method="POST" class="max-w-xl space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form action="/profile/update" method="POST" enctype="multipart/form-data" class="space-y-5">
+            <!-- Profile Avatar Upload -->
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+                {% if user.avatar_url %}
+                <img src="{{ user.avatar_url }}" alt="Avatar" class="w-14 h-14 rounded-xl object-cover border border-slate-200 shadow-sm shrink-0">
+                {% else %}
+                <div class="w-14 h-14 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+                    {{ user.full_name[:2].upper() }}
+                </div>
+                {% endif %}
+                <div class="flex-1 w-full text-center sm:text-left space-y-1">
+                    <label class="block text-xs font-bold text-slate-800">Profile Picture / Avatar</label>
+                    <input type="file" name="avatar_file" accept=".png,.jpg,.jpeg,.svg,.webp"
+                        class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-indigo-100 file:text-indigo-800">
+                    <span class="text-[10px] text-slate-400 block">Accepted formats: PNG, JPG, SVG, WebP.</span>
+                </div>
+            </div>
+
+            <!-- Basic Identity Information -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
                     <input type="text" name="full_name" value="{{ user.full_name }}" required
                         class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Designation / Role Title</label>
-                    <input type="text" name="designation" value="{{ user.designation or '' }}" placeholder="e.g. Department Head"
+                    <input type="text" name="designation" value="{{ user.designation or '' }}" placeholder="e.g. Department Head, Student, Faculty"
                         class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
             </div>
 
+            <!-- Department & School Affiliation -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Department / Subject Area</label>
+                    <input type="text" name="department" value="{{ user.department or '' }}" placeholder="e.g. Foreign Language, Mathematics"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">School / Institution Name</label>
+                    <input type="text" name="school_name" value="{{ user.school_name or '' }}" placeholder="e.g. Leadership Boulevard, Government High School"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                    <input type="email" name="email" value="{{ user.email or '' }}" placeholder="user@example.edu"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Contact Phone</label>
+                    <input type="text" name="phone" value="{{ user.phone or '' }}" placeholder="+91 98765 43210"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Guardian & Address Details (Especially helpful for student records) -->
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-address-card text-indigo-600"></i>
+                    <span>Guardian & Geographical Data</span>
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Father / Guardian Name</label>
+                        <input type="text" name="guardian_name" value="{{ user.guardian_name or '' }}" placeholder="Parent or Guardian"
+                            class="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Block</label>
+                        <input type="text" name="block" value="{{ user.block or '' }}" placeholder="Block / Mandal"
+                            class="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">District</label>
+                        <input type="text" name="district" value="{{ user.district or '' }}" placeholder="District"
+                            class="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">State</label>
+                        <input type="text" name="state" value="{{ user.state or '' }}" placeholder="State"
+                            class="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">PIN Code</label>
+                        <input type="text" name="pincode" value="{{ user.pincode or '' }}" placeholder="PIN Code"
+                            class="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <!-- About / Bio -->
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
-                <input type="email" name="email" value="{{ user.email or '' }}" placeholder="student@example.edu"
-                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                <span class="text-[11px] text-slate-400 mt-0.5 block">Connect your email for account recovery and notifications.</span>
+                <label class="block text-xs font-bold text-slate-700 mb-1">About / Bio</label>
+                <textarea name="bio" rows="2" placeholder="Brief introduction, academic interests or responsibilities..."
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">{{ user.bio or '' }}</textarea>
             </div>
 
+            <!-- Password Update Section -->
             <div class="pt-3 border-t border-slate-100 space-y-3">
-                <h4 class="text-xs font-bold text-slate-800">Change Password (Optional)</h4>
+                <h4 class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-lock text-slate-500"></i>
+                    <span>Security & Password (Optional)</span>
+                </h4>
                 
-                <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Current Password</label>
-                    <input type="password" name="current_password" placeholder="••••••••"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Current Password</label>
+                        <input type="password" name="current_password" placeholder="••••••••"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">New Password</label>
-                    <input type="password" name="new_password" placeholder="At least 6 characters"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">New Password</label>
+                        <input type="password" name="new_password" placeholder="At least 6 characters"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
                 </div>
             </div>
 
-            <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
-                Save Profile Changes
-            </button>
+            <div class="flex justify-end pt-2">
+                <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-md shadow-indigo-100 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Save Complete Profile</span>
+                </button>
+            </div>
         </form>
     </div>
 

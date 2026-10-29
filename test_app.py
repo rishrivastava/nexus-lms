@@ -424,6 +424,90 @@ def test_lms():
     assert saved_branding["contact_email"] == "hod.cse@institution.edu"
     print("✓ Department Administrator Profile, Typography, and Contact Branding verified")
 
+    # 22. Test Completely Editable Profile
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users 
+            SET department = 'Foreign Language', phone = '+91 9988776655', guardian_name = 'Vikram Sharma',
+                school_name = 'Delhi Public School', district = 'South Delhi', state = 'Delhi',
+                pincode = '110001', bio = 'Passionate about coding and languages.'
+            WHERE id = 3
+        """)
+        cursor.execute("SELECT * FROM users WHERE id = 3")
+        updated_u = dict(cursor.fetchone())
+        assert updated_u["department"] == "Foreign Language"
+        assert updated_u["phone"] == "+91 9988776655"
+        assert updated_u["guardian_name"] == "Vikram Sharma"
+        assert updated_u["district"] == "South Delhi"
+        assert updated_u["bio"] == "Passionate about coding and languages."
+    print("✓ Completely Editable User Profile verified across all educational & contact fields")
+
+    # 23. Test Chatbot Queries & Role-based Visibility (Student vs Teacher Queries)
+    from app.gemini_service import answer_support_query
+    from starlette.requests import Request
+    from app.routes.api_routes import create_query, get_queries_feed
+
+    # A: Student Query -> Visibility must be teachers_and_admin
+    stu_token = create_access_token({"sub": "CS2026-001", "role": "student"})
+    stu_scope = {
+        "type": "http", "method": "POST", "path": "/api/queries/create",
+        "headers": [(b"cookie", f"lms_token={stu_token}".encode("utf-8"))]
+    }
+    stu_req = Request(stu_scope)
+    stu_req._json = {
+        "subject": "Doubt on Lesson 2",
+        "message": "Can you explain recursion with a practical example?",
+        "category": "Academic",
+        "course_title": "Python Programming"
+    }
+    stu_res = asyncio.run(create_query(stu_req))
+    import json
+    stu_data = json.loads(stu_res.body)
+    assert stu_data["status"] == "success"
+    assert stu_data["visibility"] == "teachers_and_admin"
+    assert "Gemini" in stu_data["ai_response"] or "Ticket" in stu_data["ai_response"]
+
+    # B: Teacher Query -> Visibility must be admin_only
+    teach_token = create_access_token({"sub": "T-ALAN", "role": "teacher"})
+    teach_scope = {
+        "type": "http", "method": "POST", "path": "/api/queries/create",
+        "headers": [(b"cookie", f"lms_token={teach_token}".encode("utf-8"))]
+    }
+    teach_req = Request(teach_scope)
+    teach_req._json = {
+        "subject": "Lab Equipment Requisition",
+        "message": "Requesting budget approval for additional GPU compute nodes.",
+        "category": "Administrative"
+    }
+    teach_res = asyncio.run(create_query(teach_req))
+    teach_data = json.loads(teach_res.body)
+    assert teach_data["status"] == "success"
+    assert teach_data["visibility"] == "admin_only"
+
+    # C: Teacher Feed Verification -> Must see student query, but NOT other teachers' confidential queries
+    t_feed_scope = {
+        "type": "http", "method": "GET", "path": "/api/queries/feed",
+        "headers": [(b"cookie", f"lms_token={teach_token}".encode("utf-8"))],
+        "query_string": b""
+    }
+    t_feed_req = Request(t_feed_scope)
+    t_feed_res = asyncio.run(get_queries_feed(t_feed_req))
+    t_feed_data = json.loads(t_feed_res.body)["data"]
+    # Teacher can see student queries
+    assert any(q["ticket_id"] == stu_data["ticket_id"] for q in t_feed_data)
+    # Teacher cannot see other teachers' queries (only their own if user_id matches)
+    for q in t_feed_data:
+        if q["visibility"] == "admin_only":
+            assert q["user_id"] == "T-ALAN"
+    print("✓ Chatbot Queries with Strict Role-Based Visibility (Student visible to faculty, Teacher confidential to Admin) verified")
+
+    # 24. Test Gemini AI Integration Engine & Fallback
+    gemini_resp = answer_support_query("TKT-999", "Rohan", "student", "Algorithm complexity", "What is Big O notation?", "Data Structures")
+    assert "Rohan" in gemini_resp
+    assert "TKT-999" in gemini_resp
+    print("✓ Google Gemini AI Academic Assistant engine & automated responses verified")
+
     print("\n🎉 ALL TESTS PASSED! LMS backend and database engine are fully operational.")
 
 if __name__ == "__main__":

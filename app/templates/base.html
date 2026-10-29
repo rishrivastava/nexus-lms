@@ -224,6 +224,139 @@
         </div>
     </footer>
 
+    <!-- Floating Chatbot & Query Help Desk Widget -->
+    {% if user %}
+    <div id="lmsChatbotContainer" class="fixed bottom-6 right-6 z-50">
+        <!-- Floating Trigger Pill/Button -->
+        <button onclick="toggleLmsChatbot()" id="chatbotToggleBtn"
+            class="group flex items-center space-x-2 px-4 py-3 rounded-full bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 text-white shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all">
+            <span class="relative flex h-3 w-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-400"></span>
+            </span>
+            <i class="fa-solid fa-headset text-base"></i>
+            <span class="text-xs font-bold tracking-wide">Help Desk & AI</span>
+        </button>
+
+        <!-- Chatbot Window Modal -->
+        <div id="lmsChatbotModal" class="hidden absolute bottom-14 right-0 w-[92vw] sm:w-[420px] max-h-[85vh] h-[580px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-fadeIn">
+            <!-- Header -->
+            <div class="p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/30 border border-indigo-400/30 flex items-center justify-center text-amber-400 text-sm">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
+                            <span>LMS AI Assistant & Help Desk</span>
+                        </h4>
+                        <p class="text-[10px] text-indigo-300">
+                            {% if user.role == 'student' %}
+                            Student Queries &bull; Visible to Faculty & Admin
+                            {% elif user.role == 'teacher' %}
+                            Faculty Query Desk &bull; Confidential (Admin Only)
+                            {% else %}
+                            Department Admin Help Desk
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <button onclick="toggleLmsChatbot()" class="text-slate-400 hover:text-white p-1 text-base">&times;</button>
+            </div>
+
+            <!-- Chatbot Navigation Tabs -->
+            <div class="flex border-b border-slate-200 bg-slate-50 text-xs font-bold">
+                <button onclick="switchChatbotTab('ask')" id="cbTab-ask" class="flex-1 py-2.5 text-center border-b-2 border-indigo-600 text-indigo-600">
+                    <i class="fa-solid fa-pen mr-1"></i> Ask Query
+                </button>
+                <button onclick="switchChatbotTab('history')" id="cbTab-history" class="flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+                    <i class="fa-solid fa-clock-rotate-left mr-1"></i> My Queries (<span id="cbMyCount">0</span>)
+                </button>
+            </div>
+
+            <!-- Content Area -->
+            <div class="flex-1 overflow-y-auto p-4 text-xs space-y-4">
+                <!-- Panel 1: Ask Query Form -->
+                <div id="cbPanel-ask" class="space-y-3">
+                    <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-[11px] text-indigo-900 flex items-start space-x-2">
+                        <i class="fa-solid fa-robot text-indigo-600 mt-0.5 text-sm shrink-0"></i>
+                        <span>
+                            Ask any question. <strong>Google Gemini AI</strong> provides an instant response, and your ticket is registered to 
+                            <strong>{% if user.role == 'teacher' %}the Department Administrator{% else %}your Teacher and Administrator{% endif %}</strong>!
+                        </span>
+                    </div>
+
+                    <form id="cbQueryForm" onsubmit="submitChatbotQuery(event)" class="space-y-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Category</label>
+                                <select id="cbCategory" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-indigo-500">
+                                    <option value="Academic & Coursework">Academic</option>
+                                    <option value="Technical Support">Technical</option>
+                                    <option value="Assessment & Quiz">Quiz Help</option>
+                                    <option value="Administrative">Administrative</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Course / Topic</label>
+                                <input type="text" id="cbCourseTitle" placeholder="e.g. Mathematics, Spanish"
+                                    class="w-full px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1">Query Subject *</label>
+                            <input type="text" id="cbSubject" required placeholder="Brief summary of your question"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1">Detailed Message / Question *</label>
+                            <textarea id="cbMessage" required rows="3" placeholder="Describe your question or difficulty in detail..."
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+
+                        <button type="submit" id="cbSubmitBtn"
+                            class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-100 flex items-center justify-center space-x-2 transition">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            <span>Send Query & Get AI Answer</span>
+                        </button>
+                    </form>
+
+                    <!-- Latest Submitted Ticket Live Display -->
+                    <div id="cbLatestResult" class="hidden p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="font-bold text-slate-800" id="cbResultTicket"></span>
+                            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Registered</span>
+                        </div>
+                        <div class="p-3 bg-white border border-indigo-100 rounded-xl text-xs text-slate-700 space-y-1">
+                            <span class="font-bold text-indigo-700 flex items-center gap-1">
+                                <i class="fa-solid fa-sparkles text-amber-500"></i> Immediate AI Response:
+                            </span>
+                            <p id="cbResultAiText" class="whitespace-pre-line text-[11px] text-slate-600"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 2: My Tickets History -->
+                <div id="cbPanel-history" class="hidden space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Your Ticket History</span>
+                        <button onclick="loadMyQueries()" class="text-[11px] text-indigo-600 font-bold hover:underline">
+                            <i class="fa-solid fa-rotate-right mr-1"></i> Refresh
+                        </button>
+                    </div>
+                    <div id="cbTicketList" class="space-y-2.5">
+                        <div class="text-center py-8 text-slate-400 text-xs">
+                            Loading tickets...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Global Notification & Heartbeat Scripts -->
     <script>
     // Live Student Heartbeat & Notification Fetcher
@@ -292,6 +425,129 @@
         try {
             await fetch('/api/notifications/read-all', { method: 'POST' });
             loadNotifications();
+        } catch(e) {}
+    }
+
+    // ==========================================
+    // LMS CHATBOT & QUERY HELP DESK SCRIPT
+    // ==========================================
+    function toggleLmsChatbot() {
+        const modal = document.getElementById('lmsChatbotModal');
+        if (modal) {
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                loadMyQueries();
+            }
+        }
+    }
+
+    function switchChatbotTab(tab) {
+        const askPanel = document.getElementById('cbPanel-ask');
+        const histPanel = document.getElementById('cbPanel-history');
+        const askBtn = document.getElementById('cbTab-ask');
+        const histBtn = document.getElementById('cbTab-history');
+
+        if (tab === 'ask') {
+            askPanel.classList.remove('hidden');
+            histPanel.classList.add('hidden');
+            askBtn.className = "flex-1 py-2.5 text-center border-b-2 border-indigo-600 text-indigo-600";
+            histBtn.className = "flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800";
+        } else {
+            askPanel.classList.add('hidden');
+            histPanel.classList.remove('hidden');
+            histBtn.className = "flex-1 py-2.5 text-center border-b-2 border-indigo-600 text-indigo-600";
+            askBtn.className = "flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800";
+            loadMyQueries();
+        }
+    }
+
+    async function submitChatbotQuery(e) {
+        e.preventDefault();
+        const submitBtn = document.getElementById('cbSubmitBtn');
+        const originalBtnHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Consulting Gemini AI & Registering...';
+
+        const subject = document.getElementById('cbSubject').value;
+        const message = document.getElementById('cbMessage').value;
+        const category = document.getElementById('cbCategory').value;
+        const course_title = document.getElementById('cbCourseTitle').value;
+
+        try {
+            const res = await fetch('/api/queries/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subject, message, category, course_title })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('cbQueryForm').reset();
+                const resBox = document.getElementById('cbLatestResult');
+                document.getElementById('cbResultTicket').innerText = data.ticket_id;
+                document.getElementById('cbResultAiText').innerText = data.ai_response;
+                resBox.classList.remove('hidden');
+                loadMyQueries();
+            } else {
+                alert(data.detail || 'Failed to submit query.');
+            }
+        } catch(err) {
+            alert('Error connecting to support service.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+        }
+    }
+
+    async function loadMyQueries() {
+        try {
+            const res = await fetch('/api/queries/my');
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            const badgeCount = document.getElementById('cbMyCount');
+            if (badgeCount) badgeCount.innerText = data.count || 0;
+
+            const listEl = document.getElementById('cbTicketList');
+            if (!listEl) return;
+
+            if (!data.data || data.data.length === 0) {
+                listEl.innerHTML = '<div class="text-center py-6 text-slate-400 text-xs"><i class="fa-regular fa-comment-dots text-xl block mb-1"></i>No previous queries found.</div>';
+                return;
+            }
+
+            listEl.innerHTML = data.data.map(q => {
+                const statusColor = q.status === 'resolved' ? 'bg-emerald-100 text-emerald-800' : (q.status === 'replied' ? 'bg-sky-100 text-sky-800' : 'bg-amber-100 text-amber-800');
+                return `
+                    <div class="p-3 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-xs">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="font-mono font-bold text-slate-700">${q.ticket_id}</span>
+                            <span class="px-2 py-0.5 rounded-full font-bold text-[10px] capitalize ${statusColor}">${q.status}</span>
+                        </div>
+                        <h5 class="font-bold text-slate-900 text-xs">${q.subject}</h5>
+                        <p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl">${q.message}</p>
+                        
+                        ${q.ai_response ? `
+                            <div class="p-2 bg-indigo-50/70 border border-indigo-100 rounded-xl text-[11px] text-indigo-900">
+                                <span class="font-bold flex items-center gap-1 text-[10px] text-indigo-700 uppercase">
+                                    <i class="fa-solid fa-sparkles text-amber-500"></i> AI Answer
+                                </span>
+                                <p class="whitespace-pre-line mt-0.5">${q.ai_response}</p>
+                            </div>
+                        ` : ''}
+
+                        ${q.admin_reply ? `
+                            <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 space-y-1">
+                                <div class="flex items-center justify-between font-bold text-[10px] text-emerald-800">
+                                    <span><i class="fa-solid fa-user-check mr-1"></i> Response from ${q.replied_by || 'Admin'}</span>
+                                    <span>${q.replied_at ? q.replied_at.substring(0, 16) : ''}</span>
+                                </div>
+                                <p class="text-[11px] text-emerald-950 font-medium">${q.admin_reply}</p>
+                            </div>
+                        ` : '<div class="text-[10px] text-amber-600 italic"><i class="fa-regular fa-clock mr-1"></i> Awaiting official administrator / faculty review...</div>'}
+                    </div>
+                `;
+            }).join('');
         } catch(e) {}
     }
 

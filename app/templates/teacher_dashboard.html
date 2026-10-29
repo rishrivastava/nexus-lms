@@ -88,6 +88,84 @@
             </button>
         </div>
     {% endif %}
+
+    <!-- Student Queries (Chatbot Help Desk) Card -->
+    <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-headset text-indigo-600"></i>
+                    <span>Student Help Desk & Chatbot Queries</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Questions raised by students across courses. Google Gemini AI provides instant answers, and you can post faculty guidance.
+                </p>
+            </div>
+            <span class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs">
+                <span>{{ student_queries|length }} Questions Registered</span>
+            </span>
+        </div>
+
+        {% if not student_queries %}
+        <div class="text-center py-8 text-slate-400 text-xs">
+            <i class="fa-regular fa-comment-dots text-2xl block mb-1.5 text-slate-300"></i>
+            No student queries pending right now.
+        </div>
+        {% else %}
+        <div class="space-y-4">
+            {% for q in student_queries %}
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-mono font-bold text-xs text-slate-700">{{ q.ticket_id }}</span>
+                        <span class="font-bold text-xs text-slate-900">{{ q.user_name }}</span>
+                        <span class="text-slate-400 text-[11px]">({{ q.user_id }})</span>
+                        {% if q.course_title %}
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">{{ q.course_title }}</span>
+                        {% endif %}
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize
+                        {% if q.status == 'resolved' %}bg-emerald-100 text-emerald-800
+                        {% elif q.status == 'replied' %}bg-sky-100 text-sky-800
+                        {% else %}bg-amber-100 text-amber-800{% endif %}">
+                        {{ q.status }}
+                    </span>
+                </div>
+
+                <div>
+                    <h5 class="font-bold text-xs text-slate-900">{{ q.subject }}</h5>
+                    <p class="text-xs text-slate-600 mt-1 bg-white p-2.5 rounded-xl border border-slate-200">{{ q.message }}</p>
+                </div>
+
+                {% if q.ai_response %}
+                <div class="p-2.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-[11px] text-indigo-950 space-y-0.5">
+                    <span class="font-bold flex items-center gap-1 text-[10px] text-indigo-700 uppercase">
+                        <i class="fa-solid fa-sparkles text-amber-500"></i> Gemini AI Answer Delivered
+                    </span>
+                    <p class="whitespace-pre-line text-[11px] text-slate-700">{{ q.ai_response }}</p>
+                </div>
+                {% endif %}
+
+                {% if q.admin_reply %}
+                <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-950">
+                    <span class="font-bold text-[10px] text-emerald-800 block"><i class="fa-solid fa-check mr-1"></i> Response by {{ q.replied_by }}:</span>
+                    <p class="mt-0.5 font-medium">{{ q.admin_reply }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Faculty Reply Box -->
+                <form onsubmit="submitFacultyReply(event, '{{ q.ticket_id }}')" class="pt-2 flex items-center space-x-2">
+                    <input type="text" id="facultyReply_{{ q.ticket_id }}" placeholder="Type teacher reply..." required
+                        class="flex-1 px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-indigo-500">
+                    <button type="submit" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">
+                        Reply
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Create Course Modal -->
@@ -225,6 +303,28 @@ async function openCourseDeleteModal(courseId, title, code) {
         document.getElementById('delModalStudentWarning').innerText = 'Warning: Enrolled students will be affected.';
     }
     document.getElementById('courseDeleteModal').classList.remove('hidden');
+}
+
+async function submitFacultyReply(e, ticketId) {
+    e.preventDefault();
+    const input = document.getElementById(`facultyReply_${ticketId}`);
+    const replyText = input.value;
+    try {
+        const res = await fetch('/api/queries/reply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket_id: ticketId, reply_text: replyText, status: 'resolved' })
+        });
+        if (res.ok) {
+            alert('Reply posted and student notified!');
+            location.reload();
+        } else {
+            const data = await res.json();
+            alert(data.detail || 'Error posting reply.');
+        }
+    } catch(err) {
+        alert('Connection error.');
+    }
 }
 </script>
 {% endblock %}

@@ -52,10 +52,13 @@ def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
     user_id = payload["sub"]
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, user_id, full_name, department, email, role, must_change_password FROM users WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
         user = cursor.fetchone()
         if user:
-            return dict(user)
+            user_dict = dict(user)
+            # Remove sensitive password hash from session user object
+            user_dict.pop("password_hash", None)
+            return user_dict
     return None
 
 def require_role(allowed_roles: list):

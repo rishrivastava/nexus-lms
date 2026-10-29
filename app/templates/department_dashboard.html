@@ -83,6 +83,10 @@
             <i class="fa-solid fa-chalkboard-user"></i>
             <span>Faculty ({{ teachers|length }})</span>
         </button>
+        <button onclick="switchTab('queries')" id="tabBtn-queries" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-headset text-indigo-600"></i>
+            <span>Help Desk & Queries {% if open_queries_count %}<span class="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10px]">{{ open_queries_count }}</span>{% endif %}</span>
+        </button>
         {% if user.role == 'department_admin' %}
         <button onclick="switchTab('integrations')" id="tabBtn-integrations" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-chart-line text-amber-500"></i>
@@ -1460,8 +1464,273 @@ in
                 </div>
             </form>
         </div>
+
+        <!-- 4. Google Gemini AI Integration Card -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-5">
+            <div class="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center">
+                        <i class="fa-solid fa-wand-magic-sparkles text-amber-500 mr-2"></i>
+                        <span>Google Gemini AI Integration</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Power conversational student & faculty help desk, instant academic answers, and quiz generation with Google Gemini 2.5 Flash.
+                    </p>
+                </div>
+                <span class="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Gemini 2.5 Active</span>
+                </span>
+            </div>
+
+            <form onsubmit="saveGeminiSettings(event)" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">
+                            Google AI Studio API Key
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-indigo-600 font-normal hover:underline ml-1">(Get Key)</a>
+                        </label>
+                        <input type="password" id="geminiApiKeyInput" value="{{ branding.gemini_api_key or '' }}" placeholder="AIzaSy..."
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <p class="text-[11px] text-slate-400 mt-1">Leaves your API key securely stored in system settings.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Model Selection</label>
+                        <select id="geminiModelInput" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                            <option value="gemini-2.5-flash" {% if branding.gemini_model == 'gemini-2.5-flash' %}selected{% endif %}>Gemini 2.5 Flash (Fast, high-efficiency, recommended)</option>
+                            <option value="gemini-2.5-pro" {% if branding.gemini_model == 'gemini-2.5-pro' %}selected{% endif %}>Gemini 2.5 Pro (Deep complex academic reasoning)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Feature Toggles -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="block text-xs font-bold text-slate-800">Auto-Reply to Chatbot Inquiries</span>
+                            <span class="text-[10px] text-slate-500">Instant AI answers to student and teacher questions</span>
+                        </div>
+                        <input type="checkbox" id="geminiAutoReplyToggle" {% if branding.gemini_auto_reply != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
+                    </div>
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="block text-xs font-bold text-slate-800">Enable Gemini Engine</span>
+                            <span class="text-[10px] text-slate-500">Global activation switch for AI features</span>
+                        </div>
+                        <input type="checkbox" id="geminiEnabledToggle" {% if branding.gemini_enabled != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <button type="button" onclick="testGeminiConnectionLive()" id="testGeminiBtn"
+                        class="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-vial"></i>
+                        <span>Test API Connection</span>
+                    </button>
+
+                    <button type="submit" id="saveGeminiBtn"
+                        class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Save Gemini AI Settings</span>
+                    </button>
+                </div>
+            </form>
+            <div id="geminiTestResult" class="hidden p-3 rounded-2xl text-xs"></div>
+        </div>
     </div>
     {% endif %}
+
+    <!-- =================================================================== -->
+    <!-- TAB 8B: HELP DESK & CHATBOT QUERIES                                 -->
+    <!-- =================================================================== -->
+    <div id="tab-queries" class="tab-content hidden space-y-6">
+        <!-- Top Metrics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-500 uppercase">Total Inquiries</span>
+                    <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-solid fa-headset"></i>
+                    </span>
+                </div>
+                <div class="text-2xl font-black text-slate-900 mt-2">{{ all_queries|length }}</div>
+                <span class="text-[11px] text-slate-400">Registered across platform</span>
+            </div>
+
+            <div class="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-500 uppercase">Pending Review</span>
+                    <span class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-regular fa-clock"></i>
+                    </span>
+                </div>
+                <div class="text-2xl font-black text-amber-600 mt-2">{{ open_queries_count }}</div>
+                <span class="text-[11px] text-slate-400">Awaiting official reply</span>
+            </div>
+
+            <div class="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-500 uppercase">Student Queries</span>
+                    <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </span>
+                </div>
+                <div class="text-2xl font-black text-slate-900 mt-2">
+                    {{ all_queries|selectattr('user_role', 'equalto', 'student')|list|length }}
+                </div>
+                <span class="text-[11px] text-emerald-600 font-semibold">Shared with Faculty</span>
+            </div>
+
+            <div class="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-500 uppercase">Faculty Queries</span>
+                    <span class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </span>
+                </div>
+                <div class="text-2xl font-black text-slate-900 mt-2">
+                    {{ all_queries|selectattr('user_role', 'equalto', 'teacher')|list|length }}
+                </div>
+                <span class="text-[11px] text-purple-600 font-semibold">Confidential (Admin Only)</span>
+            </div>
+        </div>
+
+        <!-- Queries Feed Card -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-comments text-indigo-600"></i>
+                        <span>Central Help Desk & Chatbot Inquiries</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Review academic questions from students and confidential faculty requests. Immediate Gemini AI answers are delivered automatically.
+                    </p>
+                </div>
+                <!-- Filter Pills -->
+                <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                    <button onclick="filterAdminQueries('all')" class="query-filter-btn px-3 py-1.5 rounded-xl bg-slate-900 text-white" data-filter="all">All</button>
+                    <button onclick="filterAdminQueries('student')" class="query-filter-btn px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="student">Students</button>
+                    <button onclick="filterAdminQueries('teacher')" class="query-filter-btn px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="teacher">Teachers (Confidential)</button>
+                    <button onclick="filterAdminQueries('open')" class="query-filter-btn px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="open">Pending</button>
+                </div>
+            </div>
+
+            <!-- Queries List -->
+            <div class="space-y-4" id="adminQueryContainer">
+                {% if not all_queries %}
+                <div class="text-center py-12 text-slate-400 text-xs">
+                    <i class="fa-solid fa-headset text-3xl block mb-2 text-slate-300"></i>
+                    No support queries or chatbot inquiries registered yet.
+                </div>
+                {% endif %}
+
+                {% for q in all_queries %}
+                <div class="admin-query-card p-5 bg-white border border-slate-200 rounded-3xl space-y-3.5 hover:border-indigo-300 transition"
+                    data-role="{{ q.user_role }}" data-status="{{ q.status }}">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-mono font-bold text-xs text-slate-700">{{ q.ticket_id }}</span>
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                                {% if q.user_role == 'teacher' %}bg-purple-100 text-purple-800 border border-purple-200
+                                {% else %}bg-emerald-100 text-emerald-800 border border-emerald-200{% endif %}">
+                                <i class="fa-solid {% if q.user_role == 'teacher' %}fa-user-tie{% else %}fa-graduation-cap{% endif %} mr-1"></i>
+                                {{ q.user_role }}
+                            </span>
+                            <span class="font-bold text-xs text-slate-900">{{ q.user_name }}</span>
+                            <span class="text-slate-400 text-[11px]">({{ q.user_id }})</span>
+                            {% if q.visibility == 'admin_only' %}
+                            <span class="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[10px]">
+                                <i class="fa-solid fa-shield-halved mr-1"></i> Admin Confidential
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 font-bold text-[10px]">
+                                <i class="fa-solid fa-users-viewfinder mr-1"></i> Visible to Faculty
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="flex items-center space-x-2 text-[11px]">
+                            <span class="px-2.5 py-0.5 rounded-full font-bold capitalize text-[10px]
+                                {% if q.status == 'resolved' %}bg-emerald-100 text-emerald-800
+                                {% elif q.status == 'replied' %}bg-sky-100 text-sky-800
+                                {% else %}bg-amber-100 text-amber-800{% endif %}">
+                                {{ q.status }}
+                            </span>
+                            <span class="text-slate-400">{{ q.created_at[:16] }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Subject and Message -->
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                            <span>{{ q.subject }}</span>
+                            {% if q.category %}
+                            <span class="text-[10px] font-normal px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ q.category }}</span>
+                            {% endif %}
+                            {% if q.course_title %}
+                            <span class="text-[10px] font-normal px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">Course: {{ q.course_title }}</span>
+                            {% endif %}
+                        </h4>
+                        <p class="text-xs text-slate-700 bg-slate-50 p-3 rounded-2xl mt-1.5 leading-relaxed">{{ q.message }}</p>
+                    </div>
+
+                    <!-- Gemini AI Immediate Response -->
+                    {% if q.ai_response %}
+                    <div class="p-3.5 bg-gradient-to-r from-indigo-50/80 via-purple-50/50 to-indigo-50/80 border border-indigo-200/80 rounded-2xl space-y-1">
+                        <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+                            <span>Gemini AI Auto-Response (Delivered instantly to user)</span>
+                        </span>
+                        <p class="text-xs text-indigo-950 whitespace-pre-line leading-relaxed">{{ q.ai_response }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Official Admin / Faculty Reply Section -->
+                    {% if q.admin_reply %}
+                    <div class="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-1">
+                        <div class="flex items-center justify-between text-[11px] font-bold text-emerald-900">
+                            <span><i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i> Official Reply by {{ q.replied_by or 'Administrator' }}</span>
+                            <span class="text-[10px] text-emerald-700">{{ q.replied_at[:16] if q.replied_at else '' }}</span>
+                        </div>
+                        <p class="text-xs text-emerald-950 font-medium">{{ q.admin_reply }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Quick Reply Form (Inline) -->
+                    <div class="pt-2 border-t border-slate-100">
+                        <details class="group">
+                            <summary class="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5">
+                                <i class="fa-solid fa-reply"></i>
+                                <span>{% if q.admin_reply %}Update Official Reply{% else %}Write Official Reply & Resolve{% endif %}</span>
+                            </summary>
+                            <form onsubmit="submitAdminReply(event, '{{ q.ticket_id }}')" class="mt-3 space-y-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 mb-1">Reply Message</label>
+                                    <textarea id="replyText_{{ q.ticket_id }}" rows="2" required placeholder="Type official response to send to user..."
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-indigo-500">{{ q.admin_reply or '' }}</textarea>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2 text-xs">
+                                        <label class="text-[11px] font-bold text-slate-600">Status:</label>
+                                        <select id="replyStatus_{{ q.ticket_id }}" class="px-2 py-1 border border-slate-300 rounded-lg text-xs bg-white">
+                                            <option value="resolved" {% if q.status == 'resolved' %}selected{% endif %}>Mark Resolved</option>
+                                            <option value="replied" {% if q.status == 'replied' %}selected{% endif %}>Replied (In Progress)</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-sm transition">
+                                        Submit Reply & Notify
+                                    </button>
+                                </div>
+                            </form>
+                        </details>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
 
     <!-- =================================================================== -->
     <!-- TAB 9: AUDIT TRAIL                                                  -->
@@ -2031,6 +2300,130 @@ function filterStudentTable() {
     for (let i = 1; i < tr.length; i++) {
         const txt = tr[i].textContent.toUpperCase();
         tr[i].style.display = txt.indexOf(filter) > -1 ? "" : "none";
+    }
+}
+
+// Help Desk Query Filtering
+function filterAdminQueries(filter) {
+    document.querySelectorAll('.query-filter-btn').forEach(btn => {
+        if (btn.getAttribute('data-filter') === filter) {
+            btn.className = "query-filter-btn px-3 py-1.5 rounded-xl bg-slate-900 text-white";
+        } else {
+            btn.className = "query-filter-btn px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200";
+        }
+    });
+
+    document.querySelectorAll('.admin-query-card').forEach(card => {
+        const role = card.getAttribute('data-role');
+        const status = card.getAttribute('data-status');
+
+        if (filter === 'all') {
+            card.style.display = '';
+        } else if (filter === 'student') {
+            card.style.display = role === 'student' ? '' : 'none';
+        } else if (filter === 'teacher') {
+            card.style.display = role === 'teacher' ? '' : 'none';
+        } else if (filter === 'open') {
+            card.style.display = status === 'open' ? '' : 'none';
+        }
+    });
+}
+
+// Admin Reply Handler
+async function submitAdminReply(e, ticketId) {
+    e.preventDefault();
+    const replyText = document.getElementById(`replyText_${ticketId}`).value;
+    const status = document.getElementById(`replyStatus_${ticketId}`).value;
+
+    try {
+        const res = await fetch('/api/queries/reply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket_id: ticketId, reply_text: replyText, status })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert('Reply sent successfully and user notified!');
+            location.reload();
+        } else {
+            alert(data.detail || 'Failed to submit reply.');
+        }
+    } catch(err) {
+        alert('Error connecting to query service.');
+    }
+}
+
+// Gemini AI Settings & Testing
+async function saveGeminiSettings(e) {
+    e.preventDefault();
+    const saveBtn = document.getElementById('saveGeminiBtn');
+    const origHtml = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
+
+    const apiKey = document.getElementById('geminiApiKeyInput').value;
+    const model = document.getElementById('geminiModelInput').value;
+    const autoReply = document.getElementById('geminiAutoReplyToggle').checked ? '1' : '0';
+    const enabled = document.getElementById('geminiEnabledToggle').checked ? '1' : '0';
+
+    try {
+        const res = await fetch('/api/gemini/save-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                gemini_api_key: apiKey,
+                gemini_model: model,
+                gemini_auto_reply: autoReply,
+                gemini_enabled: enabled
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert('Google Gemini AI settings saved successfully!');
+        } else {
+            alert(data.detail || 'Failed to save Gemini settings.');
+        }
+    } catch(err) {
+        alert('Error connecting to server.');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = origHtml;
+    }
+}
+
+async function testGeminiConnectionLive() {
+    const testBtn = document.getElementById('testGeminiBtn');
+    const resDiv = document.getElementById('geminiTestResult');
+    const origHtml = testBtn.innerHTML;
+    testBtn.disabled = true;
+    testBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Testing...';
+    resDiv.classList.add('hidden');
+
+    const apiKey = document.getElementById('geminiApiKeyInput').value;
+    const model = document.getElementById('geminiModelInput').value;
+
+    try {
+        const res = await fetch('/api/gemini/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey, model })
+        });
+        const data = await res.json();
+        resDiv.classList.remove('hidden');
+        if (data.success) {
+            resDiv.className = "p-3 rounded-2xl text-xs bg-emerald-50 border border-emerald-200 text-emerald-900";
+            resDiv.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 mr-1.5"></i> <strong>Success!</strong> ${data.message}`;
+        } else {
+            resDiv.className = "p-3 rounded-2xl text-xs bg-amber-50 border border-amber-200 text-amber-900";
+            resDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-600 mr-1.5"></i> ${data.error}`;
+        }
+    } catch(err) {
+        resDiv.classList.remove('hidden');
+        resDiv.className = "p-3 rounded-2xl text-xs bg-red-50 border border-red-200 text-red-900";
+        resDiv.innerHTML = 'Error testing Gemini API connection.';
+    } finally {
+        testBtn.disabled = false;
+        testBtn.innerHTML = origHtml;
     }
 }
 </script>

@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException, status
+from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from app.templates_config import templates
-from app.database import get_db
+from app.database import get_db, UPLOAD_DIR, update_system_settings
 from app.auth import verify_password, hash_password, create_access_token, get_current_user
+from app.utils import normalize_name
 import os
+import uuid
+import shutil
 
 router = APIRouter()
 
@@ -205,32 +208,75 @@ async def update_profile(
     request: Request,
     full_name: str = Form(None),
     designation: str = Form(None),
+    department: str = Form(None),
+    school_name: str = Form(None),
     email: str = Form(None),
+    phone: str = Form(None),
+    guardian_name: str = Form(None),
+    block: str = Form(None),
+    district: str = Form(None),
+    state: str = Form(None),
+    pincode: str = Form(None),
+    bio: str = Form(None),
     current_password: str = Form(None),
-    new_password: str = Form(None)
+    new_password: str = Form(None),
+    avatar_file: UploadFile = File(None)
 ):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    clean_email = email.strip() if email else None
-    
+    clean_email = email.strip() if email and email.strip() else None
+    clean_name = full_name.strip() if full_name and full_name.strip() else user["full_name"]
+    clean_desig = designation.strip() if designation and designation.strip() else (user.get("designation") or "")
+    clean_dept = department.strip() if department and department.strip() else user.get("department", "")
+    clean_school = school_name.strip() if school_name and school_name.strip() else user.get("school_name", "")
+    clean_phone = phone.strip() if phone and phone.strip() else (user.get("phone") or "")
+    clean_guardian = guardian_name.strip() if guardian_name and guardian_name.strip() else (user.get("guardian_name") or "")
+    clean_block = block.strip() if block and block.strip() else (user.get("block") or "")
+    clean_district = district.strip() if district and district.strip() else (user.get("district") or "")
+    clean_state = state.strip() if state and state.strip() else (user.get("state") or "")
+    clean_pincode = pincode.strip() if pincode and pincode.strip() else (user.get("pincode") or "")
+    clean_bio = bio.strip() if bio and bio.strip() else (user.get("bio") or "")
+
+    final_avatar = user.get("avatar_url") or ""
+    if isinstance(avatar_file, UploadFile) and avatar_file.filename:
+        ext = os.path.splitext(avatar_file.filename)[1].lower()
+        if ext in [".png", ".jpg", ".jpeg", ".svg", ".webp"]:
+            safe_avatar_name = f"avatar_{uuid.uuid4().hex[:8]}{ext}"
+            file_path = os.path.join(UPLOAD_DIR, safe_avatar_name)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(avatar_file.file, buffer)
+            final_avatar = f"/static/uploads/{safe_avatar_name}"
+
     with get_db() as conn:
         cursor = conn.cursor()
 
-        # Full Name & Designation update (for Admin / Faculty)
-        if full_name and full_name.strip():
-            clean_name = full_name.strip()
-            clean_desig = designation.strip() if designation and designation.strip() else user.get("designation")
-            cursor.execute("""
-                UPDATE users 
-                SET full_name = ?, designation = ?
-                WHERE id = ?
-            """, (clean_name, clean_desig, user["id"]))
-        
+        # Update all profile fields
+        cursor.execute("""
+            UPDATE users 
+            SET full_name = ?, designation = ?, department = ?, school_name = ?,
+                phone = ?, guardian_name = ?, block = ?, district = ?, state = ?,
+                pincode = ?, bio = ?, avatar_url = ?,
+                normalized_name = ?, normalized_guardian = ?
+            WHERE id = ?
+        """, (
+            clean_name, clean_desig, clean_dept, clean_school,
+            clean_phone, clean_guardian, clean_block, clean_district, clean_state,
+            clean_pincode, clean_bio, final_avatar,
+            normalize_name(clean_name), normalize_name(clean_guardian),
+            user["id"]
+        ))
+
+        # If admin changed department, update system settings branding as well
+        if user["role"] == "department_admin" and clean_dept:
+            update_system_settings({"department_name": clean_dept})
+
         # Password update if requested
         if new_password and new_password.strip():
-            if not current_password or not verify_password(current_password.strip(), user["password_hash"]):
+            # If must_change_password was set, current_password can be optional or checked
+            if not user.get("password_hash") or not verify_password(current_password.strip() if current_password else "", user.get("password_hash", "")):
+                # If they didn't provide correct current password
                 return RedirectResponse(url="/profile?error=Incorrect+current+password", status_code=303)
             if len(new_password.strip()) < 6:
                 return RedirectResponse(url="/profile?error=New+password+must+be+at+least+6+characters", status_code=303)
@@ -238,7 +284,7 @@ async def update_profile(
             cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user["id"]))
 
         # Email update
-        if clean_email and clean_email != user["email"]:
+        if clean_email and clean_email != user.get("email"):
             try:
                 cursor.execute("UPDATE users SET email = ? WHERE id = ?", (clean_email, user["id"]))
             except Exception as e:
