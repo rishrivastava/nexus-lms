@@ -353,13 +353,17 @@ def init_db():
         # Default system branding and settings
         default_settings = {
             "platform_name": "Nexus LMS",
-            "platform_tagline": "Foreign Language Learning Portal",
+            "platform_tagline": "Language learning made easy",
             "institution_name": "Leadership Boulevard Pvt Ltd",
             "department_name": "Foreign Language",
             "department_tagline": "Pioneering in Language Teaching",
             "brand_color": "#1e3a8a",
             "secondary_brand_color": "#0284c7",
             "welcome_message": "Welcome to the Foreign Language Learning Portal. Master world languages with curated modules, interactive videos, and speaking practice.",
+            "login_help_text": "Enter your User ID / Serial Number and password to access your portal.",
+            "login_user_id_placeholder": "e.g. Serial Number or ID",
+            "login_button_text": "Sign In",
+            "login_footer_text": "Accredited Foreign Language Learning Portal",
             "logo_icon": "fa-language",
             "logo_image_url": "",
             "department_banner_url": "",
@@ -379,6 +383,14 @@ def init_db():
         }
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (k, v))
+
+        # Always cleanse any legacy IIT, Science or Computer Science from system settings
+        cursor.execute("UPDATE system_settings SET value = 'Leadership Boulevard Pvt Ltd' WHERE value LIKE '%Indian Institute%'")
+        cursor.execute("UPDATE system_settings SET value = 'Foreign Language' WHERE value LIKE '%Computer Science%'")
+        cursor.execute("UPDATE system_settings SET value = 'Language learning made easy' WHERE key = 'platform_tagline' OR value LIKE '%Departmental Learning%'")
+        cursor.execute("UPDATE system_settings SET value = 'Pioneering in Language Teaching' WHERE value LIKE '%Pioneering Innovation%'")
+        cursor.execute("UPDATE system_settings SET value = 'info@fl4schools.com' WHERE value LIKE '%cse@institution.edu%'")
+        cursor.execute("UPDATE system_settings SET value = 'Mumbai' WHERE value LIKE '%Computing Annex%'")
 
         # Ensure user department matches current department_name where still default Computer Science or NULL
         cursor.execute("SELECT value FROM system_settings WHERE key = 'department_name'")

@@ -411,23 +411,29 @@ def test_lms():
 
     # 21. Test Department Profile, Typography Preset, and Branding Settings
     branding_test_payload = {
-        "department_name": "Department of Computer Science & Engineering",
-        "institution_name": "Indian Institute of Science & Technology",
-        "department_tagline": "Pioneering Innovation and Computational Excellence",
+        "department_name": "Foreign Language",
+        "institution_name": "Leadership Boulevard Pvt Ltd",
+        "platform_name": "Nexus LMS",
+        "platform_tagline": "Language learning made easy",
+        "department_tagline": "Pioneering in Language Teaching",
         "brand_color": "#1e3a8a",
         "secondary_brand_color": "#0284c7",
-        "font_family": "Noto Sans Devanagari",
-        "contact_email": "hod.cse@institution.edu",
-        "contact_phone": "+91 80 1234 5678",
-        "contact_office": "Computing Annex, Room 402"
+        "font_family": "Outfit",
+        "contact_email": "info@fl4schools.com",
+        "contact_phone": "+91 9540594033",
+        "contact_office": "Mumbai",
+        "login_help_text": "Enter your User ID / Serial Number and password to access your portal.",
+        "login_button_text": "Sign In"
     }
     update_system_settings(branding_test_payload)
     saved_branding = get_system_settings()
-    assert saved_branding["department_name"] == "Department of Computer Science & Engineering"
-    assert saved_branding["font_family"] == "Noto Sans Devanagari"
+    assert saved_branding["department_name"] == "Foreign Language"
+    assert saved_branding["institution_name"] == "Leadership Boulevard Pvt Ltd"
+    assert saved_branding["platform_tagline"] == "Language learning made easy"
+    assert saved_branding["font_family"] == "Outfit"
     assert saved_branding["secondary_brand_color"] == "#0284c7"
-    assert saved_branding["contact_email"] == "hod.cse@institution.edu"
-    print("✓ Department Administrator Profile, Typography, and Contact Branding verified")
+    assert saved_branding["contact_email"] == "info@fl4schools.com"
+    print("✓ Foreign Language Profile, Typography, and Contact Branding verified")
 
     # 22. Test Completely Editable Profile
     with get_db() as conn:
