@@ -480,11 +480,11 @@ def create_notification(user_id: int, title: str, message: str, link_url: str = 
     except Exception as e:
         print(f"Error creating notification: {e}")
 
-def notify_users(user_ids: list, title: str, message: str, link_url: str = None, category: str = "general", event_type: str = None):
+def notify_users(user_ids: list, title: str, message: str, link_url: str = None, category: str = "general", event_type: str = None, conn=None):
     if not user_ids:
         return
     try:
-        with get_db() as conn:
+        if conn is not None:
             cursor = conn.cursor()
             if event_type:
                 cursor.execute("SELECT is_enabled FROM notification_settings WHERE event_type = ?", (event_type,))
@@ -496,6 +496,19 @@ def notify_users(user_ids: list, title: str, message: str, link_url: str = None,
                     INSERT INTO notifications (user_id, title, message, link_url, category)
                     VALUES (?, ?, ?, ?, ?)
                 """, (uid, title, message, link_url, category))
+        else:
+            with get_db() as c_conn:
+                cursor = c_conn.cursor()
+                if event_type:
+                    cursor.execute("SELECT is_enabled FROM notification_settings WHERE event_type = ?", (event_type,))
+                    row = cursor.fetchone()
+                    if row and row["is_enabled"] == 0:
+                        return  # Suppressed by admin policy
+                for uid in user_ids:
+                    cursor.execute("""
+                        INSERT INTO notifications (user_id, title, message, link_url, category)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (uid, title, message, link_url, category))
     except Exception as e:
         print(f"Error notifying multiple users: {e}")
 

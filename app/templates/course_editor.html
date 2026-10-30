@@ -167,7 +167,7 @@
             <h3 class="text-base font-bold text-slate-900 flex items-center"><i class="fa-brands fa-youtube text-red-500 mr-2"></i> Add YouTube Video</h3>
             <button onclick="document.getElementById('addYoutubeModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form id="youtubeForm" method="POST" class="space-y-4">
+        <form id="youtubeForm" action="/teacher/course/{{ course.id }}/lesson/youtube" method="POST" class="space-y-4">
             <input type="hidden" name="course_id" value="{{ course.id }}">
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Video Title</label>
@@ -197,7 +197,7 @@
             <h3 class="text-base font-bold text-slate-900 flex items-center"><i class="fa-solid fa-file-pdf text-sky-500 mr-2"></i> Upload PDF Document</h3>
             <button onclick="document.getElementById('addPdfModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form id="pdfForm" method="POST" enctype="multipart/form-data" class="space-y-4">
+        <form id="pdfForm" action="/teacher/course/{{ course.id }}/lesson/pdf" method="POST" enctype="multipart/form-data" class="space-y-4">
             <input type="hidden" name="course_id" value="{{ course.id }}">
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Document Title</label>
@@ -226,7 +226,7 @@
             <h3 class="text-base font-bold text-slate-900 flex items-center"><i class="fa-solid fa-clipboard-question text-purple-500 mr-2"></i> Create Assessment Quiz</h3>
             <button onclick="document.getElementById('addQuizModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form id="quizFormModal" method="POST" class="space-y-4">
+        <form id="quizFormModal" action="/teacher/course/{{ course.id }}/lesson/quiz" method="POST" class="space-y-4">
             <input type="hidden" name="course_id" value="{{ course.id }}">
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Quiz Title</label>

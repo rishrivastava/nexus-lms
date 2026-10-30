@@ -248,6 +248,12 @@ async def course_editor(request: Request, course_id: int):
         cursor.execute("SELECT * FROM modules WHERE course_id = ? ORDER BY position ASC, id ASC", (course_id,))
         modules_raw = cursor.fetchall()
         
+        # If course has no modules, auto-create Module 1 so lessons can always be added seamlessly
+        if not modules_raw:
+            cursor.execute("INSERT INTO modules (course_id, title, position) VALUES (?, 'Module 1: General Lessons', 1)", (course_id,))
+            cursor.execute("SELECT * FROM modules WHERE course_id = ? ORDER BY position ASC, id ASC", (course_id,))
+            modules_raw = cursor.fetchall()
+        
         modules = []
         for m in modules_raw:
             mod_dict = dict(m)
@@ -279,6 +285,72 @@ async def add_module(request: Request, course_id: int, title: str = Form(...)):
         cursor.execute("INSERT INTO modules (course_id, title, position) VALUES (?, ?, ?)", (course_id, title.strip(), max_pos + 1))
     return RedirectResponse(url=f"/teacher/course/{course_id}", status_code=303)
 
+@router.get("/teacher/module/{module_id}/lesson/youtube")
+async def get_youtube_lesson_redirect(request: Request, module_id: int):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT course_id FROM modules WHERE id = ?", (module_id,))
+        row = cursor.fetchone()
+        if row:
+            return RedirectResponse(url=f"/teacher/course/{row[0]}", status_code=303)
+    return RedirectResponse(url="/teacher", status_code=303)
+
+@router.get("/teacher/module/{module_id}/lesson/pdf")
+async def get_pdf_lesson_redirect(request: Request, module_id: int):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT course_id FROM modules WHERE id = ?", (module_id,))
+        row = cursor.fetchone()
+        if row:
+            return RedirectResponse(url=f"/teacher/course/{row[0]}", status_code=303)
+    return RedirectResponse(url="/teacher", status_code=303)
+
+@router.get("/teacher/module/{module_id}/lesson/quiz")
+async def get_quiz_lesson_redirect(request: Request, module_id: int):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT course_id FROM modules WHERE id = ?", (module_id,))
+        row = cursor.fetchone()
+        if row:
+            return RedirectResponse(url=f"/teacher/course/{row[0]}", status_code=303)
+    return RedirectResponse(url="/teacher", status_code=303)
+
+@router.post("/teacher/course/{course_id}/lesson/youtube")
+@router.post("/teacher/course/{course_id}")
+async def add_course_level_youtube_lesson(
+    request: Request,
+    course_id: int,
+    title: str = Form(...),
+    youtube_url: str = Form(...),
+    duration_minutes: int = Form(10),
+    module_id: int = Form(None)
+):
+    require_teacher_or_admin(request)
+    with get_db() as conn:
+        cursor = conn.cursor()
+        target_mod_id = module_id
+        if not target_mod_id:
+            cursor.execute("SELECT id FROM modules WHERE course_id = ? ORDER BY position ASC, id ASC LIMIT 1", (course_id,))
+            mod_row = cursor.fetchone()
+            if mod_row:
+                target_mod_id = mod_row[0]
+            else:
+                cursor.execute("INSERT INTO modules (course_id, title, position) VALUES (?, 'Module 1: General Lessons', 1)", (course_id,))
+                target_mod_id = cursor.lastrowid
+
+        cursor.execute("SELECT MAX(position) FROM lessons WHERE module_id = ?", (target_mod_id,))
+        max_pos = cursor.fetchone()[0] or 0
+        cursor.execute("""
+            INSERT INTO lessons (module_id, title, content_type, content_value, position, duration_minutes)
+            VALUES (?, ?, 'youtube', ?, ?, ?)
+        """, (target_mod_id, title.strip(), youtube_url.strip(), max_pos + 1, duration_minutes))
+
+        cursor.execute("SELECT user_id FROM enrollments WHERE course_id = ?", (course_id,))
+        enrolled_ids = [r[0] for r in cursor.fetchall()]
+        notify_users(enrolled_ids, f"New Lecture Video: {title.strip()}", "A new video lecture has been added to your curriculum.", f"/course/{course_id}", "course", "content_published", conn=conn)
+
+    return RedirectResponse(url=f"/teacher/course/{course_id}", status_code=303)
+
 @router.post("/teacher/module/{module_id}/lesson/youtube")
 async def add_youtube_lesson(
     request: Request,
@@ -301,7 +373,51 @@ async def add_youtube_lesson(
         # Notify enrolled students
         cursor.execute("SELECT user_id FROM enrollments WHERE course_id = ?", (course_id,))
         enrolled_ids = [r[0] for r in cursor.fetchall()]
-        notify_users(enrolled_ids, f"New Lecture Video: {title.strip()}", f"A new video lecture has been added to your curriculum.", f"/course/{course_id}", "course", "content_published")
+        notify_users(enrolled_ids, f"New Lecture Video: {title.strip()}", f"A new video lecture has been added to your curriculum.", f"/course/{course_id}", "course", "content_published", conn=conn)
+
+    return RedirectResponse(url=f"/teacher/course/{course_id}", status_code=303)
+
+@router.post("/teacher/course/{course_id}/lesson/pdf")
+async def add_course_level_pdf_lesson(
+    request: Request,
+    course_id: int,
+    title: str = Form(...),
+    pdf_file: UploadFile = File(...),
+    duration_minutes: int = Form(15),
+    module_id: int = Form(None)
+):
+    require_teacher_or_admin(request)
+    ext = os.path.splitext(pdf_file.filename)[1].lower()
+    if ext != ".pdf":
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        
+    safe_filename = f"{uuid.uuid4().hex}_{pdf_file.filename}"
+    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(pdf_file.file, buffer)
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        target_mod_id = module_id
+        if not target_mod_id:
+            cursor.execute("SELECT id FROM modules WHERE course_id = ? ORDER BY position ASC, id ASC LIMIT 1", (course_id,))
+            mod_row = cursor.fetchone()
+            if mod_row:
+                target_mod_id = mod_row[0]
+            else:
+                cursor.execute("INSERT INTO modules (course_id, title, position) VALUES (?, 'Module 1: General Lessons', 1)", (course_id,))
+                target_mod_id = cursor.lastrowid
+
+        cursor.execute("SELECT MAX(position) FROM lessons WHERE module_id = ?", (target_mod_id,))
+        max_pos = cursor.fetchone()[0] or 0
+        cursor.execute("""
+            INSERT INTO lessons (module_id, title, content_type, content_value, position, duration_minutes)
+            VALUES (?, ?, 'pdf', ?, ?, ?)
+        """, (target_mod_id, title.strip(), safe_filename, max_pos + 1, duration_minutes))
+
+        cursor.execute("SELECT user_id FROM enrollments WHERE course_id = ?", (course_id,))
+        enrolled_ids = [r[0] for r in cursor.fetchall()]
+        notify_users(enrolled_ids, f"New Reading Material: {title.strip()}", "A new PDF study document has been uploaded.", f"/course/{course_id}", "course", "content_published", conn=conn)
 
     return RedirectResponse(url=f"/teacher/course/{course_id}", status_code=303)
 
@@ -338,7 +454,7 @@ async def add_pdf_lesson(
         # Notify enrolled students
         cursor.execute("SELECT user_id FROM enrollments WHERE course_id = ?", (course_id,))
         enrolled_ids = [r[0] for r in cursor.fetchall()]
-        notify_users(enrolled_ids, f"New Reading Material: {title.strip()}", f"A new PDF study document has been uploaded.", f"/course/{course_id}", "course", "content_published")
+        notify_users(enrolled_ids, f"New Reading Material: {title.strip()}", f"A new PDF study document has been uploaded.", f"/course/{course_id}", "course", "content_published", conn=conn)
 
     return RedirectResponse(url=f"/teacher/course/{course_id}", status_code=303)
 
@@ -370,7 +486,7 @@ async def add_quiz_lesson(
         # Notify enrolled students
         cursor.execute("SELECT user_id FROM enrollments WHERE course_id = ?", (course_id,))
         enrolled_ids = [r[0] for r in cursor.fetchall()]
-        notify_users(enrolled_ids, f"New Timed Assessment: {title.strip()}", f"A new {duration_minutes}-minute quiz assessment is now available.", f"/course/{course_id}", "quiz", "quiz_published")
+        notify_users(enrolled_ids, f"New Timed Assessment: {title.strip()}", f"A new {duration_minutes}-minute quiz assessment is now available.", f"/course/{course_id}", "quiz", "quiz_published", conn=conn)
 
     return RedirectResponse(url=f"/teacher/course/{course_id}", status_code=303)
 
