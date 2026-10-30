@@ -353,24 +353,25 @@ def init_db():
         # Default system branding and settings
         default_settings = {
             "platform_name": "Nexus LMS",
-            "platform_tagline": "Departmental Learning & Governance Portal",
-            "institution_name": "Apex University",
-            "department_name": "Department of Computer Science & Engineering",
-            "department_tagline": "Excellence in Computational Sciences, AI & Distributed Systems",
-            "brand_color": "#4f46e5",
-            "secondary_brand_color": "#06b6d4",
-            "welcome_message": "Access your assigned curriculum, stream YouTube lecture materials, review academic PDFs, and verify knowledge with module quizzes.",
-            "logo_icon": "fa-graduation-cap",
+            "platform_tagline": "Foreign Language Learning Portal",
+            "institution_name": "Leadership Boulevard Pvt Ltd",
+            "department_name": "Foreign Language",
+            "department_tagline": "Pioneering in Language Teaching",
+            "brand_color": "#1e3a8a",
+            "secondary_brand_color": "#0284c7",
+            "welcome_message": "Welcome to the Foreign Language Learning Portal. Master world languages with curated modules, interactive videos, and speaking practice.",
+            "logo_icon": "fa-language",
             "logo_image_url": "",
             "department_banner_url": "",
-            "contact_email": "dept.cse@institution.edu",
-            "contact_phone": "+91 (0) 80 2345 6789",
-            "contact_office": "Block B, Tech Quad, Campus 1",
-            "branding_text": "Official academic governance and learning management portal.",
+            "contact_email": "info@fl4schools.com",
+            "contact_phone": "+91 9540594033",
+            "contact_office": "Mumbai",
+            "branding_text": "Accredited Academic Portal for Foreign Language Learning.",
             "font_family": "outfit",
             "powerbi_api_key": "pbi_live_9a7f82b3d1e4c5a6b7c8d9e0f1a2b3c4",
             "powerbi_last_sync_at": "",
             "live_inactivity_minutes": "5",
+            "accreditation_badge": "Accredited Academic Portal",
             "gemini_api_key": "",
             "gemini_model": "gemini-2.5-flash",
             "gemini_auto_reply": "1",
@@ -383,7 +384,7 @@ def init_db():
         cursor.execute("SELECT value FROM system_settings WHERE key = 'department_name'")
         dept_row = cursor.fetchone()
         if dept_row and dept_row[0]:
-            cursor.execute("UPDATE users SET department = ? WHERE department = 'Computer Science' OR department IS NULL", (dept_row[0],))
+            cursor.execute("UPDATE users SET department = ? WHERE department = 'Computer Science' OR department IS NULL OR department LIKE '%Engineering%'", (dept_row[0],))
 
 def get_system_settings() -> dict:
     with get_db() as conn:

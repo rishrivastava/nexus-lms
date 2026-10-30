@@ -194,7 +194,7 @@ async def department_dashboard(
         """)
         all_subjects = [r[0] for r in cursor.fetchall() if r[0]]
         if not all_subjects:
-            all_subjects = ["Computer Science", "General"]
+            all_subjects = ["Foreign Language", "French", "Spanish", "General"]
 
         selected_dept = department if department and department != "all" else None
         active_subject = subject if subject and subject in all_subjects else all_subjects[0]

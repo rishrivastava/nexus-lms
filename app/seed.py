@@ -20,14 +20,14 @@ def seed_data():
         cursor.execute("""
             INSERT INTO users (user_id, full_name, department, email, password_hash, role, must_change_password)
             VALUES (?, ?, ?, ?, ?, ?, 0)
-        """, ("DEPT-HEAD", "Dr. Margaret Hamilton", "Computer Science", "head.cs@institution.edu", admin_pass, "department_admin"))
+        """, ("DEPT-HEAD", "Academic Director", "Foreign Language", "head@fl4schools.com", admin_pass, "department_admin"))
         
         # 2. Insert Teacher
         teacher_pass = hash_password("teacher123")
         cursor.execute("""
             INSERT INTO users (user_id, full_name, department, email, password_hash, role, must_change_password)
             VALUES (?, ?, ?, ?, ?, ?, 0)
-        """, ("T-ALAN", "Prof. Alan Turing", "Computer Science", "alan.turing@institution.edu", teacher_pass, "teacher"))
+        """, ("T-ALAN", "Prof. Claire Dubois", "Foreign Language", "claire.dubois@fl4schools.com", teacher_pass, "teacher"))
         teacher_id = cursor.lastrowid
         
         # 3. Insert Students (with default temporary passwords and must_change_password = 1)
@@ -50,14 +50,15 @@ def seed_data():
 
         # 4. Insert Course
         cursor.execute("""
-            INSERT INTO courses (title, code, department, description, thumbnail_url, teacher_id, is_published)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO courses (title, code, department, subject, description, thumbnail_url, teacher_id, is_published)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
         """, (
-            "Web Architecture & Modern APIs",
-            "CS-201",
-            "Computer Science",
-            "Master the fundamentals of HTTP, RESTful API design, database schemas, and modern web application architecture.",
-            "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop&q=60",
+            "French A1: Beginner French & Fundamentals",
+            "FR-101",
+            "Foreign Language",
+            "French",
+            "Learn the fundamentals of French: alphabet, greetings, essential vocabulary, and foundational sentence structure.",
+            "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&auto=format&fit=crop&q=60",
             teacher_id
         ))
         course_id = cursor.lastrowid
@@ -67,18 +68,17 @@ def seed_data():
         cursor.execute("""
             INSERT INTO modules (course_id, title, position)
             VALUES (?, ?, 1)
-        """, (course_id, "Module 1: Internet & HTTP Foundations"))
+        """, (course_id, "Module 1: Salutations et Les Bases (Greetings & Basics)"))
         mod1_id = cursor.lastrowid
 
         # Lesson 1: YouTube video
         cursor.execute("""
             INSERT INTO lessons (module_id, title, content_type, content_value, position, duration_minutes)
-            VALUES (?, ?, 'youtube', ?, 1, 12)
-        """, (mod1_id, "How the Web Works: HTTP & DNS", "https://www.youtube.com/watch?v=7_LPdttKXPc"))
+            VALUES (?, ?, 'youtube', ?, 1, 15)
+        """, (mod1_id, "Learn French in 15 Minutes - French Basics for Beginners", "https://www.youtube.com/watch?v=ujDtm0hZyII"))
 
         # Lesson 2: PDF Document
-        # Create a sample PDF file in the uploads directory
-        sample_pdf_path = os.path.join(UPLOAD_DIR, "CS201_HTTP_Guide.pdf")
+        sample_pdf_path = os.path.join(UPLOAD_DIR, "French_A1_Beginner_Grammar_and_Vocabulary.pdf")
         if not os.path.exists(sample_pdf_path):
             with open(sample_pdf_path, "w") as f:
                 f.write("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000101 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF\n")
@@ -86,13 +86,13 @@ def seed_data():
         cursor.execute("""
             INSERT INTO lessons (module_id, title, content_type, content_value, position, duration_minutes)
             VALUES (?, ?, 'pdf', ?, 2, 15)
-        """, (mod1_id, "Lecture Notes: HTTP Status Codes & RESTful Design", "CS201_HTTP_Guide.pdf"))
+        """, (mod1_id, "Study Guide: French Greetings, Pronouns & Everyday Vocabulary", "French_A1_Beginner_Grammar_and_Vocabulary.pdf"))
 
         # Lesson 3: Quiz
         cursor.execute("""
             INSERT INTO lessons (module_id, title, content_type, content_value, position, duration_minutes)
             VALUES (?, ?, 'quiz', ?, 3, 10)
-        """, (mod1_id, "Knowledge Check: Web Basics", "Test your understanding of HTTP and web protocols."))
+        """, (mod1_id, "Knowledge Check: French Greetings & Essentials", "Test your understanding of French greetings, pronouns, and numbers."))
         quiz_lesson_id = cursor.lastrowid
 
         cursor.execute("""
@@ -105,33 +105,33 @@ def seed_data():
         questions = [
             (
                 quiz_id,
-                "Which HTTP status code signifies that a resource was successfully created on the server?",
-                "200 OK",
-                "201 Created",
-                "204 No Content",
-                "301 Moved Permanently",
+                "Which French greeting means 'Good morning' or 'Hello'?",
+                "Au revoir",
+                "Bonjour",
+                "Merci",
+                "Bonne nuit",
                 "B",
-                "201 Created indicates the request succeeded and resulted in a new resource."
+                "Bonjour is the standard French greeting meaning Good morning or Hello."
             ),
             (
                 quiz_id,
-                "What is the primary role of DNS (Domain Name System)?",
-                "To encrypt network traffic",
-                "To translate human-friendly domain names to IP addresses",
-                "To route database queries",
-                "To compress image assets",
-                "B",
-                "DNS acts like the phonebook of the Internet, translating domains to IP addresses."
+                "How do you say 'Thank you very much' in French?",
+                "De rien",
+                "S'il vous plaît",
+                "Merci beaucoup",
+                "Enchanté",
+                "C",
+                "Merci beaucoup translates directly to 'Thank you very much'."
             ),
             (
                 quiz_id,
-                "Which HTTP method is considered idempotent?",
-                "POST",
-                "GET",
-                "CONNECT",
-                "PATCH",
+                "What does the phrase 'Comment vous appelez-vous ?' mean?",
+                "Where do you live?",
+                "What is your name?",
+                "How old are you?",
+                "How are you?",
                 "B",
-                "GET, PUT, and DELETE are idempotent; making identical repeated requests has the same effect."
+                "'Comment vous appelez-vous ?' is the polite way to ask for someone's name."
             )
         ]
         cursor.executemany("""
