@@ -1001,12 +1001,13 @@ def test_lms():
 
     # 2. Complete Course Structure Modifications
     target_course_id = teacher_courses[0]["id"]
+    target_course_code = teacher_courses[0]["code"]
     req_course_edit = Request({"type": "http", "method": "POST", "path": f"/teacher/course/{target_course_id}/edit", "headers": teacher_headers})
     asyncio.run(edit_course(
         req_course_edit,
         course_id=target_course_id,
-        title="Spanish Conversational Mastery (Advanced)",
-        code="SPAN-101",
+        title="French Conversational Mastery (Advanced)",
+        code=target_course_code,
         department="Languages",
         subject="Spanish",
         subtitle="Conversational fluency made intuitive",
@@ -1084,8 +1085,8 @@ def test_lms():
     asyncio.run(edit_course(
         req_admin_reassign,
         course_id=target_course_id,
-        title="Spanish Conversational Mastery (Admin Managed)",
-        code="SPAN-101",
+        title="French Conversational Mastery (Admin Managed)",
+        code=target_course_code,
         department="Languages",
         subject="Spanish",
         subtitle="Conversational fluency made intuitive",

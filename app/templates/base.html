@@ -53,6 +53,87 @@
         .theme-border { border-color: var(--brand-theme) !important; }
         .theme-sec-bg { background-color: var(--brand-secondary) !important; }
         .theme-sec-text { color: var(--brand-secondary) !important; }
+
+        /* Running Golden Retriever Animations (In Memory of Mylo) */
+        @keyframes mylo-bob {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-7px) rotate(-1deg); }
+        }
+        @keyframes mylo-tail {
+            0%, 100% { transform: rotate(-8deg); }
+            50% { transform: rotate(22deg); }
+        }
+        @keyframes mylo-ear {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-18deg); }
+        }
+        @keyframes mylo-leg-front-1 {
+            0% { transform: rotate(-32deg); }
+            50% { transform: rotate(32deg); }
+            100% { transform: rotate(-32deg); }
+        }
+        @keyframes mylo-leg-front-2 {
+            0% { transform: rotate(32deg); }
+            50% { transform: rotate(-32deg); }
+            100% { transform: rotate(32deg); }
+        }
+        @keyframes mylo-leg-back-1 {
+            0% { transform: rotate(30deg); }
+            50% { transform: rotate(-32deg); }
+            100% { transform: rotate(30deg); }
+        }
+        @keyframes mylo-leg-back-2 {
+            0% { transform: rotate(-32deg); }
+            50% { transform: rotate(30deg); }
+            100% { transform: rotate(-32deg); }
+        }
+        @keyframes mylo-dust {
+            0% { transform: translateX(25px); opacity: 0; }
+            50% { opacity: 0.7; }
+            100% { transform: translateX(-35px); opacity: 0; }
+        }
+        @keyframes mylo-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .mylo-body-group {
+            animation: mylo-bob 0.45s ease-in-out infinite;
+            transform-origin: 60px 45px;
+        }
+        .mylo-tail {
+            animation: mylo-tail 0.35s ease-in-out infinite;
+            transform-origin: 28px 38px;
+        }
+        .mylo-ear {
+            animation: mylo-ear 0.45s ease-in-out infinite;
+            transform-origin: 94px 24px;
+        }
+        .mylo-front-leg-1 {
+            animation: mylo-leg-front-1 0.45s ease-in-out infinite;
+            transform-origin: 82px 50px;
+        }
+        .mylo-front-leg-2 {
+            animation: mylo-leg-front-2 0.45s ease-in-out infinite;
+            transform-origin: 88px 50px;
+        }
+        .mylo-back-leg-1 {
+            animation: mylo-leg-back-1 0.45s ease-in-out infinite;
+            transform-origin: 36px 52px;
+        }
+        .mylo-back-leg-2 {
+            animation: mylo-leg-back-2 0.45s ease-in-out infinite;
+            transform-origin: 42px 52px;
+        }
+        .mylo-dust-1 {
+            animation: mylo-dust 0.5s linear infinite;
+        }
+        .mylo-dust-2 {
+            animation: mylo-dust 0.5s linear infinite 0.25s;
+        }
+        .mylo-spinner-ring {
+            animation: mylo-spin 1.2s linear infinite;
+            transform-origin: 50% 50%;
+        }
     </style>
     {% block head %}{% endblock %}
 </head>
@@ -235,7 +316,13 @@
     <footer class="bg-white border-t border-slate-200 py-6 mt-12">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
             <p>&copy; 2026 {{ brand.department_name }} &bull; {{ brand.institution_name }}</p>
-            <p class="text-[11px] text-slate-400">Powered by {{ brand.platform_name }} Enterprise Engine</p>
+            <div class="flex items-center gap-2">
+                <p class="text-[11px] text-slate-400">Powered by {{ brand.platform_name }} Enterprise Engine</p>
+                <span class="text-slate-300">&bull;</span>
+                <span class="text-[11px] font-semibold text-amber-600 flex items-center gap-1 tracking-wide">
+                    <i class="fa-solid fa-paw text-[10px]"></i> in memory of mylo
+                </span>
+            </div>
         </div>
     </footer>
 
@@ -482,6 +569,9 @@
         const originalBtnHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Consulting Mylo AI & Registering...';
+        if (window.showMyloLoader) {
+            window.showMyloLoader('Consulting Mylo AI...', 'Analyzing query & generating comprehensive response');
+        }
 
         const subject = document.getElementById('cbSubject').value;
         const message = document.getElementById('cbMessage').value;
@@ -511,6 +601,9 @@
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalBtnHtml;
+            if (window.hideMyloLoader) {
+                window.hideMyloLoader();
+            }
         }
     }
 
@@ -566,6 +659,23 @@
         } catch(e) {}
     }
 
+    // Global Mylo Loader Helpers
+    window.showMyloLoader = function(title = "Loading, please wait...", subtitle = "Processing request...") {
+        const el = document.getElementById('myloGlobalLoader');
+        if (el) {
+            const t = document.getElementById('myloLoaderTitle');
+            const s = document.getElementById('myloLoaderSub');
+            if (t) t.innerText = title;
+            if (s) s.innerText = subtitle;
+            el.classList.remove('hidden');
+        }
+    };
+
+    window.hideMyloLoader = function() {
+        const el = document.getElementById('myloGlobalLoader');
+        if (el) el.classList.add('hidden');
+    };
+
     // Initialize intervals
     {% if user %}
     document.addEventListener('DOMContentLoaded', () => {
@@ -575,6 +685,92 @@
         setInterval(loadNotifications, 45000); // 45s notification poll
     });
     {% endif %}
+    </script>
+
+    <!-- Global Mylo Loading Overlay (Running Golden Retriever & Loading Figure) -->
+    <div id="myloGlobalLoader" class="hidden fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-slate-100 transform transition-all scale-100">
+            <!-- Dog & Spinner Wrapper -->
+            <div class="relative inline-flex items-center justify-center w-36 h-28 mx-auto">
+                <!-- Outer Orbit Spinner Ring -->
+                <svg class="mylo-spinner-ring absolute w-32 h-32" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#fef3c7" stroke-width="4"></circle>
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#f59e0b" stroke-width="4" stroke-dasharray="65 180" stroke-linecap="round"></circle>
+                </svg>
+
+                <!-- Golden Retriever Running SVG -->
+                <svg class="mylo-dog-svg w-32 h-24" viewBox="0 0 130 85" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Speed Dust Lines -->
+                    <g class="mylo-dust-1">
+                        <ellipse cx="28" cy="74" rx="6" ry="1.5" fill="#e2e8f0" />
+                    </g>
+                    <g class="mylo-dust-2">
+                        <ellipse cx="45" cy="77" rx="8" ry="2" fill="#cbd5e1" />
+                    </g>
+
+                    <!-- Back Leg Far (Back Leg 2) -->
+                    <path class="mylo-back-leg-2" d="M38 50 C36 58, 30 66, 26 73 C28 74, 32 74, 33 72 C36 67, 43 58, 42 50 Z" fill="#d97706" />
+
+                    <!-- Front Leg Far (Front Leg 2) -->
+                    <path class="mylo-front-leg-2" d="M84 48 C83 56, 78 65, 75 73 C77 74, 81 74, 82 72 C85 65, 90 56, 89 48 Z" fill="#d97706" />
+
+                    <!-- Dog Body Group (Bobbing) -->
+                    <g class="mylo-body-group">
+                        <!-- Feathery Wagging Tail -->
+                        <path class="mylo-tail" d="M30 40 C20 38, 8 28, 5 18 C12 22, 18 30, 28 35 Z" fill="#f59e0b" stroke="#d97706" stroke-width="1" />
+                        
+                        <!-- Golden Torso -->
+                        <path d="M32 44 C30 36, 40 32, 54 32 C68 32, 78 35, 84 40 C88 43, 86 52, 78 54 C66 56, 44 56, 36 52 C33 50, 32 47, 32 44 Z" fill="#fbbf24" stroke="#f59e0b" stroke-width="1.5" />
+                        
+                        <!-- Fluffy Chest / Rump Highlights -->
+                        <path d="M72 38 C76 40, 84 42, 85 47 C85 51, 80 54, 76 54 C72 54, 70 46, 72 38 Z" fill="#fef08a" opacity="0.6" />
+
+                        <!-- Golden Neck & Head -->
+                        <path d="M78 38 L88 24 C90 21, 95 18, 101 18 C108 18, 114 22, 115 26 C115 28, 112 33, 108 34 C104 35, 96 36, 92 40 C88 44, 82 43, 78 38 Z" fill="#fbbf24" stroke="#f59e0b" stroke-width="1.2" />
+
+                        <!-- Snout & Mouth -->
+                        <path d="M106 24 C110 24, 118 25, 120 28 C120 30, 116 33, 110 33 L106 33 Z" fill="#fef08a" />
+                        <ellipse cx="119" cy="27" rx="2.5" ry="2" fill="#1e293b" />
+                        <path d="M112 32 Q115 35 118 32" stroke="#b45309" stroke-width="1.2" fill="none" stroke-linecap="round" />
+                        <path d="M113 33 C113 36, 116 36, 116 33 Z" fill="#f472b6" />
+
+                        <!-- Shiny Friendly Eye -->
+                        <ellipse cx="103" cy="22" rx="2" ry="2.2" fill="#1e293b" />
+                        <circle cx="102.5" cy="21.2" r="0.7" fill="#ffffff" />
+
+                        <!-- Red Collar with Gold Charm -->
+                        <path d="M85 36 L92 39 L90 42 L83 39 Z" fill="#ef4444" />
+                        <circle cx="89" cy="42" r="2" fill="#fbbf24" stroke="#b45309" stroke-width="0.6" />
+
+                        <!-- Floppy Bouncing Golden Ear -->
+                        <path class="mylo-ear" d="M92 20 C96 18, 100 24, 98 32 C97 37, 92 41, 88 38 C86 34, 88 24, 92 20 Z" fill="#d97706" stroke="#b45309" stroke-width="1" />
+                    </g>
+
+                    <!-- Back Leg Near (Back Leg 1) -->
+                    <path class="mylo-back-leg-1" d="M34 50 C32 58, 25 66, 20 73 C22 74, 26 74, 28 72 C32 66, 40 58, 38 50 Z" fill="#f59e0b" />
+
+                    <!-- Front Leg Near (Front Leg 1) -->
+                    <path class="mylo-front-leg-1" d="M80 48 C79 56, 73 65, 70 73 C72 74, 76 74, 77 72 C80 65, 86 56, 85 48 Z" fill="#f59e0b" />
+                </svg>
+            </div>
+
+            <!-- Loading Figure & Tribute -->
+            <div class="mt-4">
+                <!-- 3 Pulsing Dots -->
+                <div class="flex items-center justify-center space-x-1.5 mb-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-bounce"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.15s]"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-bounce [animation-delay:0.3s]"></span>
+                </div>
+                <h4 class="text-base font-bold text-slate-900" id="myloLoaderTitle">Loading, please wait...</h4>
+                <p class="text-xs text-slate-500 mt-1" id="myloLoaderSub">Processing request</p>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-600 tracking-wide">
+                    <i class="fa-solid fa-paw text-amber-500"></i>
+                    <span>in memory of mylo</span>
+                </div>
+            </div>
+        </div>
+    </div>
     </script>
 
     {% block scripts %}{% endblock %}

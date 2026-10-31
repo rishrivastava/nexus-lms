@@ -555,9 +555,48 @@ async function askMyloWhyWrong(questionId, userChoice) {
 
     box.classList.remove('hidden');
     box.innerHTML = `
-        <div class="flex items-center space-x-2 text-purple-700 font-semibold text-xs py-1">
-            <i class="fa-solid fa-wand-magic-sparkles fa-spin text-amber-500"></i>
-            <span>Mylo AI Tutor is analyzing your answer and formulating a pedagogical explanation...</span>
+        <div class="py-4 text-center">
+            <div class="relative inline-flex items-center justify-center w-28 h-20 mx-auto">
+                <svg class="mylo-spinner-ring absolute w-24 h-24" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#fef3c7" stroke-width="4"></circle>
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#f59e0b" stroke-width="4" stroke-dasharray="65 180" stroke-linecap="round"></circle>
+                </svg>
+                <svg class="mylo-dog-svg w-24 h-18" viewBox="0 0 130 85" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g class="mylo-dust-1"><ellipse cx="28" cy="74" rx="6" ry="1.5" fill="#e2e8f0" /></g>
+                    <g class="mylo-dust-2"><ellipse cx="45" cy="77" rx="8" ry="2" fill="#cbd5e1" /></g>
+                    <path class="mylo-back-leg-2" d="M38 50 C36 58, 30 66, 26 73 C28 74, 32 74, 33 72 C36 67, 43 58, 42 50 Z" fill="#d97706" />
+                    <path class="mylo-front-leg-2" d="M84 48 C83 56, 78 65, 75 73 C77 74, 81 74, 82 72 C85 65, 90 56, 89 48 Z" fill="#d97706" />
+                    <g class="mylo-body-group">
+                        <path class="mylo-tail" d="M30 40 C20 38, 8 28, 5 18 C12 22, 18 30, 28 35 Z" fill="#f59e0b" stroke="#d97706" stroke-width="1" />
+                        <path d="M32 44 C30 36, 40 32, 54 32 C68 32, 78 35, 84 40 C88 43, 86 52, 78 54 C66 56, 44 56, 36 52 C33 50, 32 47, 32 44 Z" fill="#fbbf24" stroke="#f59e0b" stroke-width="1.5" />
+                        <path d="M72 38 C76 40, 84 42, 85 47 C85 51, 80 54, 76 54 C72 54, 70 46, 72 38 Z" fill="#fef08a" opacity="0.6" />
+                        <path d="M78 38 L88 24 C90 21, 95 18, 101 18 C108 18, 114 22, 115 26 C115 28, 112 33, 108 34 C104 35, 96 36, 92 40 C88 44, 82 43, 78 38 Z" fill="#fbbf24" stroke="#f59e0b" stroke-width="1.2" />
+                        <path d="M106 24 C110 24, 118 25, 120 28 C120 30, 116 33, 110 33 L106 33 Z" fill="#fef08a" />
+                        <ellipse cx="119" cy="27" rx="2.5" ry="2" fill="#1e293b" />
+                        <path d="M112 32 Q115 35 118 32" stroke="#b45309" stroke-width="1.2" fill="none" stroke-linecap="round" />
+                        <path d="M113 33 C113 36, 116 36, 116 33 Z" fill="#f472b6" />
+                        <ellipse cx="103" cy="22" rx="2" ry="2.2" fill="#1e293b" />
+                        <circle cx="102.5" cy="21.2" r="0.7" fill="#ffffff" />
+                        <path d="M85 36 L92 39 L90 42 L83 39 Z" fill="#ef4444" />
+                        <circle cx="89" cy="42" r="2" fill="#fbbf24" stroke="#b45309" stroke-width="0.6" />
+                        <path class="mylo-ear" d="M92 20 C96 18, 100 24, 98 32 C97 37, 92 41, 88 38 C86 34, 88 24, 92 20 Z" fill="#d97706" stroke="#b45309" stroke-width="1" />
+                    </g>
+                    <path class="mylo-back-leg-1" d="M34 50 C32 58, 25 66, 20 73 C22 74, 26 74, 28 72 C32 66, 40 58, 38 50 Z" fill="#f59e0b" />
+                    <path class="mylo-front-leg-1" d="M80 48 C79 56, 73 65, 70 73 C72 74, 76 74, 77 72 C80 65, 86 56, 85 48 Z" fill="#f59e0b" />
+                </svg>
+            </div>
+            <div class="mt-2">
+                <div class="flex items-center justify-center space-x-1.5 mb-1">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-bounce"></span>
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.15s]"></span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-bounce [animation-delay:0.3s]"></span>
+                </div>
+                <p class="text-xs font-bold text-slate-800">Mylo AI Tutor is analyzing your answer...</p>
+                <p class="text-[10px] text-slate-500">Formulating pedagogical explanation</p>
+                <p class="text-[10px] font-semibold text-amber-600 mt-2 tracking-wide flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-paw text-[9px]"></i> in memory of mylo
+                </p>
+            </div>
         </div>
     `;
 

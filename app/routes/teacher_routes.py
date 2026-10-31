@@ -26,7 +26,7 @@ def require_teacher_or_admin(request: Request):
 @router.get("/teacher", response_class=HTMLResponse)
 @router.get("/teacher/studio", response_class=HTMLResponse)
 async def teacher_dashboard(request: Request):
-    """Window 1: Teacher Studio - Central workspace for managing courses, content & quizzes."""
+    """Teacher Studio - Central workspace for managing courses, content & quizzes."""
     user = require_teacher_or_admin(request)
     
     with get_db() as conn:
@@ -520,7 +520,7 @@ async def teacher_analytics_view(
     date_range: Optional[str] = "30d",
     search: Optional[str] = None
 ):
-    """Window 2: Teacher Analytics Dashboard - Dedicated multi-course academic & student performance monitor."""
+    """Teacher Analytics Dashboard - Dedicated multi-course academic & student performance monitor."""
     user = require_teacher_or_admin(request)
     data = compute_teacher_analytics(user, course_id=course_id, date_range=date_range or "30d", search=search)
     return templates.TemplateResponse("teacher_analytics.html", {
@@ -583,24 +583,28 @@ async def edit_course(
     course_id: int,
     title: str = Form(...),
     code: str = Form(...),
-    department: str = Form(...),
-    subject: str = Form(None),
+    department: Optional[str] = Form(None),
+    subject: Optional[str] = Form(None),
     subtitle: Optional[str] = Form(None),
     learning_path: Optional[str] = Form(None),
     instructions: Optional[str] = Form(None),
-    description: str = Form(...),
-    thumbnail_url: str = Form(None),
+    description: Optional[str] = Form(""),
+    thumbnail_url: Optional[str] = Form(None),
+    duration_hours: Optional[int] = Form(None),
     status_val: str = Form("published"),
     teacher_id: Optional[int] = Form(None),
     notify_students: int = Form(0)
 ):
     user = require_teacher_or_admin(request)
     
+    if hasattr(department, "default"): department = None
     if hasattr(subject, "default"): subject = None
     if hasattr(subtitle, "default"): subtitle = None
     if hasattr(learning_path, "default"): learning_path = None
     if hasattr(instructions, "default"): instructions = None
+    if hasattr(description, "default"): description = ""
     if hasattr(thumbnail_url, "default"): thumbnail_url = None
+    if hasattr(duration_hours, "default"): duration_hours = None
     if hasattr(status_val, "default"): status_val = "published"
     if hasattr(teacher_id, "default"): teacher_id = None
     if hasattr(notify_students, "default"): notify_students = 0
@@ -615,8 +619,15 @@ async def edit_course(
         if user["role"] != "department_admin" and course["teacher_id"] != user["id"]:
             raise HTTPException(status_code=403, detail="Permission denied")
 
+        # Ensure course code is unique across other courses
+        cursor.execute("SELECT id FROM courses WHERE code = ? AND id != ?", (code.strip().upper(), course_id))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail=f"A course with code '{code.strip().upper()}' already exists. Please choose a unique code.")
+
         thumb = thumbnail_url.strip() if thumbnail_url else course["thumbnail_url"]
-        subj = subject.strip() if subject and subject.strip() else department.strip()
+        dept = department.strip() if department and department.strip() else (course["department"] or "Foreign Language")
+        subj = subject.strip() if subject and subject.strip() else dept
+        desc = description.strip() if description else (course["description"] or "")
         is_pub = 1 if status_val == "published" else (2 if status_val == "archived" else 0)
 
         new_teacher_id = course["teacher_id"]
@@ -635,7 +646,7 @@ async def edit_course(
             SET title = ?, subtitle = ?, code = ?, department = ?, subject = ?, description = ?, 
                 learning_path = ?, instructions = ?, thumbnail_url = ?, teacher_id = ?, is_published = ?, status = ?
             WHERE id = ?
-        """, (title.strip(), sub, code.strip().upper(), department.strip(), subj, description.strip(), lp, inst, thumb, new_teacher_id, is_pub, status_val, course_id))
+        """, (title.strip(), sub, code.strip().upper(), dept, subj, desc, lp, inst, thumb, new_teacher_id, is_pub, status_val, course_id))
 
         log_audit(
             user["id"],
