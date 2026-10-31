@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate - {{ cert.student_name }} - {{ cert.certificate_id }}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800;900&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400;1,600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .font-cinzel { font-family: 'Cinzel', serif; }
+        .font-playfair { font-family: 'Playfair Display', serif; }
+        .font-sans { font-family: 'Inter', sans-serif; }
+
+        @media print {
+            body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            .no-print { display: none !important; }
+            .certificate-container {
+                box-shadow: none !important;
+                border: 8px solid #1e3a8a !important;
+                page-break-inside: avoid;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+            }
+            @page {
+                size: A4 landscape;
+                margin: 1cm;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-center p-4 sm:p-8 font-sans text-slate-800">
+
+    <!-- Top Action Bar (hidden when printed) -->
+    <div class="max-w-4xl w-full flex items-center justify-between mb-4 no-print px-2">
+        <a href="javascript:history.back()" class="inline-flex items-center text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+            <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to LMS
+        </a>
+        <div class="flex items-center space-x-3">
+            <a href="/verify/{{ cert.certificate_id }}" target="_blank"
+                class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-indigo-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition">
+                <i class="fa-solid fa-shield-check text-emerald-600"></i>
+                <span>Open Verification Page</span>
+            </a>
+            <button onclick="window.print()"
+                class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-md hover:bg-indigo-700 transition">
+                <i class="fa-solid fa-print"></i>
+                <span>Print / Save as PDF</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Certificate Sheet -->
+    <div class="certificate-container max-w-4xl w-full bg-white rounded-3xl shadow-2xl p-8 sm:p-14 border-[10px] border-double border-indigo-900 relative overflow-hidden">
+        
+        <!-- Ornate Corner Accents -->
+        <div class="absolute top-3 left-3 w-12 h-12 border-t-4 border-l-4 border-amber-500 rounded-tl-lg"></div>
+        <div class="absolute top-3 right-3 w-12 h-12 border-t-4 border-r-4 border-amber-500 rounded-tr-lg"></div>
+        <div class="absolute bottom-3 left-3 w-12 h-12 border-b-4 border-l-4 border-amber-500 rounded-bl-lg"></div>
+        <div class="absolute bottom-3 right-3 w-12 h-12 border-b-4 border-r-4 border-amber-500 rounded-br-lg"></div>
+
+        <!-- Watermark Background -->
+        <div class="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+            <i class="fa-solid fa-graduation-cap text-[320px] text-indigo-950"></i>
+        </div>
+
+        <div class="relative z-10 text-center space-y-6">
+            <!-- Organization Header -->
+            <div class="space-y-1">
+                <div class="flex items-center justify-center gap-2 mb-1">
+                    <i class="fa-solid fa-crown text-amber-500 text-lg"></i>
+                    <h3 class="font-cinzel text-xs font-bold tracking-[0.25em] text-amber-600 uppercase">Official Academic Credential</h3>
+                    <i class="fa-solid fa-crown text-amber-500 text-lg"></i>
+                </div>
+                <h1 class="font-cinzel text-2xl sm:text-3xl font-black text-indigo-950 tracking-wider uppercase">
+                    Leadership Boulevard Pvt Ltd
+                </h1>
+                <p class="text-xs font-semibold tracking-widest text-slate-500 uppercase">Nexus Learning Management System</p>
+            </div>
+
+            <!-- Certificate Title -->
+            <div class="py-2">
+                <div class="inline-block border-y-2 border-amber-500/70 py-2 px-8">
+                    <h2 class="font-cinzel text-2xl sm:text-4xl font-extrabold tracking-wide text-indigo-900 uppercase">
+                        Certificate of Completion
+                    </h2>
+                </div>
+            </div>
+
+            <!-- Recipient Text -->
+            <div class="space-y-3 max-w-2xl mx-auto">
+                <p class="font-playfair italic text-base sm:text-lg text-slate-600">This is to officially certify that</p>
+                <div class="pb-1 border-b-2 border-slate-300 inline-block min-w-[320px]">
+                    <h3 class="font-playfair text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+                        {{ cert.student_name }}
+                    </h3>
+                </div>
+                <p class="text-xs text-slate-500 font-mono tracking-wider">Student ID: {{ cert.student_uid }}</p>
+                
+                <p class="font-playfair text-sm sm:text-base text-slate-700 leading-relaxed pt-2">
+                    has successfully satisfied all instructional coursework, knowledge check milestones, and comprehensive assessment requirements for:
+                </p>
+
+                <div class="py-1">
+                    <h4 class="font-cinzel text-lg sm:text-xl font-bold text-indigo-950">
+                        {{ cert.course_name }}
+                    </h4>
+                    {% if cert.course_code %}
+                    <p class="text-xs font-mono font-bold text-indigo-600">Course Code: {{ cert.course_code }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Bottom Row: Signatures, Seal, QR Code, and Certificate ID -->
+            <div class="pt-8 border-t border-slate-200 grid grid-cols-3 items-center gap-4 text-center">
+                
+                <!-- Signatory 1 -->
+                <div class="text-center space-y-1">
+                    <div class="font-playfair italic font-bold text-lg text-slate-800 border-b border-slate-300 pb-1 mx-4">
+                        Dr. S. K. Narayan
+                    </div>
+                    <p class="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Academic Director</p>
+                    <p class="text-[10px] text-slate-400">Leadership Boulevard Pvt Ltd</p>
+                </div>
+
+                <!-- Center: Official Seal & QR Code -->
+                <div class="flex flex-col items-center justify-center space-y-2">
+                    <div class="p-1 bg-white border border-slate-200 rounded-xl shadow-xs">
+                        <img src="{{ cert.qr_code_data_uri }}" alt="Verification QR Code" class="w-20 h-20 sm:w-24 sm:h-24 object-contain">
+                    </div>
+                    <span class="text-[9px] font-mono text-slate-500 uppercase tracking-tight">Scan to verify authenticity</span>
+                </div>
+
+                <!-- Signatory 2 / Issue Date -->
+                <div class="text-center space-y-1">
+                    <div class="font-playfair font-semibold text-base text-slate-800 border-b border-slate-300 pb-1 mx-4">
+                        {{ cert.completion_date or cert.issued_at[:10] }}
+                    </div>
+                    <p class="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Date of Issue</p>
+                    <p class="text-[10px] text-slate-400">Verified & Registered</p>
+                </div>
+            </div>
+
+            <!-- Permanent Unique Certificate ID -->
+            <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+                <span class="font-medium text-slate-600">Issued by: <strong>Leadership Boulevard Pvt Ltd</strong></span>
+                <span class="font-mono font-bold text-indigo-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
+                    Certificate ID: {{ cert.certificate_id }}
+                </span>
+                <span class="font-semibold text-amber-600 flex items-center gap-1 text-[11px]">
+                    <i class="fa-solid fa-paw text-[10px]"></i> powered by mylo
+                </span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

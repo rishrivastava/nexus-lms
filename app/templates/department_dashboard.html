@@ -100,6 +100,10 @@
             <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i>
             <span>Mylo AI Controls & Usage</span>
         </button>
+        <button onclick="switchTab('certificates')" id="tabBtn-certificates" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-award text-emerald-600"></i>
+            <span>Certificates & Verification</span>
+        </button>
         <button onclick="switchTab('conflicts')" id="tabBtn-conflicts" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-user-shield"></i>
             <span>Conflicts {% if student_conflicts %}<span class="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px]">{{ student_conflicts|length }}</span>{% endif %}</span>
@@ -2047,42 +2051,69 @@ in
                     </div>
                 </div>
 
-                <!-- Global Master Toggles -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <!-- Global Student AI Toggle -->
-                    <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-2xl flex items-center justify-between">
-                        <div>
-                            <span class="block text-xs font-bold text-purple-900">Student Access</span>
-                            <span class="text-[10px] text-purple-700">Enable Mylo AI for students</span>
+                <!-- 3 Core Options to Activate Gemini AI -->
+                <div class="space-y-3 pt-1">
+                    <label class="block text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-sparkles text-purple-600"></i>
+                        <span>3 Core Options to Activate Gemini AI</span>
+                    </label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Option 1: AI for Students -->
+                        <div class="p-4 bg-purple-50/70 border-2 border-purple-200/90 rounded-2xl flex flex-col justify-between hover:shadow-sm transition">
+                            <div class="space-y-1.5 mb-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="inline-flex items-center space-x-1.5 text-xs font-extrabold text-purple-950">
+                                        <i class="fa-solid fa-graduation-cap text-purple-600 text-sm"></i>
+                                        <span>1. AI for Students</span>
+                                    </span>
+                                    <input type="checkbox" id="myloAiStudentsToggle" {% if branding.mylo_ai_students_enabled != '0' and branding.mylo_ai_enabled_globally != '0' %}checked{% endif %} class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer">
+                                </div>
+                                <p class="text-[11px] text-purple-900 leading-relaxed font-medium">
+                                    Enables students to know detailed explanations of what they have done wrong in quizzes and assessments.
+                                </p>
+                            </div>
+                            <span class="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">
+                                <i class="fa-solid fa-circle-check text-purple-600"></i> Quiz Mistake Explanations
+                            </span>
                         </div>
-                        <input type="checkbox" id="myloGlobalStudentToggle" {% if branding.mylo_ai_enabled_globally != '0' %}checked{% endif %} class="w-4 h-4 text-purple-600 rounded">
-                    </div>
 
-                    <!-- Quiz Explanations Toggle -->
-                    <div class="p-3 bg-indigo-50/50 border border-indigo-200 rounded-2xl flex items-center justify-between">
-                        <div>
-                            <span class="block text-xs font-bold text-indigo-900">Quiz Explanations</span>
-                            <span class="text-[10px] text-indigo-700">AI-generated quiz feedback</span>
+                        <!-- Option 2: AI for Teachers -->
+                        <div class="p-4 bg-indigo-50/70 border-2 border-indigo-200/90 rounded-2xl flex flex-col justify-between hover:shadow-sm transition">
+                            <div class="space-y-1.5 mb-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="inline-flex items-center space-x-1.5 text-xs font-extrabold text-indigo-950">
+                                        <i class="fa-solid fa-chalkboard-user text-indigo-600 text-sm"></i>
+                                        <span>2. AI for Teachers</span>
+                                    </span>
+                                    <input type="checkbox" id="myloAiTeachersToggle" {% if branding.teacher_can_generate_quiz != '0' and branding.allow_teacher_ai_quiz != '0' %}checked{% endif %} class="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
+                                </div>
+                                <p class="text-[11px] text-indigo-900 leading-relaxed font-medium">
+                                    Enables teachers to auto-create comprehensive assessments and quizzes directly from curriculum topics.
+                                </p>
+                            </div>
+                            <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
+                                <i class="fa-solid fa-circle-check text-indigo-600"></i> Create Assessments & Quizzes
+                            </span>
                         </div>
-                        <input type="checkbox" id="myloQuizExpToggle" {% if branding.mylo_ai_quiz_explanations_enabled != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
-                    </div>
 
-                    <!-- Teacher AI Quiz Creator -->
-                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
-                        <div>
-                            <span class="block text-xs font-bold text-slate-800">Teacher AI Quiz</span>
-                            <span class="text-[10px] text-slate-500">Allow teachers to build AI quizzes</span>
+                        <!-- Option 3: AI for Chatbot -->
+                        <div class="p-4 bg-emerald-50/70 border-2 border-emerald-200/90 rounded-2xl flex flex-col justify-between hover:shadow-sm transition">
+                            <div class="space-y-1.5 mb-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="inline-flex items-center space-x-1.5 text-xs font-extrabold text-emerald-950">
+                                        <i class="fa-solid fa-robot text-emerald-600 text-sm"></i>
+                                        <span>3. AI for Chatbot</span>
+                                    </span>
+                                    <input type="checkbox" id="myloAiChatbotToggle" {% if branding.mylo_ai_chatbot_enabled != '0' and branding.gemini_auto_reply != '0' %}checked{% endif %} class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer">
+                                </div>
+                                <p class="text-[11px] text-emerald-900 leading-relaxed font-medium">
+                                    Enables 24/7 intelligent automated helpdesk and chatbot responses for student and faculty queries.
+                                </p>
+                            </div>
+                            <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                                <i class="fa-solid fa-circle-check text-emerald-600"></i> Automated Query & Chatbot Help
+                            </span>
                         </div>
-                        <input type="checkbox" id="myloTeacherQuizToggle" {% if branding.allow_teacher_ai_quiz != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
-                    </div>
-
-                    <!-- Auto-Reply Chatbot -->
-                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
-                        <div>
-                            <span class="block text-xs font-bold text-slate-800">Help Desk Auto-Reply</span>
-                            <span class="text-[10px] text-slate-500">Instant AI answers to queries</span>
-                        </div>
-                        <input type="checkbox" id="myloChatbotReplyToggle" {% if branding.gemini_auto_reply != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
                     </div>
                 </div>
 
@@ -2237,6 +2268,180 @@ in
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TAB: CERTIFICATES & QR VERIFICATION MANAGEMENT            -->
+    <!-- ========================================================= -->
+    <div id="tab-certificates" class="tab-content hidden space-y-6">
+        <!-- Header Banner -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold mb-2">
+                    <i class="fa-solid fa-award"></i>
+                    <span>Leadership Boulevard Pvt Ltd • Credential Ledger</span>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Certificate Management & QR Verification</h2>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
+                    Centrally generate unique certificate IDs (e.g., <code class="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-xs">LBPL-2026-000001</code>), embed dynamic verification QR codes, track public scan count, revoke credentials, and reissue with audit history.
+                </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="openIssueCertModal()" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-sm transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Issue Certificate</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Issued</div>
+                <div class="text-2xl font-black text-slate-900" id="kpiTotalCerts">{{ certificates|length if certificates else 0 }}</div>
+                <div class="text-[11px] text-slate-500 mt-1">Permanent Unique Records</div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Verified Scans</div>
+                <div class="text-2xl font-black text-indigo-600" id="kpiTotalScans">{{ certificates|map(attribute='verification_count')|sum if certificates else 0 }}</div>
+                <div class="text-[11px] text-slate-500 mt-1">QR / URL Authentications</div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Active Credentials</div>
+                <div class="text-2xl font-black text-emerald-600" id="kpiActiveCerts">{{ certificates|selectattr('status', 'equalto', 'verified')|list|length if certificates else 0 }}</div>
+                <div class="text-[11px] text-slate-500 mt-1">Valid & Authentic</div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Revoked / Reissued</div>
+                <div class="text-2xl font-black text-rose-600" id="kpiRevokedCerts">{{ certificates|selectattr('status', 'equalto', 'revoked')|list|length if certificates else 0 }}</div>
+                <div class="text-[11px] text-slate-500 mt-1">Archived or Invalidated</div>
+            </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-4 sm:p-6 shadow-sm space-y-4">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="relative w-full sm:w-96">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="certSearchInput" onkeyup="filterCertificatesTable()" placeholder="Search certificate ID, student name, roll no, or course..."
+                        class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="flex items-center space-x-2 self-start sm:self-auto">
+                    <span class="text-xs font-semibold text-slate-500">Status:</span>
+                    <select id="certStatusFilter" onchange="filterCertificatesTable()" class="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                        <option value="all">All Certificates</option>
+                        <option value="verified">Verified Only</option>
+                        <option value="revoked">Revoked Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Certificates Ledger Table -->
+            <div class="overflow-x-auto border border-slate-100 rounded-2xl">
+                <table class="w-full text-left text-xs border-collapse" id="certificatesTable">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-200">
+                            <th class="py-3 px-4">Certificate ID</th>
+                            <th class="py-3 px-4">Student Name & ID</th>
+                            <th class="py-3 px-4">Course</th>
+                            <th class="py-3 px-3">Issued Date</th>
+                            <th class="py-3 px-3 text-center">Status</th>
+                            <th class="py-3 px-3 text-center">QR Scans</th>
+                            <th class="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-medium" id="certificatesTableBody">
+                        {% if certificates %}
+                        {% for cert in certificates %}
+                        <tr class="cert-row hover:bg-slate-50/50 transition" data-status="{{ cert.status }}" data-text="{{ cert.certificate_id }} {{ cert.student_name }} {{ cert.student_uid }} {{ cert.course_name }}">
+                            <td class="py-3 px-4">
+                                <a href="/certificate/{{ cert.certificate_id }}" target="_blank" class="font-mono font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200/60 inline-flex items-center gap-1.5 transition">
+                                    <i class="fa-solid fa-award text-amber-500 text-[11px]"></i>
+                                    <span>{{ cert.certificate_id }}</span>
+                                </a>
+                                {% if cert.reissued_from_id %}
+                                <div class="text-[10px] text-slate-400 mt-0.5">Reissued from: <span class="font-mono">{{ cert.reissued_from_id }}</span></div>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-slate-900">{{ cert.student_name }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">Roll: {{ cert.student_uid }}</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-slate-800">{{ cert.course_name }}</div>
+                                {% if cert.course_code %}
+                                <div class="text-[11px] text-indigo-600 font-mono">{{ cert.course_code }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-3 text-slate-600">
+                                <div>{{ cert.completion_date or cert.issued_at[:10] }}</div>
+                            </td>
+                            <td class="py-3 px-3 text-center">
+                                {% if cert.status == 'verified' %}
+                                <span class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 text-[10px]"></i>
+                                    <span>Verified</span>
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200" title="{{ cert.revocation_reason or 'Revoked' }}">
+                                    <i class="fa-solid fa-ban text-rose-600 text-[10px]"></i>
+                                    <span>Revoked</span>
+                                </span>
+                                {% if cert.reissued_to_id %}
+                                <div class="text-[10px] text-indigo-600 mt-0.5 font-mono">Replaced by {{ cert.reissued_to_id }}</div>
+                                {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-3 text-center">
+                                <span class="inline-flex items-center gap-1 font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                                    <i class="fa-solid fa-qrcode text-slate-500 text-[10px]"></i>
+                                    <span>{{ cert.verification_count }}</span>
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                                <div class="flex items-center justify-end space-x-1.5">
+                                    <!-- View Certificate -->
+                                    <a href="/certificate/{{ cert.certificate_id }}" target="_blank"
+                                        class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="View Full Printable Certificate">
+                                        <i class="fa-solid fa-print"></i>
+                                    </a>
+                                    <!-- Public Verify -->
+                                    <a href="/verify/{{ cert.certificate_id }}" target="_blank"
+                                        class="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="Open Public Verification Page">
+                                        <i class="fa-solid fa-shield-check"></i>
+                                    </a>
+                                    {% if cert.status == 'verified' %}
+                                    <!-- Revoke Button -->
+                                    <button type="button" onclick="openRevokeCertModal('{{ cert.certificate_id }}', '{{ cert.student_name }}')"
+                                        class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Revoke Certificate">
+                                        <i class="fa-solid fa-ban"></i>
+                                    </button>
+                                    {% endif %}
+                                    <!-- Reissue Button -->
+                                    <button type="button" onclick="openReissueCertModal('{{ cert.certificate_id }}', '{{ cert.student_name }}')"
+                                        class="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Reissue with New Certificate ID">
+                                        <i class="fa-solid fa-rotate"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr id="noCertsRow">
+                            <td colspan="7" class="py-8 text-center text-slate-400">
+                                <i class="fa-solid fa-award text-3xl mb-2 text-slate-300"></i>
+                                <p class="text-xs">No certificates issued yet. Click "Issue Certificate" to grant credentials.</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -2676,6 +2881,148 @@ in
     </div>
 </div>
 
+<!-- Modal: Issue Authentic Certificate -->
+<div id="issueCertModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-award text-emerald-600 mr-2"></i> Issue Authentic Certificate
+            </h3>
+            <button onclick="closeIssueCertModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <p class="text-xs text-slate-500">
+            Issues a permanently recorded credential with auto-generated unique ID (<code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-indigo-700">LBPL-2026-XXXXXX</code>) and scannable QR verification code.
+        </p>
+
+        <form id="issueCertForm" onsubmit="submitIssueCertificate(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Select Student *</label>
+                <select id="issueCertStudentId" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                    <option value="">-- Choose Enrolled Student --</option>
+                    {% for s in students %}
+                    <option value="{{ s.id }}">{{ s.full_name }} ({{ s.user_id }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Select Course *</label>
+                <select id="issueCertCourseId" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                    <option value="">-- Choose Course --</option>
+                    {% for c in all_courses %}
+                    <option value="{{ c.id }}">{{ c.title }} ({{ c.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Completion Date</label>
+                    <input type="text" id="issueCertDate" placeholder="e.g. November 01, 2026"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Grade / Score (%)</label>
+                    <input type="number" id="issueCertScore" step="0.1" min="0" max="100" value="100.0"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center space-x-2 text-xs text-emerald-800">
+                <i class="fa-solid fa-shield-check text-emerald-600 text-base shrink-0"></i>
+                <span>Issued by Leadership Boulevard Pvt Ltd with permanent non-duplicable public QR code.</span>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2">
+                <button type="button" onclick="closeIssueCertModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" id="issueCertSubmitBtn" class="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Generate & Issue Certificate</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Revoke Certificate -->
+<div id="revokeCertModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-100 space-y-4">
+        <div class="flex items-center space-x-3 text-red-600">
+            <div class="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-xl shrink-0">
+                <i class="fa-solid fa-ban"></i>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 text-base">Revoke Certificate?</h4>
+                <p class="text-xs text-red-600 font-semibold font-mono" id="revokeCertIdDisplay">LBPL-2026-000000</p>
+            </div>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">
+            Revoking this certificate immediately invalidates it. Anyone scanning the QR code or visiting the verification link will see an official <strong class="text-red-700">Revoked Certificate</strong> warning notice.
+        </p>
+
+        <form onsubmit="submitRevokeCertificate(event)" class="space-y-3">
+            <input type="hidden" id="revokeCertId">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Revocation Reason *</label>
+                <textarea id="revokeReasonInput" rows="2" required placeholder="e.g. Academic integrity violation, administrative re-assessment"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-red-500 focus:outline-none"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2">
+                <button type="button" onclick="closeRevokeCertModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" id="revokeCertSubmitBtn" class="px-5 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition">
+                    Confirm Revocation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Reissue Certificate -->
+<div id="reissueCertModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex items-center space-x-3 text-indigo-600">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-xl shrink-0">
+                <i class="fa-solid fa-rotate text-indigo-600"></i>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 text-base">Reissue Certificate</h4>
+                <p class="text-xs text-indigo-600 font-semibold font-mono" id="reissueCertIdDisplay">LBPL-2026-000000</p>
+            </div>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">
+            Reissuing will automatically generate a <strong>brand new unique certificate ID</strong> and a fresh QR code for the student, while preserving the original record in the institutional audit ledger.
+        </p>
+
+        <form onsubmit="submitReissueCertificate(event)" class="space-y-3">
+            <input type="hidden" id="reissueCertId">
+
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center space-x-2 text-xs text-amber-900">
+                <i class="fa-solid fa-clock-rotate-left text-amber-600 text-base shrink-0"></i>
+                <span>Previous credential will be linked to the newly issued certificate for audit compliance.</span>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2">
+                <button type="button" onclick="closeReissueCertModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" id="reissueCertSubmitBtn" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                    Confirm & Reissue
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 // Tab Switching
 function switchTab(tabId) {
@@ -2963,10 +3310,11 @@ async function saveMyloAiSettings(e) {
 
     const apiKey = document.getElementById('myloApiKeyInput') ? document.getElementById('myloApiKeyInput').value : '';
     const model = document.getElementById('myloModelInput') ? document.getElementById('myloModelInput').value : 'gemini-2.5-flash';
-    const autoReply = document.getElementById('myloChatbotReplyToggle') && document.getElementById('myloChatbotReplyToggle').checked ? '1' : '0';
-    const globalStudent = document.getElementById('myloGlobalStudentToggle') && document.getElementById('myloGlobalStudentToggle').checked ? '1' : '0';
-    const quizExp = document.getElementById('myloQuizExpToggle') && document.getElementById('myloQuizExpToggle').checked ? '1' : '0';
-    const allowTeacherAi = document.getElementById('myloTeacherQuizToggle') && document.getElementById('myloTeacherQuizToggle').checked ? '1' : '0';
+    
+    // 3 Core Activation Options
+    const aiForStudents = document.getElementById('myloAiStudentsToggle') && document.getElementById('myloAiStudentsToggle').checked ? '1' : '0';
+    const aiForTeachers = document.getElementById('myloAiTeachersToggle') && document.getElementById('myloAiTeachersToggle').checked ? '1' : '0';
+    const aiForChatbot = document.getElementById('myloAiChatbotToggle') && document.getElementById('myloAiChatbotToggle').checked ? '1' : '0';
 
     // Compute unchecked courses (disabled courses)
     const disabledCourses = [];
@@ -2993,11 +3341,16 @@ async function saveMyloAiSettings(e) {
             body: JSON.stringify({
                 gemini_api_key: apiKey,
                 gemini_model: model,
-                gemini_auto_reply: autoReply,
                 gemini_enabled: '1',
-                allow_teacher_ai_quiz: allowTeacherAi,
-                mylo_ai_enabled_globally: globalStudent,
-                mylo_ai_quiz_explanations_enabled: quizExp,
+                // 3 Core Options
+                mylo_ai_students_enabled: aiForStudents,
+                teacher_can_generate_quiz: aiForTeachers,
+                mylo_ai_chatbot_enabled: aiForChatbot,
+                // Compatibility
+                gemini_auto_reply: aiForChatbot,
+                allow_teacher_ai_quiz: aiForTeachers,
+                mylo_ai_enabled_globally: aiForStudents,
+                mylo_ai_quiz_explanations_enabled: aiForStudents,
                 mylo_ai_disabled_courses: disabledCourses.join(','),
                 mylo_ai_disabled_subjects: disabledSubjects,
                 mylo_ai_disabled_students: disabledStudents,
@@ -3120,6 +3473,198 @@ async function saveGeminiSettings(e) {
 
 async function testGeminiConnectionLive() {
     return testMyloConnectionLive();
+}
+
+// =========================================================
+// Certificate Management & QR Verification Controls
+// =========================================================
+
+function openIssueCertModal() {
+    const modal = document.getElementById('issueCertModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeIssueCertModal() {
+    const modal = document.getElementById('issueCertModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function submitIssueCertificate(e) {
+    if (e) e.preventDefault();
+    const studentId = document.getElementById('issueCertStudentId').value;
+    const courseId = document.getElementById('issueCertCourseId').value;
+    const compDate = document.getElementById('issueCertDate').value.trim();
+    const score = document.getElementById('issueCertScore').value.trim() || '100.0';
+
+    if (!studentId || !courseId) {
+        alert('Please select both a student and a course.');
+        return;
+    }
+
+    const btn = document.getElementById('issueCertSubmitBtn');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Generating Unique ID & QR...';
+    }
+
+    const formData = new FormData();
+    formData.append('student_id', studentId);
+    formData.append('course_id', courseId);
+    if (compDate) formData.append('completion_date', compDate);
+    formData.append('grade_score', score);
+
+    try {
+        const res = await fetch('/api/certificates/issue', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`Certificate ${data.data.certificate_id} successfully issued to ${data.data.student_name}!`);
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Failed to issue certificate.');
+        }
+    } catch (err) {
+        alert('Server connection error while issuing certificate.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+}
+
+function openRevokeCertModal(certId, studentName) {
+    document.getElementById('revokeCertId').value = certId;
+    document.getElementById('revokeCertIdDisplay').innerText = certId + (studentName ? ` • ${studentName}` : '');
+    document.getElementById('revokeReasonInput').value = '';
+    const modal = document.getElementById('revokeCertModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeRevokeCertModal() {
+    const modal = document.getElementById('revokeCertModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function submitRevokeCertificate(e) {
+    if (e) e.preventDefault();
+    const certId = document.getElementById('revokeCertId').value;
+    const reason = document.getElementById('revokeReasonInput').value.trim();
+
+    if (!reason) {
+        alert('Please provide a reason for certificate revocation.');
+        return;
+    }
+
+    const btn = document.getElementById('revokeCertSubmitBtn');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Revoking...';
+    }
+
+    const formData = new FormData();
+    formData.append('certificate_id', certId);
+    formData.append('reason', reason);
+
+    try {
+        const res = await fetch('/api/certificates/revoke', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(data.message || `Certificate ${certId} revoked.`);
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Failed to revoke certificate.');
+        }
+    } catch (err) {
+        alert('Server connection error while revoking certificate.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+}
+
+function openReissueCertModal(certId, studentName) {
+    document.getElementById('reissueCertId').value = certId;
+    document.getElementById('reissueCertIdDisplay').innerText = certId + (studentName ? ` • ${studentName}` : '');
+    const modal = document.getElementById('reissueCertModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeReissueCertModal() {
+    const modal = document.getElementById('reissueCertModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function submitReissueCertificate(e) {
+    if (e) e.preventDefault();
+    const certId = document.getElementById('reissueCertId').value;
+
+    const btn = document.getElementById('reissueCertSubmitBtn');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Reissuing...';
+    }
+
+    const formData = new FormData();
+    formData.append('certificate_id', certId);
+
+    try {
+        const res = await fetch('/api/certificates/reissue', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(data.message || `Certificate reissued successfully.`);
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Failed to reissue certificate.');
+        }
+    } catch (err) {
+        alert('Server connection error while reissuing certificate.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+}
+
+function filterCertificatesTable() {
+    const query = (document.getElementById('certSearchInput')?.value || '').toLowerCase().trim();
+    const statusFilter = document.getElementById('certStatusFilter')?.value || 'all';
+    const rows = document.querySelectorAll('.cert-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status');
+        const rowText = (row.getAttribute('data-text') || '').toLowerCase();
+        
+        const matchesQuery = !query || rowText.includes(query);
+        const matchesStatus = statusFilter === 'all' || rowStatus === statusFilter;
+
+        if (matchesQuery && matchesStatus) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const noRow = document.getElementById('noCertsRow');
+    if (noRow) {
+        noRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
 }
 </script>
 {% endblock %}

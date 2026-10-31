@@ -14,7 +14,11 @@
         <a href="/student" class="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-indigo-600 transition">
             <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Dashboard
         </a>
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2.5">
+            <a href="/course/{{ course.id }}/certificate" target="_blank" class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition shadow-xs">
+                <i class="fa-solid fa-award text-amber-500"></i>
+                <span>Certificate</span>
+            </a>
             <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
                 {{ course.code }}
             </span>
@@ -555,13 +559,9 @@ async function askMyloWhyWrong(questionId, userChoice) {
 
     box.classList.remove('hidden');
     box.innerHTML = `
-        <div class="py-4 text-center">
-            <div class="relative inline-flex items-center justify-center w-28 h-20 mx-auto">
-                <svg class="mylo-spinner-ring absolute w-24 h-24" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="46" fill="none" stroke="#fef3c7" stroke-width="4"></circle>
-                    <circle cx="50" cy="50" r="46" fill="none" stroke="#f59e0b" stroke-width="4" stroke-dasharray="65 180" stroke-linecap="round"></circle>
-                </svg>
-                <svg class="mylo-dog-svg w-24 h-18" viewBox="0 0 130 85" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div class="py-3 text-center">
+            <div class="inline-flex items-center justify-center mx-auto mb-1">
+                <svg class="mylo-dog-svg w-16 h-12" viewBox="0 0 130 85" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <g class="mylo-dust-1"><ellipse cx="28" cy="74" rx="6" ry="1.5" fill="#e2e8f0" /></g>
                     <g class="mylo-dust-2"><ellipse cx="45" cy="77" rx="8" ry="2" fill="#cbd5e1" /></g>
                     <path class="mylo-back-leg-2" d="M38 50 C36 58, 30 66, 26 73 C28 74, 32 74, 33 72 C36 67, 43 58, 42 50 Z" fill="#d97706" />
@@ -585,16 +585,16 @@ async function askMyloWhyWrong(questionId, userChoice) {
                     <path class="mylo-front-leg-1" d="M80 48 C79 56, 73 65, 70 73 C72 74, 76 74, 77 72 C80 65, 86 56, 85 48 Z" fill="#f59e0b" />
                 </svg>
             </div>
-            <div class="mt-2">
-                <div class="flex items-center justify-center space-x-1.5 mb-1">
+            <div class="mt-1">
+                <div class="flex items-center justify-center space-x-1 mb-1">
                     <span class="w-2 h-2 rounded-full bg-amber-500 animate-bounce"></span>
                     <span class="w-2 h-2 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.15s]"></span>
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-bounce [animation-delay:0.3s]"></span>
                 </div>
                 <p class="text-xs font-bold text-slate-800">Mylo AI Tutor is analyzing your answer...</p>
                 <p class="text-[10px] text-slate-500">Formulating pedagogical explanation</p>
-                <p class="text-[10px] font-semibold text-amber-600 mt-2 tracking-wide flex items-center justify-center gap-1">
-                    <i class="fa-solid fa-paw text-[9px]"></i> in memory of mylo
+                <p class="text-[10px] font-semibold text-amber-600 mt-1.5 tracking-wide flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-paw text-[9px]"></i> powered by mylo
                 </p>
             </div>
         </div>

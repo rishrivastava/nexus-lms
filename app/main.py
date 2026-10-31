@@ -11,6 +11,7 @@ from app.routes.student_routes import router as student_router
 from app.routes.teacher_routes import router as teacher_router
 from app.routes.dept_routes import router as dept_router
 from app.routes.api_routes import router as api_router
+from app.routes.cert_routes import router as cert_router
 
 app = FastAPI(title="Nexus LMS", description="Departmental Learning Management System")
 
@@ -28,6 +29,7 @@ app.include_router(student_router)
 app.include_router(teacher_router)
 app.include_router(dept_router)
 app.include_router(api_router)
+app.include_router(cert_router)
 
 @app.on_event("startup")
 async def on_startup():

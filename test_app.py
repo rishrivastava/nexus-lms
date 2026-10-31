@@ -7,6 +7,16 @@ from app.utils import extract_youtube_id
 def test_lms():
     print("Running LMS Direct Unit Tests...")
     init_db()
+    update_system_settings({
+        "gemini_auto_reply": "1",
+        "gemini_enabled": "1",
+        "allow_teacher_ai_quiz": "1",
+        "teacher_can_generate_quiz": "1",
+        "mylo_ai_students_enabled": "1",
+        "mylo_ai_chatbot_enabled": "1",
+        "mylo_ai_enabled_globally": "1",
+        "mylo_ai_quiz_explanations_enabled": "1"
+    })
     
     # 1. Test Password Hashing & Verification
     pwd = "secretPassword123"
@@ -1240,6 +1250,138 @@ def test_lms():
     assert usage_metrics["quiz_explanation_requests"] >= 1
     assert len(usage_metrics["course_breakdown"]) >= 1
     print(f"✓ Mylo AI Usage & Expenditure Dashboard verified: {usage_metrics['total_requests']} requests, {usage_metrics['total_tokens']} tokens, ${usage_metrics['estimated_cost_usd']} (₹{usage_metrics['estimated_cost_inr']})")
+
+    # =========================================================================
+    # TEST SUITE 29: Unique Certificate IDs, QR Verification & 3 AI Options
+    # =========================================================================
+    print("\n--- TEST SUITE 29: Unique Certificate IDs, QR Verification & 3 AI Options ---")
+    from app.database import (
+        generate_unique_certificate_id,
+        generate_qr_code_base64,
+        issue_certificate,
+        verify_certificate,
+        revoke_certificate,
+        reissue_certificate,
+        list_certificates,
+        get_student_certificates
+    )
+    from app.routes.cert_routes import (
+        public_certificate_verification,
+        issue_certificate_api,
+        revoke_certificate_api,
+        reissue_certificate_api
+    )
+    from app.routes.teacher_routes import ai_generate_quiz
+
+    # 1. Unique Certificate ID Format
+    cert_id_1 = generate_unique_certificate_id()
+    cert_id_2 = generate_unique_certificate_id()
+    assert cert_id_1.startswith("LBPL-"), f"Unexpected certificate ID prefix: {cert_id_1}"
+    assert len(cert_id_1) >= 15, f"Certificate ID format too short: {cert_id_1}"
+    assert cert_id_1 != cert_id_2, "Certificate IDs must be globally unique and distinct"
+    print(f"✓ Unique Certificate ID scheme verified: {cert_id_1} & {cert_id_2}")
+
+    # 2. QR Code Generation
+    qr_uri = generate_qr_code_base64(f"/verify/{cert_id_1}")
+    assert qr_uri.startswith("data:image/png;base64,"), "QR code must be a base64 PNG data URI"
+    assert len(qr_uri) > 100, "QR code data URI appears empty or corrupted"
+    print("✓ Scannable PNG QR code generation verified (Base64 data URI)")
+
+    # 3. Certificate Issuance for Student & Course
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE role = 'student' LIMIT 1")
+        test_student = cursor.fetchone()
+        cursor.execute("SELECT id FROM courses LIMIT 1")
+        test_course = cursor.fetchone()
+
+    assert test_student is not None, "At least one student must exist"
+    assert test_course is not None, "At least one course must exist"
+    
+    cert_record = issue_certificate(student_id=test_student["id"], course_id=test_course["id"], admin_user_id=1)
+    assert cert_record["certificate_id"].startswith("LBPL-")
+    assert cert_record["status"] == "verified"
+    assert cert_record["issued_by"] == "Leadership Boulevard Pvt Ltd"
+    assert cert_record["verification_count"] == 0
+    issued_cert_id = cert_record["certificate_id"]
+    print(f"✓ Certificate successfully issued: ID={issued_cert_id}, Student={cert_record['student_name']}, IssuedBy={cert_record['issued_by']}")
+
+    # 4. Public Certificate Verification (QR Scan / Link Hit)
+    verified_data = verify_certificate(issued_cert_id, increment_count=True)
+    assert verified_data is not None
+    assert verified_data["status"] == "verified"
+    assert verified_data["verification_count"] == 1
+    # Verify second hit increments count
+    verified_data_2 = verify_certificate(issued_cert_id, increment_count=True)
+    assert verified_data_2["verification_count"] == 2
+    print(f"✓ Public verification verified: Counter incremented to {verified_data_2['verification_count']} scans")
+
+    # 5. Public Verification Route Simulation (No login required)
+    req_pub_verify = Request({"type": "http", "method": "GET", "path": f"/verify/{issued_cert_id}", "headers": []})
+    pub_res = asyncio.run(public_certificate_verification(req_pub_verify, issued_cert_id))
+    assert pub_res.status_code == 200
+    assert b"Leadership Boulevard Pvt Ltd" in pub_res.body or b"LEADERSHIP BOULEVARD" in pub_res.body
+    assert b"Certificate Verified" in pub_res.body
+    print("✓ Public Verification Route verified without authentication")
+
+    # 6. Admin Certificate Revocation
+    rev_ok = revoke_certificate(issued_cert_id, reason="Academic compliance review", admin_user_id=1)
+    assert rev_ok == True
+    revoked_verify = verify_certificate(issued_cert_id, increment_count=False)
+    assert revoked_verify["status"] == "revoked"
+    assert revoked_verify["revocation_reason"] == "Academic compliance review"
+
+    pub_res_rev = asyncio.run(public_certificate_verification(req_pub_verify, issued_cert_id))
+    assert pub_res_rev.status_code == 200
+    assert b"Certificate Revoked" in pub_res_rev.body or b"Revoked Certificate" in pub_res_rev.body
+    print("✓ Certificate Revocation verified: Immediately reflects on public verification page")
+
+    # 7. Certificate Reissuance
+    reissued_cert = reissue_certificate(issued_cert_id, admin_user_id=1)
+    new_cert_id = reissued_cert["certificate_id"]
+    assert new_cert_id != issued_cert_id
+    assert new_cert_id.startswith("LBPL-")
+    assert reissued_cert["status"] == "verified"
+    assert reissued_cert["reissued_from_id"] == issued_cert_id
+    
+    # Old cert must point to new cert
+    archived_old = verify_certificate(issued_cert_id, increment_count=False)
+    assert archived_old["reissued_to_id"] == new_cert_id
+    print(f"✓ Certificate Reissuance verified: {issued_cert_id} -> {new_cert_id} with full audit history")
+
+    # 8. 3 Core AI Activation Options Enforcement
+    # Test Option 2: AI for Teachers (teacher_can_generate_quiz)
+    async def get_ai_disabled():
+        return {
+            "mylo_ai_students_enabled": "0",
+            "teacher_can_generate_quiz": "0",
+            "mylo_ai_chatbot_enabled": "0"
+        }
+    req_set_ai.json = get_ai_disabled
+    asyncio.run(save_gemini_settings(req_set_ai))
+
+    # Teacher AI Quiz Generation should now be blocked (403)
+    teacher_headers = [(b"cookie", f"lms_token={teacher_token}".encode("utf-8"))]
+    req_t_quiz = Request({"type": "http", "method": "POST", "path": "/api/teacher/generate-quiz", "headers": teacher_headers})
+    req_t_quiz.form = lambda: asyncio.sleep(0, result={"course_id": test_course["id"], "topic": "Python Functions"})
+    try:
+        asyncio.run(ai_generate_quiz(req_t_quiz, course_id=test_course["id"], topic="Python Functions"))
+        assert False, "Expected 403 Forbidden for teacher AI quiz generation"
+    except HTTPException as e:
+        assert e.status_code == 403
+        assert "quiz creation for teachers is currently disabled" in e.detail.lower() or "assessment" in e.detail.lower()
+    print("✓ Core AI Option 2 verified: AI for Teachers toggle strictly blocks unauthorized assessment creation (403)")
+
+    # Restore AI Settings
+    async def get_ai_restored():
+        return {
+            "mylo_ai_students_enabled": "1",
+            "teacher_can_generate_quiz": "1",
+            "mylo_ai_chatbot_enabled": "1"
+        }
+    req_set_ai.json = get_ai_restored
+    asyncio.run(save_gemini_settings(req_set_ai))
+    print("✓ Core AI Options 1, 2, 3 restoration verified")
 
     print("\n🎉 ALL TESTS PASSED! LMS backend and database engine are fully operational.")
 

@@ -79,6 +79,15 @@
                             </p>
                         </div>
 
+                        <!-- View Certificate Button if course completed -->
+                        {% if course.progress_percent == 100 %}
+                        <a href="/course/{{ course.id }}/certificate" target="_blank" class="w-full mb-2.5 flex items-center justify-center space-x-2 py-2 px-4 rounded-xl font-bold text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition shadow-xs">
+                            <i class="fa-solid fa-award text-amber-500"></i>
+                            <span>View Verified Certificate</span>
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i>
+                        </a>
+                        {% endif %}
+
                         <!-- Action Button -->
                         <a href="/course/{{ course.id }}" class="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition shadow-sm {% if course.progress_percent == 100 %}bg-slate-100 text-slate-700 hover:bg-slate-200{% else %}bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100{% endif %}">
                             <span>{% if course.progress_percent == 0 %}Start Course{% elif course.progress_percent == 100 %}Review Course{% else %}Continue Learning{% endif %}</span>

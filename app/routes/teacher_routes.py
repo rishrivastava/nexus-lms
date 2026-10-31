@@ -1624,15 +1624,19 @@ async def ai_generate_quiz(
     else:
         duration_minutes = int(duration_minutes)
     
-    # Administrator governance check
+    # Administrator governance check (Option 2: AI for Teachers)
     with get_db() as conn:
         cursor = conn.cursor()
         if user["role"] == "teacher":
-            cursor.execute("SELECT value FROM system_settings WHERE key = 'allow_teacher_ai_quiz'")
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'teacher_can_generate_quiz'")
             row = cursor.fetchone()
-            allowed = row[0] if row else "1"
+            allowed = row[0] if row else None
+            if not allowed:
+                cursor.execute("SELECT value FROM system_settings WHERE key = 'allow_teacher_ai_quiz'")
+                r2 = cursor.fetchone()
+                allowed = r2[0] if r2 else "1"
             if allowed != "1":
-                raise HTTPException(status_code=403, detail="Gemini AI Quiz Generation is currently disabled for teachers by the administrator.")
+                raise HTTPException(status_code=403, detail="Mylo AI assessment & quiz creation for teachers is currently disabled by the administrator.")
 
     path_params = request.path_params
     if not course_id and "course_id" in path_params:

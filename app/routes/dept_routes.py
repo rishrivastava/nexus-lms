@@ -4,7 +4,8 @@ from app.templates_config import templates
 from app.database import (
     get_db, get_system_settings, update_system_settings, UPLOAD_DIR,
     log_audit, get_dashboard_permissions, update_dashboard_permissions,
-    get_notification_settings, update_notification_settings, get_ai_usage_metrics
+    get_notification_settings, update_notification_settings, get_ai_usage_metrics,
+    list_certificates
 )
 from app.auth import get_current_user, hash_password
 from app.utils import normalize_name, generate_unique_student_id
@@ -770,7 +771,8 @@ async def department_dashboard(
         "all_queries": all_queries,
         "open_queries_count": open_queries_count,
         "last_rejected_count": len(LAST_IMPORT_REJECTED),
-        "ai_usage_metrics": get_ai_usage_metrics()
+        "ai_usage_metrics": get_ai_usage_metrics(),
+        "certificates": list_certificates()
     })
 
 @router.post("/department/courses/assign")
@@ -1553,6 +1555,7 @@ async def delete_all_students(request: Request):
             cursor.execute(f"DELETE FROM enrollments WHERE user_id IN ({int_ph})", student_int_ids)
             cursor.execute(f"DELETE FROM lesson_progress WHERE user_id IN ({int_ph})", student_int_ids)
             cursor.execute(f"DELETE FROM quiz_attempts WHERE user_id IN ({int_ph})", student_int_ids)
+            cursor.execute(f"DELETE FROM certificates WHERE student_id IN ({int_ph})", student_int_ids)
             cursor.execute(f"DELETE FROM support_queries WHERE user_id IN ({str_ph})", student_str_ids)
             cursor.execute("DELETE FROM student_conflicts")
             cursor.execute("DELETE FROM users WHERE role = 'student'")
@@ -1575,6 +1578,7 @@ async def delete_single_student(request: Request, student_user_id: str):
             cursor.execute("DELETE FROM enrollments WHERE user_id = ?", (st_id,))
             cursor.execute("DELETE FROM lesson_progress WHERE user_id = ?", (st_id,))
             cursor.execute("DELETE FROM quiz_attempts WHERE user_id = ?", (st_id,))
+            cursor.execute("DELETE FROM certificates WHERE student_id = ?", (st_id,))
             cursor.execute("DELETE FROM support_queries WHERE user_id = ?", (clean_uid,))
             cursor.execute("DELETE FROM users WHERE id = ?", (st_id,))
             log_audit(admin["id"], "DELETE_STUDENT", "users", clean_uid, f"Deleted student record {st_name} ({clean_uid})", conn=conn)

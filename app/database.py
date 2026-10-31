@@ -390,6 +390,38 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_logs_course ON ai_usage_logs(course_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_logs_feature ON ai_usage_logs(feature_type);")
 
+        # 18. Verified Certificates Table with Unique ID & QR Verification
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS certificates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            certificate_id TEXT UNIQUE NOT NULL,               -- e.g. "LBPL-2026-000001"
+            student_id INTEGER NOT NULL,                       -- FK to users.id
+            student_name TEXT NOT NULL,
+            student_uid TEXT NOT NULL,                         -- e.g. "CS2026-002"
+            course_id INTEGER NOT NULL,                        -- FK to courses.id
+            course_name TEXT NOT NULL,
+            course_code TEXT,
+            issued_by TEXT NOT NULL DEFAULT 'Leadership Boulevard Pvt Ltd',
+            issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status TEXT NOT NULL DEFAULT 'verified',           -- 'verified', 'revoked', 'reissued'
+            revoked_at TIMESTAMP,
+            revocation_reason TEXT,
+            reissued_from_id TEXT,
+            reissued_to_id TEXT,
+            qr_code_data_uri TEXT,
+            verification_url TEXT,
+            verification_count INTEGER DEFAULT 0,
+            last_verified_at TIMESTAMP,
+            completion_date TEXT,
+            grade_score REAL DEFAULT 100.0,
+            FOREIGN KEY (student_id) REFERENCES users(id),
+            FOREIGN KEY (course_id) REFERENCES courses(id)
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_cert_id ON certificates(certificate_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_cert_student ON certificates(student_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_cert_course ON certificates(course_id);")
+
         # Default system branding and settings
         default_settings = {
             "platform_name": "Nexus LMS",
@@ -421,6 +453,9 @@ def init_db():
             "gemini_auto_reply": "1",
             "gemini_enabled": "1",
             "allow_teacher_ai_quiz": "1",
+            "teacher_can_generate_quiz": "1",
+            "mylo_ai_students_enabled": "1",
+            "mylo_ai_chatbot_enabled": "1",
             "mylo_ai_enabled_globally": "1",
             "mylo_ai_quiz_explanations_enabled": "1",
             "mylo_ai_disabled_courses": "",
@@ -627,14 +662,20 @@ def is_ai_feature_enabled(feature: str, student_user_id: str = None, course_id: 
     if course_id and str(course_id) in disabled_courses:
         return False, "Mylo AI is disabled for this course by administrative policy."
 
-    # 5. Quiz explanations specific controls
+    # 5. Feature-specific master controls (Students, Teachers, Chatbot)
     if feature == "quiz_explanation":
-        if settings.get("mylo_ai_quiz_explanations_enabled", "1") == "0":
-            return False, "Mylo AI-generated quiz explanations are currently disabled by the administrator."
+        if settings.get("mylo_ai_students_enabled", settings.get("mylo_ai_quiz_explanations_enabled", "1")) == "0":
+            return False, "Mylo AI quiz explanations are currently disabled by the administrator."
 
         disabled_exp_courses = [c.strip() for c in settings.get("mylo_ai_quiz_explanations_disabled_courses", "").split(",") if c.strip()]
         if course_id and str(course_id) in disabled_exp_courses:
             return False, "Mylo AI quiz explanations are disabled for this course by administrative policy."
+    elif feature == "quiz_generation":
+        if settings.get("teacher_can_generate_quiz", settings.get("allow_teacher_ai_quiz", "1")) == "0":
+            return False, "Mylo AI quiz generation for teachers is currently disabled by the administrator."
+    elif feature == "chatbot":
+        if settings.get("mylo_ai_chatbot_enabled", settings.get("gemini_auto_reply", "1")) == "0":
+            return False, "Mylo AI chatbot responses are currently disabled by the administrator."
 
     return True, "Allowed"
 
@@ -733,4 +774,254 @@ def get_ai_usage_metrics() -> dict:
             "student_usage": student_usage,
             "recent_logs": recent_logs
         }
+
+
+# ===================================================================
+# UNIQUE CERTIFICATE ID & QR-BASED VERIFICATION MANAGEMENT
+# ===================================================================
+
+_LAST_CERT_SEQ = 0
+
+def generate_unique_certificate_id(conn=None) -> str:
+    """
+    Generates a structured, guaranteed unique certificate ID.
+    Format: LBPL-YYYY-000001 (e.g. LBPL-2026-000001)
+    """
+    global _LAST_CERT_SEQ
+    from datetime import datetime
+    year = datetime.now().year
+    prefix = f"LBPL-{year}-"
+    should_close = False
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        should_close = True
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT certificate_id FROM certificates WHERE certificate_id LIKE ? ORDER BY id DESC LIMIT 1", (f"{prefix}%",))
+        row = cursor.fetchone()
+        db_seq = 0
+        if row and row[0]:
+            try:
+                db_seq = int(row[0].split("-")[-1])
+            except Exception:
+                cursor.execute("SELECT COUNT(*) FROM certificates")
+                db_seq = cursor.fetchone()[0] or 0
+        else:
+            cursor.execute("SELECT COUNT(*) FROM certificates")
+            db_seq = cursor.fetchone()[0] or 0
+
+        seq = max(db_seq + 1, _LAST_CERT_SEQ + 1)
+        _LAST_CERT_SEQ = seq
+        return f"{prefix}{seq:06d}"
+    finally:
+        if should_close:
+            conn.close()
+
+def generate_qr_code_base64(data: str) -> str:
+    """
+    Generates a high-contrast, scannable QR code embedded as a Base64 PNG data URI.
+    """
+    import io
+    import base64
+    import qrcode
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=8,
+        border=2,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#0f172a", back_color="#ffffff")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+
+def issue_certificate(student_id: int, course_id: int, admin_user_id: int = None, completion_date: str = None, grade_score: float = None, conn=None) -> dict:
+    """
+    Automatically generates and permanently registers an authentic certificate for a student in a course.
+    Embeds a unique certificate ID (LBPL-YYYY-000001) and scannable verification QR code.
+    """
+    from datetime import datetime
+    should_close = False
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        should_close = True
+    try:
+        cursor = conn.cursor()
+        # Fetch student details (accepts either user integer ID or string user_id like 'CS2026-002')
+        if isinstance(student_id, str) and not student_id.isdigit():
+            cursor.execute("SELECT id, user_id, full_name FROM users WHERE user_id = ?", (student_id,))
+        else:
+            cursor.execute("SELECT id, user_id, full_name FROM users WHERE id = ?", (int(student_id),))
+        student = cursor.fetchone()
+        if not student:
+            raise ValueError(f"Student '{student_id}' not found in database")
+
+        # Fetch course details
+        cursor.execute("SELECT id, title, code FROM courses WHERE id = ?", (course_id,))
+        course = cursor.fetchone()
+        if not course:
+            raise ValueError(f"Course #{course_id} not found in database")
+
+        # Check if an active verified certificate already exists for this student & course
+        cursor.execute("SELECT * FROM certificates WHERE student_id = ? AND course_id = ? AND status = 'verified'", (student["id"], course["id"]))
+        existing = cursor.fetchone()
+        if existing:
+            return dict(existing)
+
+        cert_id = generate_unique_certificate_id(conn=conn)
+        verification_url = f"/verify/{cert_id}"
+        qr_code_data_uri = generate_qr_code_base64(verification_url)
+        comp_date = completion_date or datetime.now().strftime("%B %d, %Y")
+
+        cursor.execute("""
+            INSERT INTO certificates (
+                certificate_id, student_id, student_name, student_uid,
+                course_id, course_name, course_code, issued_by,
+                status, qr_code_data_uri, verification_url, completion_date, grade_score
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Leadership Boulevard Pvt Ltd', 'verified', ?, ?, ?, ?)
+        """, (
+            cert_id, student["id"], student["full_name"], student["user_id"],
+            course["id"], course["title"], course["code"],
+            qr_code_data_uri, verification_url, comp_date, grade_score or 100.0
+        ))
+        new_row_id = cursor.lastrowid
+        conn.commit()
+
+        if admin_user_id:
+            log_audit(admin_user_id, "CERTIFICATE_ISSUE", "certificates", str(new_row_id), f"Issued certificate {cert_id} for student {student['full_name']} in course {course['title']}", conn=conn)
+
+        cursor.execute("SELECT * FROM certificates WHERE id = ?", (new_row_id,))
+        return dict(cursor.fetchone())
+    finally:
+        if should_close:
+            conn.close()
+
+def get_certificate_by_id(certificate_id: str, conn=None) -> dict:
+    """Retrieves a certificate record by its unique Certificate ID."""
+    should_close = False
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        should_close = True
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM certificates WHERE certificate_id = ? COLLATE NOCASE", (certificate_id.strip(),))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        if should_close:
+            conn.close()
+
+def verify_certificate(certificate_id: str, increment_count: bool = True) -> dict:
+    """
+    Public verification method: checks validity, increments scan counter, and returns certificate details.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM certificates WHERE certificate_id = ? COLLATE NOCASE", (certificate_id.strip(),))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        cert = dict(row)
+        if increment_count and cert["status"] == "verified":
+            cursor.execute("UPDATE certificates SET verification_count = verification_count + 1, last_verified_at = CURRENT_TIMESTAMP WHERE id = ?", (cert["id"],))
+            cert["verification_count"] += 1
+        return cert
+
+def revoke_certificate(certificate_id: str, reason: str = None, admin_user_id: int = None) -> bool:
+    """
+    Revokes an issued certificate. Revocation immediately takes effect across public verification.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM certificates WHERE certificate_id = ? COLLATE NOCASE", (certificate_id.strip(),))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        cert = dict(row)
+        rev_reason = reason.strip() if reason and reason.strip() else "Revoked by Administrator"
+        cursor.execute("UPDATE certificates SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP, revocation_reason = ? WHERE id = ?", (rev_reason, cert["id"]))
+        if admin_user_id:
+            log_audit(admin_user_id, "CERTIFICATE_REVOKE", "certificates", str(cert["id"]), f"Revoked certificate {certificate_id}. Reason: {rev_reason}", conn=conn)
+        return True
+
+def reissue_certificate(old_certificate_id: str, admin_user_id: int = None) -> dict:
+    """
+    Reissues a certificate with a new unique certificate ID and QR code,
+    while archiving the previous record to maintain a permanent audit trail.
+    """
+    from datetime import datetime
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM certificates WHERE certificate_id = ? COLLATE NOCASE", (old_certificate_id.strip(),))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"Certificate {old_certificate_id} not found")
+        old_cert = dict(row)
+
+        new_cert_id = generate_unique_certificate_id(conn=conn)
+        verification_url = f"/verify/{new_cert_id}"
+        qr_code_data_uri = generate_qr_code_base64(verification_url)
+        comp_date = old_cert["completion_date"] or datetime.now().strftime("%B %d, %Y")
+
+        # Mark old certificate as revoked / reissued
+        cursor.execute("""
+            UPDATE certificates 
+            SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP, 
+                revocation_reason = 'Reissued with new Certificate ID', reissued_to_id = ? 
+            WHERE id = ?
+        """, (new_cert_id, old_cert["id"]))
+
+        # Create new certificate
+        cursor.execute("""
+            INSERT INTO certificates (
+                certificate_id, student_id, student_name, student_uid,
+                course_id, course_name, course_code, issued_by,
+                status, reissued_from_id, qr_code_data_uri, verification_url, completion_date, grade_score
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Leadership Boulevard Pvt Ltd', 'verified', ?, ?, ?, ?, ?)
+        """, (
+            new_cert_id, old_cert["student_id"], old_cert["student_name"], old_cert["student_uid"],
+            old_cert["course_id"], old_cert["course_name"], old_cert["course_code"],
+            old_cert["certificate_id"], qr_code_data_uri, verification_url, comp_date, old_cert["grade_score"]
+        ))
+        new_row_id = cursor.lastrowid
+
+        if admin_user_id:
+            log_audit(admin_user_id, "CERTIFICATE_REISSUE", "certificates", str(new_row_id), f"Reissued certificate {old_certificate_id} -> {new_cert_id} for {old_cert['student_name']}", conn=conn)
+
+        cursor.execute("SELECT * FROM certificates WHERE id = ?", (new_row_id,))
+        return dict(cursor.fetchone())
+
+def list_certificates(status: str = None, search: str = None) -> list:
+    """Returns a list of all certificate records with optional status and search filtering."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        query = "SELECT * FROM certificates WHERE 1=1"
+        params = []
+        if status and status != "all":
+            query += " AND status = ?"
+            params.append(status)
+        if search and search.strip():
+            s = f"%{search.strip()}%"
+            query += " AND (certificate_id LIKE ? OR student_name LIKE ? OR course_name LIKE ? OR student_uid LIKE ?)"
+            params.extend([s, s, s, s])
+        query += " ORDER BY id DESC"
+        cursor.execute(query, tuple(params))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_student_certificates(student_id: int) -> list:
+    """Retrieves all valid or earned certificates belonging to a specific student."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM certificates 
+            WHERE student_id = ? 
+            ORDER BY id DESC
+        """, (student_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
 

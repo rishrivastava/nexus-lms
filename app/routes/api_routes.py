@@ -301,15 +301,21 @@ async def create_query(request: Request):
 
     ticket_id = f"TKT-{datetime.now().strftime('%y%m')}-{uuid.uuid4().hex[:4].upper()}"
 
-    # Generate Gemini AI answer
-    ai_response = answer_support_query(
-        ticket_id=ticket_id,
-        user_name=user["full_name"],
-        user_role=user["role"],
-        subject=subject,
-        message=message,
-        course_title=course_title
-    )
+    # Generate Mylo AI answer if AI for Chatbot option is enabled
+    from app.database import get_system_settings
+    settings = get_system_settings()
+    chatbot_ai_enabled = settings.get("mylo_ai_chatbot_enabled", settings.get("gemini_auto_reply", "1")) != "0"
+
+    ai_response = None
+    if chatbot_ai_enabled:
+        ai_response = answer_support_query(
+            ticket_id=ticket_id,
+            user_name=user["full_name"],
+            user_role=user["role"],
+            subject=subject,
+            message=message,
+            course_title=course_title
+        )
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -514,13 +520,37 @@ async def save_gemini_settings(request: Request):
 
     api_key = str(body.get("gemini_api_key", "")).strip()
     model = str(body.get("gemini_model", "gemini-2.5-flash")).strip()
-    auto_reply = "1" if body.get("gemini_auto_reply") in [True, "1", "true", "on"] else "0"
-    enabled = "1" if body.get("gemini_enabled") in [True, "1", "true", "on"] else "0"
-    allow_teacher_ai = "1" if body.get("allow_teacher_ai_quiz") in [True, "1", "true", "on"] else "0"
+    
+    # 3 Core AI Activation Options requested by user:
+    # 1. AI for Students (quiz mistake explanations)
+    if "mylo_ai_students_enabled" in body or "ai_for_students" in body:
+        val = body.get("mylo_ai_students_enabled", body.get("ai_for_students"))
+        ai_for_students = "1" if val in [True, "1", "true", "on", 1] else "0"
+        ai_globally = ai_for_students
+        quiz_exp_enabled = ai_for_students
+    else:
+        ai_globally = "1" if body.get("mylo_ai_enabled_globally", "1") in [True, "1", "true", "on", 1] else "0"
+        quiz_exp_enabled = "1" if body.get("mylo_ai_quiz_explanations_enabled", "1") in [True, "1", "true", "on", 1] else "0"
+        ai_for_students = "1" if (ai_globally == "1" and quiz_exp_enabled == "1") else "0"
+    
+    # 2. AI for Teachers (create assessments & quizzes from topics)
+    if "teacher_can_generate_quiz" in body or "ai_for_teachers" in body:
+        val = body.get("teacher_can_generate_quiz", body.get("ai_for_teachers"))
+        ai_for_teachers = "1" if val in [True, "1", "true", "on", 1] else "0"
+    else:
+        ai_for_teachers = "1" if body.get("allow_teacher_ai_quiz", "1") in [True, "1", "true", "on", 1] else "0"
+    
+    # 3. AI for Chatbot (automated query support)
+    if "mylo_ai_chatbot_enabled" in body or "ai_for_chatbot" in body:
+        val = body.get("mylo_ai_chatbot_enabled", body.get("ai_for_chatbot"))
+        ai_for_chatbot = "1" if val in [True, "1", "true", "on", 1] else "0"
+    else:
+        ai_for_chatbot = "1" if body.get("gemini_auto_reply", "1") in [True, "1", "true", "on", 1] else "0"
 
-    # Granular Mylo AI student & explanation controls
-    ai_globally = "1" if body.get("mylo_ai_enabled_globally") in [True, "1", "true", "on", None] else "0"
-    quiz_exp_enabled = "1" if body.get("mylo_ai_quiz_explanations_enabled") in [True, "1", "true", "on", None] else "0"
+    auto_reply = ai_for_chatbot
+    enabled = "1" if body.get("gemini_enabled") in [True, "1", "true", "on"] else "0"
+    allow_teacher_ai = ai_for_teachers
+
     disabled_courses = str(body.get("mylo_ai_disabled_courses", "")).strip()
     disabled_subjects = str(body.get("mylo_ai_disabled_subjects", "")).strip()
     disabled_students = str(body.get("mylo_ai_disabled_students", "")).strip()
@@ -532,6 +562,9 @@ async def save_gemini_settings(request: Request):
         "gemini_auto_reply": auto_reply,
         "gemini_enabled": enabled,
         "allow_teacher_ai_quiz": allow_teacher_ai,
+        "teacher_can_generate_quiz": ai_for_teachers,
+        "mylo_ai_students_enabled": ai_for_students,
+        "mylo_ai_chatbot_enabled": ai_for_chatbot,
         "mylo_ai_enabled_globally": ai_globally,
         "mylo_ai_quiz_explanations_enabled": quiz_exp_enabled,
         "mylo_ai_disabled_courses": disabled_courses,
@@ -545,7 +578,7 @@ async def save_gemini_settings(request: Request):
         "UPDATE_MYLO_AI_SETTINGS",
         "system_settings",
         "mylo_ai",
-        f"Updated Mylo AI settings: global={ai_globally}, quiz_exp={quiz_exp_enabled}, model={model}, allow_teacher_ai_quiz={allow_teacher_ai}"
+        f"Updated Mylo AI 3 Options: ai_for_students={ai_for_students}, ai_for_teachers={ai_for_teachers}, ai_for_chatbot={ai_for_chatbot}, model={model}"
     )
 
     return JSONResponse({"status": "success", "message": "Mylo AI governance settings saved successfully."})

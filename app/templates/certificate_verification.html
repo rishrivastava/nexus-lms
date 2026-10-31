@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Certificate Verification - Leadership Boulevard Pvt Ltd{% endblock %}
+
+{% block content %}
+<div class="min-h-[80vh] flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-lg mx-auto w-full">
+        <!-- Verification Card -->
+        <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+            <!-- Organization Header -->
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-6 py-6 text-center text-white relative">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md mb-2 border border-white/20">
+                    <i class="fa-solid fa-award text-amber-300 text-2xl"></i>
+                </div>
+                <h2 class="text-sm font-extrabold tracking-widest uppercase text-amber-300/90">Leadership Boulevard Pvt Ltd</h2>
+                <p class="text-[11px] text-slate-300 tracking-wider uppercase mt-0.5">Official Credential Verification Service</p>
+            </div>
+
+            <div class="p-6 sm:p-8 space-y-6">
+                {% if status == 'verified' and cert %}
+                    <!-- Verified State -->
+                    <div class="text-center space-y-2">
+                        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-xs">
+                            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                            <span>Verified</span>
+                        </div>
+                        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Certificate Verified</h1>
+                        <p class="text-xs text-slate-500">Official authentic digital credential registered in the Leadership Boulevard database.</p>
+                    </div>
+
+                    <!-- Certificate Metadata Breakdown -->
+                    <div class="bg-slate-50/80 rounded-2xl border border-slate-200/80 divide-y divide-slate-100 overflow-hidden">
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Student Name:</span>
+                            <span class="font-bold text-slate-900">{{ cert.student_name }}</span>
+                        </div>
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Course Name:</span>
+                            <span class="font-bold text-slate-900 text-right">{{ cert.course_name }}</span>
+                        </div>
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Issued By:</span>
+                            <span class="font-bold text-slate-900">{{ cert.issued_by or 'Leadership Boulevard Pvt Ltd' }}</span>
+                        </div>
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Certificate ID:</span>
+                            <span class="font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100">{{ cert.certificate_id }}</span>
+                        </div>
+                        {% if cert.completion_date %}
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Completion Date:</span>
+                            <span class="font-semibold text-slate-700">{{ cert.completion_date }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Verification Access:</span>
+                            <span class="text-slate-600 font-medium flex items-center gap-1">
+                                <i class="fa-solid fa-shield-check text-emerald-600 text-[11px]"></i>
+                                Verified {{ cert.verification_count }} time{{ 's' if cert.verification_count != 1 else '' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Authenticity Confirmation Box -->
+                    <div class="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-center space-y-1">
+                        <p class="text-xs font-bold text-emerald-900 flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-badge-check text-emerald-600"></i>
+                            <span>This certificate is authentic and has been issued by Leadership Boulevard Pvt Ltd.</span>
+                        </p>
+                        <p class="text-[11px] text-emerald-700">Digital verification integrity verified against official institutional ledger.</p>
+                    </div>
+
+                    <!-- Action: View & Print Digital Certificate -->
+                    <div class="pt-2 text-center">
+                        <a href="/certificate/{{ cert.certificate_id }}" target="_blank"
+                            class="inline-flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition">
+                            <i class="fa-solid fa-file-certificate"></i>
+                            <span>View Full Printable Certificate</span>
+                        </a>
+                    </div>
+
+                {% elif status == 'revoked' and cert %}
+                    <!-- Revoked State -->
+                    <div class="text-center space-y-2">
+                        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 text-xs font-bold shadow-xs">
+                            <i class="fa-solid fa-ban text-red-600"></i>
+                            <span>Revoked Certificate</span>
+                        </div>
+                        <h1 class="text-2xl font-black text-red-900 tracking-tight">Certificate Revoked</h1>
+                        <p class="text-xs text-red-600 font-medium">This certificate has been officially revoked by the issuing authority and is no longer valid.</p>
+                    </div>
+
+                    <div class="bg-red-50/50 rounded-2xl border border-red-200 divide-y divide-red-100 overflow-hidden">
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Certificate ID:</span>
+                            <span class="font-mono font-bold text-red-700">{{ cert.certificate_id }}</span>
+                        </div>
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Student Name:</span>
+                            <span class="font-bold text-slate-900">{{ cert.student_name }}</span>
+                        </div>
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Course:</span>
+                            <span class="font-bold text-slate-900 text-right">{{ cert.course_name }}</span>
+                        </div>
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Revocation Reason:</span>
+                            <span class="font-semibold text-red-700">{{ cert.revocation_reason or 'Administrative Revocation' }}</span>
+                        </div>
+                        {% if cert.reissued_to_id %}
+                        <div class="px-4 py-3 flex items-center justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Reissued As:</span>
+                            <a href="/verify/{{ cert.reissued_to_id }}" class="font-mono font-bold text-indigo-600 hover:underline">
+                                {{ cert.reissued_to_id }} &rarr;
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-slate-100 text-center text-xs text-slate-500">
+                        For questions regarding this certificate status, please contact Leadership Boulevard administration at <a href="mailto:info@fl4schools.com" class="text-indigo-600 font-semibold underline">info@fl4schools.com</a>.
+                    </div>
+
+                {% else %}
+                    <!-- Invalid / Not Found State -->
+                    <div class="text-center space-y-2">
+                        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-xs">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-600"></i>
+                            <span>Invalid Certificate</span>
+                        </div>
+                        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Certificate Not Found</h1>
+                        <p class="text-xs text-slate-500">The certificate ID <strong class="font-mono text-slate-800 font-bold">{{ cert_id }}</strong> does not exist in our registry.</p>
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-center space-y-2">
+                        <p class="text-xs text-amber-900 font-medium">
+                            Please verify that the certificate ID or QR code was not mistyped. Unverified or forged certificates are not recognized by Leadership Boulevard Pvt Ltd.
+                        </p>
+                    </div>
+
+                    <div class="pt-2 text-center">
+                        <a href="/login" class="inline-flex items-center text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                            <i class="fa-solid fa-arrow-left mr-1.5"></i> Return to Nexus LMS Home
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Footer Badge -->
+            <div class="bg-slate-50 px-6 py-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span>&copy; 2026 Leadership Boulevard Pvt Ltd</span>
+                <span class="font-semibold text-amber-600 flex items-center gap-1">
+                    <i class="fa-solid fa-paw text-[10px]"></i> powered by mylo
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
