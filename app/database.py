@@ -223,6 +223,8 @@ def init_db():
             cursor.execute("ALTER TABLE quiz_attempts ADD COLUMN started_at TIMESTAMP")
         if "time_taken_seconds" not in qa_cols:
             cursor.execute("ALTER TABLE quiz_attempts ADD COLUMN time_taken_seconds INTEGER DEFAULT 0")
+        if "attempt_data" not in qa_cols:
+            cursor.execute("ALTER TABLE quiz_attempts ADD COLUMN attempt_data TEXT")
 
         # 10. Audit Logs Table (Tracks administrative actions)
         cursor.execute("""
@@ -379,7 +381,8 @@ def init_db():
             "gemini_api_key": "",
             "gemini_model": "gemini-2.5-flash",
             "gemini_auto_reply": "1",
-            "gemini_enabled": "1"
+            "gemini_enabled": "1",
+            "allow_teacher_ai_quiz": "1"
         }
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (k, v))

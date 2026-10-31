@@ -501,15 +501,17 @@ async def save_gemini_settings(request: Request):
     model = str(body.get("gemini_model", "gemini-2.5-flash")).strip()
     auto_reply = "1" if body.get("gemini_auto_reply") in [True, "1", "true", "on"] else "0"
     enabled = "1" if body.get("gemini_enabled") in [True, "1", "true", "on"] else "0"
+    allow_teacher_ai = "1" if body.get("allow_teacher_ai_quiz") in [True, "1", "true", "on"] else "0"
 
     settings = {
         "gemini_api_key": api_key,
         "gemini_model": model,
         "gemini_auto_reply": auto_reply,
-        "gemini_enabled": enabled
+        "gemini_enabled": enabled,
+        "allow_teacher_ai_quiz": allow_teacher_ai
     }
     update_system_settings(settings)
-    log_audit(user["id"], "UPDATE_GEMINI_SETTINGS", "system_settings", "gemini", f"Updated Gemini AI settings: model={model}, enabled={enabled}")
+    log_audit(user["id"], "UPDATE_GEMINI_SETTINGS", "system_settings", "gemini", f"Updated Gemini AI settings: model={model}, enabled={enabled}, allow_teacher_ai_quiz={allow_teacher_ai}")
 
     return JSONResponse({"status": "success", "message": "Gemini AI settings saved successfully."})
 

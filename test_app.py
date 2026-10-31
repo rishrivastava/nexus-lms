@@ -720,6 +720,230 @@ def test_lms():
             c.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, 1)", (sid,))
             c.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, 2)", (sid,))
 
+    # 27. Test Spreadsheet Quiz Upload, Gemini AI Quiz Generation, Performance Report Card & Mistake Explanations
+    print("\n--- Test Suite 27: Spreadsheet & AI Quizzes, Report Cards & Gemini Explanations ---")
+    import io
+    import openpyxl
+    import json
+    from starlette.requests import Request
+    from starlette.datastructures import UploadFile
+    from fastapi import HTTPException
+    from app.routes.teacher_routes import download_quiz_template, upload_spreadsheet_quiz, ai_generate_quiz
+    from app.routes.student_routes import submit_quiz, explain_quiz_answer
+    from app.routes.api_routes import save_gemini_settings
+
+    teacher_token = create_access_token({"sub": "T-ALAN", "role": "teacher"})
+    teacher_headers = [(b"cookie", f"lms_token={teacher_token}".encode("utf-8"))]
+    admin_token = create_access_token({"sub": "DEPT-HEAD", "role": "department_admin"})
+    admin_headers = [(b"cookie", f"lms_token={admin_token}".encode("utf-8"))]
+    student_token = create_access_token({"sub": "CS2026-002", "role": "student"})
+    student_headers = [(b"cookie", f"lms_token={student_token}".encode("utf-8"))]
+
+    # A: Download Excel and CSV Quiz Templates
+    req_xlsx = Request({"type": "http", "method": "GET", "path": "/teacher/quiz/template/download", "headers": teacher_headers})
+    res_xlsx = asyncio.run(download_quiz_template(req_xlsx, format="xlsx"))
+    assert res_xlsx.status_code == 200
+    assert "spreadsheetml.sheet" in res_xlsx.media_type
+    wb_test = openpyxl.load_workbook(io.BytesIO(res_xlsx.body))
+    assert wb_test.active.title == "Quiz Template"
+    assert wb_test.active.cell(row=1, column=1).value == "Question"
+    print("✓ Successfully generated downloadable styled Excel template (.xlsx) with sample language questions")
+
+    req_csv = Request({"type": "http", "method": "GET", "path": "/teacher/quiz/template/download", "headers": teacher_headers})
+    res_csv = asyncio.run(download_quiz_template(req_csv, format="csv"))
+    assert res_csv.status_code == 200
+    assert "text/csv" in res_csv.media_type
+    csv_text = res_csv.body.decode("utf-8")
+    assert "Question,Option A,Option B,Option C,Option D,Correct Option,Explanation" in csv_text
+    print("✓ Successfully generated downloadable CSV template (.csv) with sample language questions")
+
+    # B: Upload Spreadsheet (.xlsx) to automatically create a quiz
+    wb_upload = openpyxl.Workbook()
+    ws_up = wb_upload.active
+    ws_up.title = "Quiz"
+    ws_up.append(["Question", "Option A", "Option B", "Option C", "Option D", "Correct Option", "Explanation"])
+    ws_up.append(["What is the Spanish word for 'Cat'?", "Gato", "Perro", "Caballo", "Pájaro", "A", "'Gato' translates to 'cat' in Spanish."])
+    ws_up.append(["What is the Spanish word for 'Dog'?", "Gato", "Perro", "Vaca", "Ratón", "B", "'Perro' means 'dog' in Spanish."])
+    ws_up.append(["How do you say 'Thank you' in Spanish?", "Por favor", "De nada", "Gracias", "Hola", "C", "'Gracias' means thank you."])
+    xlsx_io = io.BytesIO()
+    wb_upload.save(xlsx_io)
+    xlsx_io.seek(0)
+
+    upload_file_obj = UploadFile(filename="spanish_animals_quiz.xlsx", file=xlsx_io)
+    req_up = Request({
+        "type": "http", "method": "POST", "path": "/teacher/course/1/quiz/upload",
+        "headers": teacher_headers
+    })
+    req_up.scope["path_params"] = {"course_id": 1}
+    res_up = asyncio.run(upload_spreadsheet_quiz(
+        req_up,
+        file=upload_file_obj,
+        title="Spanish Animals & Basics Quiz",
+        passing_score=60,
+        duration_minutes=15,
+        course_id=1
+    ))
+    assert res_up.status_code == 303
+    
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT q.id as quiz_id, l.title, l.id as lesson_id FROM quizzes q JOIN lessons l ON q.lesson_id = l.id WHERE l.title = 'Spanish Animals & Basics Quiz'")
+        uploaded_quiz = c.fetchone()
+        assert uploaded_quiz is not None
+        uploaded_quiz_id = uploaded_quiz["quiz_id"]
+        c.execute("SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?", (uploaded_quiz_id,))
+        assert c.fetchone()[0] == 3
+    print("✓ Successfully parsed and created live quiz lesson with 3 questions from uploaded spreadsheet")
+
+    # C: Gemini AI Quiz Generation & Admin Governance Access Toggle
+    # 1. Admin sets allow_teacher_ai_quiz = "0"
+    req_gov = Request({"type": "http", "method": "POST", "path": "/api/gemini/save-settings", "headers": admin_headers})
+    async def get_gov_json():
+        return {
+            "gemini_api_key": "dummy_key",
+            "gemini_model": "gemini-2.5-flash",
+            "gemini_auto_reply": "1",
+            "gemini_enabled": "1",
+            "allow_teacher_ai_quiz": "0"
+        }
+    req_gov.json = get_gov_json
+    res_gov = asyncio.run(save_gemini_settings(req_gov))
+    assert res_gov.status_code == 200
+
+    # 2. Teacher attempts AI quiz generation -> Expect 403 Forbidden
+    req_teacher_ai = Request({
+        "type": "http", "method": "POST", "path": "/teacher/course/1/quiz/ai-generate",
+        "headers": teacher_headers
+    })
+    req_teacher_ai.scope["path_params"] = {"course_id": 1}
+    teacher_blocked = False
+    try:
+        asyncio.run(ai_generate_quiz(
+            req_teacher_ai,
+            topic="German Greetings",
+            num_questions=3,
+            difficulty="Beginner",
+            course_id=1
+        ))
+    except HTTPException as e:
+        if e.status_code == 403:
+            teacher_blocked = True
+    assert teacher_blocked == True, "Teacher should be blocked when allow_teacher_ai_quiz is 0"
+    print("✓ Admin governance successfully enforces restriction: Teacher cannot generate AI quiz when toggle is off")
+
+    # 3. Admin generates AI quiz directly -> Allowed
+    req_admin_ai = Request({
+        "type": "http", "method": "POST", "path": "/teacher/course/1/quiz/ai-generate",
+        "headers": admin_headers
+    })
+    req_admin_ai.scope["path_params"] = {"course_id": 1}
+    res_admin_ai = asyncio.run(ai_generate_quiz(
+        req_admin_ai,
+        topic="German Greetings",
+        num_questions=3,
+        difficulty="Beginner",
+        course_id=1
+    ))
+    assert res_admin_ai.status_code == 303
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT q.id as quiz_id, l.title FROM quizzes q JOIN lessons l ON q.lesson_id = l.id WHERE l.title LIKE '%German Greetings%'")
+        ai_quiz = c.fetchone()
+        assert ai_quiz is not None
+        c.execute("SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?", (ai_quiz["quiz_id"],))
+        assert c.fetchone()[0] >= 3
+    print("✓ Admin successfully auto-generated live quiz from topic using Gemini AI")
+
+    # 4. Admin re-enables allow_teacher_ai_quiz = "1" -> Teacher can now generate
+    async def get_gov_json_allow():
+        return {
+            "gemini_api_key": "dummy_key",
+            "gemini_model": "gemini-2.5-flash",
+            "gemini_auto_reply": "1",
+            "gemini_enabled": "1",
+            "allow_teacher_ai_quiz": "1"
+        }
+    req_gov.json = get_gov_json_allow
+    asyncio.run(save_gemini_settings(req_gov))
+
+    res_teacher_ai_ok = asyncio.run(ai_generate_quiz(
+        req_teacher_ai,
+        topic="French Food & Cuisine",
+        num_questions=3,
+        difficulty="Beginner",
+        course_id=1
+    ))
+    assert res_teacher_ai_ok.status_code == 303
+    print("✓ Teacher successfully allowed to auto-generate quiz after admin enables feature toggle")
+
+    # D: Student Quiz Submission & Performance Report Card (Correct vs Wrong Counts)
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, correct_option FROM quiz_questions WHERE quiz_id = ? ORDER BY id ASC", (uploaded_quiz_id,))
+        qs = c.fetchall()
+        assert len(qs) == 3
+        q1_id = str(qs[0]["id"])
+        q2_id = str(qs[1]["id"])
+        q3_id = str(qs[2]["id"])
+
+    # Student answers Q1 correctly, Q2 wrong (B is correct, student picks A), Q3 wrong (C is correct, student picks B)
+    student_answers = {
+        q1_id: "A",
+        q2_id: "A",
+        q3_id: "B"
+    }
+    req_sub = Request({
+        "type": "http", "method": "POST", "path": f"/api/quiz/{uploaded_quiz_id}/submit",
+        "headers": student_headers
+    })
+    async def get_sub_json():
+        return {"answers": student_answers, "time_taken_seconds": 95}
+    req_sub.json = get_sub_json
+
+    sub_res = asyncio.run(submit_quiz(req_sub, uploaded_quiz_id))
+    assert sub_res.status_code == 200
+    report = json.loads(sub_res.body.decode("utf-8"))
+    assert report["total_questions"] == 3
+    assert report["correct_count"] == 1
+    assert report["wrong_count"] == 2
+    assert report["score_percent"] == 33.3
+    assert report["passed"] == False
+    assert report["time_taken_seconds"] == 95
+    assert q2_id in report["review"]
+    assert report["review"][q2_id]["correct"] == False
+    assert report["review"][q2_id]["user_choice"] == "A"
+    assert report["review"][q2_id]["correct_option"] == "B"
+    print("✓ Assessment engine returns comprehensive Report Card with total questions, correct count (1) and wrong count (2)")
+
+    # Verify attempt_data persisted in quiz_attempts database
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT attempt_data FROM quiz_attempts WHERE quiz_id = ? ORDER BY id DESC LIMIT 1", (uploaded_quiz_id,))
+        saved_attempt = c.fetchone()[0]
+        assert saved_attempt is not None
+        saved_json = json.loads(saved_attempt)
+        assert saved_json["correct_count"] == 1
+        assert saved_json["wrong_count"] == 2
+    print("✓ Full attempt data stored in database quiz_attempts table")
+
+    # E: Student asks Gemini: Why is my answer wrong?
+    req_explain = Request({
+        "type": "http", "method": "POST", "path": "/api/quiz/explain-answer",
+        "headers": student_headers
+    })
+    async def get_explain_json():
+        return {"question_id": int(q2_id), "user_choice": "A"}
+    req_explain.json = get_explain_json
+
+    explain_res = asyncio.run(explain_quiz_answer(req_explain))
+    assert explain_res.status_code == 200
+    exp_data = json.loads(explain_res.body.decode("utf-8"))
+    assert exp_data["success"] == True
+    assert exp_data["question_id"] == int(q2_id)
+    assert len(exp_data["explanation"]) > 20
+    assert "Option A" in exp_data["explanation"] or "Option B" in exp_data["explanation"]
+    print("✓ Gemini AI mistake explanation service returned encouraging pedagogical guidance on why student's choice was incorrect")
+
     print("\n🎉 ALL TESTS PASSED! LMS backend and database engine are fully operational.")
 
 if __name__ == "__main__":

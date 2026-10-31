@@ -1631,20 +1631,27 @@ in
                 </div>
 
                 <!-- Feature Toggles -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                     <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
                         <div>
-                            <span class="block text-xs font-bold text-slate-800">Auto-Reply to Chatbot Inquiries</span>
-                            <span class="text-[10px] text-slate-500">Instant AI answers to student and teacher questions</span>
+                            <span class="block text-xs font-bold text-slate-800">Auto-Reply to Chatbot</span>
+                            <span class="text-[10px] text-slate-500">Instant AI answers to inquiries</span>
                         </div>
                         <input type="checkbox" id="geminiAutoReplyToggle" {% if branding.gemini_auto_reply != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
                     </div>
                     <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
                         <div>
                             <span class="block text-xs font-bold text-slate-800">Enable Gemini Engine</span>
-                            <span class="text-[10px] text-slate-500">Global activation switch for AI features</span>
+                            <span class="text-[10px] text-slate-500">Global activation switch</span>
                         </div>
                         <input type="checkbox" id="geminiEnabledToggle" {% if branding.gemini_enabled != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
+                    </div>
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="block text-xs font-bold text-slate-800">Teacher AI Quiz Creator</span>
+                            <span class="text-[10px] text-slate-500">Allow teachers to auto-generate quizzes with Gemini</span>
+                        </div>
+                        <input type="checkbox" id="allowTeacherAiQuizToggle" {% if branding.allow_teacher_ai_quiz != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
                     </div>
                 </div>
 
@@ -2669,6 +2676,7 @@ async function saveGeminiSettings(e) {
     const model = document.getElementById('geminiModelInput').value;
     const autoReply = document.getElementById('geminiAutoReplyToggle').checked ? '1' : '0';
     const enabled = document.getElementById('geminiEnabledToggle').checked ? '1' : '0';
+    const allowTeacherAi = document.getElementById('allowTeacherAiQuizToggle').checked ? '1' : '0';
 
     try {
         const res = await fetch('/api/gemini/save-settings', {
@@ -2678,7 +2686,8 @@ async function saveGeminiSettings(e) {
                 gemini_api_key: apiKey,
                 gemini_model: model,
                 gemini_auto_reply: autoReply,
-                gemini_enabled: enabled
+                gemini_enabled: enabled,
+                allow_teacher_ai_quiz: allowTeacherAi
             })
         });
         const data = await res.json();

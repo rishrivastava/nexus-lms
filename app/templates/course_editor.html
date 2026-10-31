@@ -29,6 +29,19 @@
         </div>
     </div>
 
+    <!-- Flash Alerts -->
+    {% if request.query_params.get('msg') == 'quiz_uploaded' %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center space-x-2">
+        <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+        <span>Spreadsheet quiz uploaded and published successfully! All questions and options are live.</span>
+    </div>
+    {% elif request.query_params.get('msg') == 'ai_quiz_generated' %}
+    <div class="mb-6 p-4 rounded-2xl bg-purple-50 border border-purple-200 text-purple-950 text-xs font-semibold flex items-center space-x-2">
+        <i class="fa-solid fa-wand-magic-sparkles text-purple-600 text-sm"></i>
+        <span>Gemini AI quiz generated and published successfully! Ready for student assessments.</span>
+    </div>
+    {% endif %}
+
     <!-- Course Header Banner -->
     <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-8">
         <div class="flex items-center space-x-3 mb-2">
@@ -43,13 +56,27 @@
 
     <!-- Curriculum Modules & Lessons -->
     <div class="space-y-6">
-        <div class="flex justify-between items-center">
+        <div class="flex flex-wrap justify-between items-center gap-3">
             <h2 class="text-lg font-bold text-slate-900">Curriculum Modules</h2>
-            <button onclick="document.getElementById('addModuleModal').classList.remove('hidden')"
-                class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
-                <i class="fa-solid fa-plus"></i>
-                <span>Add Module</span>
-            </button>
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openSpreadsheetModal()"
+                    class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold hover:bg-emerald-100 shadow-2xs transition">
+                    <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                    <span>Upload Spreadsheet Quiz</span>
+                </button>
+                {% if user.role == 'department_admin' or allow_teacher_ai_quiz == '1' %}
+                <button onclick="openAiQuizModal()"
+                    class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:from-purple-700 hover:to-indigo-700 shadow-sm transition">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                    <span>Generate Quiz with Gemini AI</span>
+                </button>
+                {% endif %}
+                <button onclick="document.getElementById('addModuleModal').classList.remove('hidden')"
+                    class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add Module</span>
+                </button>
+            </div>
         </div>
 
         {% if modules %}
@@ -64,16 +91,24 @@
                     </div>
 
                     <!-- Add Content Dropdown / Action Buttons -->
-                    <div class="flex items-center space-x-2">
-                        <button onclick="openAddLessonModal({{ mod.id }}, 'youtube')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-red-600 hover:border-red-300 rounded-lg text-xs font-semibold transition">
-                            <i class="fa-brands fa-youtube"></i> <span>Add Video</span>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button onclick="openAddLessonModal({{ mod.id }}, 'youtube')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-red-600 hover:border-red-300 rounded-lg text-xs font-semibold transition" title="Add Video Lesson">
+                            <i class="fa-brands fa-youtube"></i> <span>Video</span>
                         </button>
-                        <button onclick="openAddLessonModal({{ mod.id }}, 'pdf')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-sky-600 hover:border-sky-300 rounded-lg text-xs font-semibold transition">
-                            <i class="fa-solid fa-file-pdf"></i> <span>Upload PDF</span>
+                        <button onclick="openAddLessonModal({{ mod.id }}, 'pdf')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-sky-600 hover:border-sky-300 rounded-lg text-xs font-semibold transition" title="Upload PDF Material">
+                            <i class="fa-solid fa-file-pdf"></i> <span>PDF</span>
                         </button>
-                        <button onclick="openAddLessonModal({{ mod.id }}, 'quiz')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-purple-600 hover:border-purple-300 rounded-lg text-xs font-semibold transition">
-                            <i class="fa-solid fa-clipboard-question"></i> <span>Add Quiz</span>
+                        <button onclick="openAddLessonModal({{ mod.id }}, 'quiz')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-purple-600 hover:border-purple-300 rounded-lg text-xs font-semibold transition" title="Create Blank Quiz">
+                            <i class="fa-solid fa-clipboard-question"></i> <span>Quiz</span>
                         </button>
+                        <button onclick="openSpreadsheetModal({{ mod.id }})" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-semibold transition" title="Upload Excel/CSV Spreadsheet Quiz">
+                            <i class="fa-solid fa-file-excel text-emerald-600"></i> <span>Excel Quiz</span>
+                        </button>
+                        {% if user.role == 'department_admin' or allow_teacher_ai_quiz == '1' %}
+                        <button onclick="openAiQuizModal({{ mod.id }})" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-semibold transition" title="Auto-generate Quiz with Gemini AI">
+                            <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i> <span>AI Quiz</span>
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -302,6 +337,163 @@
     </div>
 </div>
 
+<!-- Modal: Upload Spreadsheet Quiz (.xlsx / .csv) -->
+<div id="uploadSpreadsheetModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-start">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-file-excel"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Upload Spreadsheet Quiz</h3>
+                    <p class="text-[11px] text-slate-500">Supports Excel (.xlsx) and Comma-Separated Values (.csv)</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('uploadSpreadsheetModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <!-- Download Suggestive Format Banner -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 flex items-center">
+                    <i class="fa-solid fa-download text-emerald-600 mr-1.5"></i> Suggestive Format Template
+                </span>
+                <span class="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">Ready to fill</span>
+            </div>
+            <p class="text-[11px] text-slate-600">Download our pre-structured template, enter questions and choices (Option A, B, C, D, Correct Option, Explanation), and upload it here.</p>
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+                <a href="/teacher/quiz/template/download?format=xlsx" download class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs font-bold shadow-2xs transition">
+                    <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                    <span>Download Excel Template (.xlsx)</span>
+                </a>
+                <a href="/teacher/quiz/template/download?format=csv" download class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold shadow-2xs transition">
+                    <i class="fa-solid fa-file-csv text-slate-600"></i>
+                    <span>CSV Template (.csv)</span>
+                </a>
+            </div>
+        </div>
+
+        <form id="spreadsheetQuizForm" action="/teacher/course/{{ course.id }}/quiz/upload" method="POST" enctype="multipart/form-data" class="space-y-3.5">
+            <input type="hidden" name="course_id" value="{{ course.id }}">
+            
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Target Curriculum Module</label>
+                <select name="module_id" id="ssModuleSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                    {% for mod in modules %}
+                    <option value="{{ mod.id }}">{{ mod.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Quiz Title (Optional)</label>
+                <input type="text" name="title" placeholder="Defaults to file name or 'Curriculum Quiz'" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Passing Score (%)</label>
+                    <input type="number" name="passing_score" value="70" min="1" max="100" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Time Limit (Mins)</label>
+                    <input type="number" name="duration_minutes" value="10" min="1" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Choose Spreadsheet File (.xlsx, .xls, .csv)</label>
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('uploadSpreadsheetModal').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span>Upload & Build Quiz</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Gemini AI Quiz Generator -->
+<div id="aiQuizModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-start">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Generate Quiz with Gemini AI</h3>
+                    <p class="text-[11px] text-slate-500">Provide a curriculum topic and AI will craft questions live</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('aiQuizModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <form id="aiQuizForm" action="/teacher/course/{{ course.id }}/quiz/ai-generate" method="POST" onsubmit="submitAiQuizForm(event)" class="space-y-3.5">
+            <input type="hidden" name="course_id" value="{{ course.id }}">
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Curriculum Topic / Concept <span class="text-red-500">*</span></label>
+                <input type="text" name="topic" required placeholder="e.g. Spanish Irregular Verbs, German Food & Drink, French Basic Greetings"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <p class="text-[11px] text-slate-400 mt-1">Be specific for richer vocabulary, sentence patterns, and pedagogical explanations.</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Target Curriculum Module</label>
+                <select name="module_id" id="aiModuleSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                    {% for mod in modules %}
+                    <option value="{{ mod.id }}">{{ mod.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Number of Questions</label>
+                    <select name="num_questions" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                        <option value="3">3 Quick Questions</option>
+                        <option value="5" selected>5 Standard Questions</option>
+                        <option value="10">10 Comprehensive Questions</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Difficulty Level</label>
+                    <select name="difficulty" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                        <option value="Beginner">Beginner (Foundation)</option>
+                        <option value="Medium" selected>Intermediate</option>
+                        <option value="Advanced">Advanced</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Passing Score (%)</label>
+                    <input type="number" name="passing_score" value="70" min="1" max="100" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Time Limit (Mins)</label>
+                    <input type="number" name="duration_minutes" value="10" min="1" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('aiQuizModal').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" id="aiGenerateBtn" class="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-100 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                    <span>Generate Quiz with AI</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Modal: Edit Course Settings -->
 <div id="editCourseModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
@@ -467,6 +659,42 @@ function openAddLessonModal(moduleId, type) {
 function openAddQuestionModal(quizId) {
     document.getElementById('questionForm').action = `/teacher/quiz/${quizId}/question`;
     document.getElementById('addQuestionModal').classList.remove('hidden');
+}
+
+function openSpreadsheetModal(moduleId) {
+    const sel = document.getElementById('ssModuleSelect');
+    if (sel && moduleId) {
+        sel.value = moduleId;
+    }
+    const form = document.getElementById('spreadsheetQuizForm');
+    if (form && moduleId) {
+        form.action = `/teacher/module/${moduleId}/quiz/upload`;
+    } else if (form) {
+        form.action = `/teacher/course/{{ course.id }}/quiz/upload`;
+    }
+    document.getElementById('uploadSpreadsheetModal').classList.remove('hidden');
+}
+
+function openAiQuizModal(moduleId) {
+    const sel = document.getElementById('aiModuleSelect');
+    if (sel && moduleId) {
+        sel.value = moduleId;
+    }
+    const form = document.getElementById('aiQuizForm');
+    if (form && moduleId) {
+        form.action = `/teacher/module/${moduleId}/quiz/ai-generate`;
+    } else if (form) {
+        form.action = `/teacher/course/{{ course.id }}/quiz/ai-generate`;
+    }
+    document.getElementById('aiQuizModal').classList.remove('hidden');
+}
+
+function submitAiQuizForm(e) {
+    const btn = document.getElementById('aiGenerateBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Generating Quiz with Gemini...';
+    }
 }
 </script>
 {% endblock %}

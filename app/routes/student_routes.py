@@ -4,6 +4,7 @@ from app.templates_config import templates
 from app.database import get_db
 from app.auth import get_current_user
 from app.utils import extract_youtube_id
+from app.gemini_service import explain_quiz_mistake
 import os
 import json
 
@@ -264,35 +265,60 @@ async def submit_quiz(request: Request, quiz_id: int):
         if time_taken_seconds > allowed_seconds:
             timed_out = True
 
-        cursor.execute("SELECT id, correct_option, explanation FROM quiz_questions WHERE quiz_id = ?", (quiz_id,))
+        cursor.execute("SELECT id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation FROM quiz_questions WHERE quiz_id = ?", (quiz_id,))
         questions = cursor.fetchall()
         
         total_questions = len(questions)
         if total_questions == 0:
-            return JSONResponse({"score_percent": 100, "passed": True, "time_taken_seconds": time_taken_seconds})
+            return JSONResponse({"score_percent": 100, "correct_count": 0, "wrong_count": 0, "total_questions": 0, "passed": True, "time_taken_seconds": time_taken_seconds, "review": {}})
 
         correct_count = 0
         review = {}
         for q in questions:
             qid = str(q["id"])
-            user_choice = answers.get(qid, "").upper()
-            correct = (user_choice == q["correct_option"].upper())
+            user_choice = answers.get(qid, "").upper().strip()
+            correct_choice = q["correct_option"].upper().strip()
+            correct = (user_choice == correct_choice)
             if correct:
                 correct_count += 1
+
+            options_map = {
+                "A": q["option_a"],
+                "B": q["option_b"],
+                "C": q["option_c"],
+                "D": q["option_d"]
+            }
+            user_choice_text = options_map.get(user_choice, "Skipped / Unanswered")
+            correct_option_text = options_map.get(correct_choice, "")
+
             review[qid] = {
+                "question_id": q["id"],
+                "question_text": q["question_text"],
+                "user_choice": user_choice,
+                "user_choice_text": user_choice_text,
                 "correct": correct,
-                "correct_option": q["correct_option"],
-                "explanation": q["explanation"]
+                "correct_option": correct_choice,
+                "correct_option_text": correct_option_text,
+                "explanation": q["explanation"] or ""
             }
 
+        wrong_count = total_questions - correct_count
         score_percent = round((correct_count / total_questions) * 100, 1)
         passed = 1 if score_percent >= quiz["passing_score"] else 0
 
-        # Record attempt with start and time taken
+        attempt_data = json.dumps({
+            "answers": answers,
+            "correct_count": correct_count,
+            "wrong_count": wrong_count,
+            "total_questions": total_questions,
+            "review": review
+        })
+
+        # Record attempt with start, time taken, and detailed attempt data
         cursor.execute("""
-            INSERT INTO quiz_attempts (user_id, quiz_id, score_percent, passed, time_taken_seconds)
-            VALUES (?, ?, ?, ?, ?)
-        """, (user["id"], quiz_id, score_percent, passed, time_taken_seconds))
+            INSERT INTO quiz_attempts (user_id, quiz_id, score_percent, passed, time_taken_seconds, attempt_data)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (user["id"], quiz_id, score_percent, passed, time_taken_seconds, attempt_data))
 
         # If passed, mark the quiz lesson as completed
         if passed:
@@ -307,10 +333,71 @@ async def submit_quiz(request: Request, quiz_id: int):
     return JSONResponse({
         "score_percent": score_percent,
         "correct_count": correct_count,
+        "wrong_count": wrong_count,
         "total_questions": total_questions,
         "passing_score": quiz["passing_score"],
         "passed": bool(passed),
         "timed_out": timed_out,
         "time_taken_seconds": time_taken_seconds,
         "review": review
+    })
+
+
+@router.post("/api/quiz/explain-answer")
+async def explain_quiz_answer(request: Request):
+    """Generates a detailed AI explanation of why the student's answer was wrong using Gemini AI."""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    question_id = body.get("question_id")
+    user_choice = (body.get("user_choice") or "").strip().upper()
+
+    if not question_id:
+        raise HTTPException(status_code=400, detail="Missing question_id parameter.")
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT qq.*, q.lesson_id, c.title as course_title 
+            FROM quiz_questions qq
+            JOIN quizzes q ON qq.quiz_id = q.id
+            JOIN lessons l ON q.lesson_id = l.id
+            JOIN modules m ON l.module_id = m.id
+            JOIN courses c ON m.course_id = c.id
+            WHERE qq.id = ?
+        """, (question_id,))
+        q = cursor.fetchone()
+        if not q:
+            raise HTTPException(status_code=404, detail="Quiz question not found.")
+
+    options_map = {
+        "A": q["option_a"],
+        "B": q["option_b"],
+        "C": q["option_c"],
+        "D": q["option_d"]
+    }
+    user_choice_text = options_map.get(user_choice, "Skipped / Unanswered")
+    correct_option = q["correct_option"].upper().strip()
+    correct_choice_text = options_map.get(correct_option, "")
+
+    explanation_text = explain_quiz_mistake(
+        question_text=q["question_text"],
+        student_choice=user_choice,
+        student_choice_text=user_choice_text,
+        correct_choice=correct_option,
+        correct_choice_text=correct_choice_text,
+        explanation=q["explanation"],
+        course_title=q["course_title"]
+    )
+
+    return JSONResponse({
+        "success": True,
+        "question_id": question_id,
+        "explanation": explanation_text
     })
