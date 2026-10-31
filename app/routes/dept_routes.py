@@ -4,7 +4,7 @@ from app.templates_config import templates
 from app.database import (
     get_db, get_system_settings, update_system_settings, UPLOAD_DIR,
     log_audit, get_dashboard_permissions, update_dashboard_permissions,
-    get_notification_settings, update_notification_settings
+    get_notification_settings, update_notification_settings, get_ai_usage_metrics
 )
 from app.auth import get_current_user, hash_password
 from app.utils import normalize_name, generate_unique_student_id
@@ -769,7 +769,8 @@ async def department_dashboard(
         "student_conflicts": student_conflicts,
         "all_queries": all_queries,
         "open_queries_count": open_queries_count,
-        "last_rejected_count": len(LAST_IMPORT_REJECTED)
+        "last_rejected_count": len(LAST_IMPORT_REJECTED),
+        "ai_usage_metrics": get_ai_usage_metrics()
     })
 
 @router.post("/department/courses/assign")

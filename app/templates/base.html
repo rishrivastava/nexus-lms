@@ -89,14 +89,27 @@
                             </a>
                         {% endif %}
                         
-                        {% if user.role in ['teacher', 'department_admin', 'dashboard_viewer'] %}
-                            {% if user.role in ['teacher', 'department_admin'] %}
-                            <a href="/teacher" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition">
-                                <i class="fa-solid fa-chalkboard-user mr-1 text-slate-400"></i> Studio
+                        {% if user.role == 'teacher' %}
+                            <a href="/teacher" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-chalkboard-user text-slate-400"></i>
+                                <span>Teacher Studio</span>
                             </a>
-                            {% endif %}
-                            <a href="/department" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition">
-                                <i class="fa-solid fa-chart-pie mr-1 text-slate-400"></i> Department Dashboards
+                            <a href="/teacher/dashboard" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-chart-line text-slate-400"></i>
+                                <span>Teacher Dashboard</span>
+                            </a>
+                        {% elif user.role in ['department_admin', 'dashboard_viewer'] %}
+                            <a href="/teacher" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-chalkboard-user text-slate-400"></i>
+                                <span>Studio</span>
+                            </a>
+                            <a href="/teacher/dashboard" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-chart-line text-slate-400"></i>
+                                <span>Faculty Analytics</span>
+                            </a>
+                            <a href="/department" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-chart-pie text-slate-400"></i>
+                                <span>Department Dashboards</span>
                             </a>
                         {% endif %}
 
@@ -283,7 +296,7 @@
                     <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-[11px] text-indigo-900 flex items-start space-x-2">
                         <i class="fa-solid fa-robot text-indigo-600 mt-0.5 text-sm shrink-0"></i>
                         <span>
-                            Ask any question. <strong>Google Gemini AI</strong> provides an instant response, and your ticket is registered to 
+                            Ask any question. <strong>Mylo AI</strong> provides an instant response, and your ticket is registered to 
                             <strong>{% if user.role == 'teacher' %}the Department Administrator{% else %}your Teacher and Administrator{% endif %}</strong>!
                         </span>
                     </div>
@@ -468,7 +481,7 @@
         const submitBtn = document.getElementById('cbSubmitBtn');
         const originalBtnHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Consulting Gemini AI & Registering...';
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Consulting Mylo AI & Registering...';
 
         const subject = document.getElementById('cbSubject').value;
         const message = document.getElementById('cbMessage').value;

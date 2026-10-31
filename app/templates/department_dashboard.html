@@ -96,6 +96,10 @@
             <i class="fa-solid fa-sliders text-amber-500"></i>
             <span>Governance & Branding</span>
         </button>
+        <button onclick="switchTab('ai-governance')" id="tabBtn-ai-governance" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i>
+            <span>Mylo AI Controls & Usage</span>
+        </button>
         <button onclick="switchTab('conflicts')" id="tabBtn-conflicts" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-user-shield"></i>
             <span>Conflicts {% if student_conflicts %}<span class="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px]">{{ student_conflicts|length }}</span>{% endif %}</span>
@@ -1953,6 +1957,289 @@ in
             {% endif %}
         </div>
     </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 11: MYLO AI GOVERNANCE, USAGE CONTROLS & EXPENDITURE            -->
+    <!-- =================================================================== -->
+    <div id="tab-ai-governance" class="tab-content hidden space-y-6">
+        <!-- Header Banner -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold mb-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Mylo AI Administrative Controls & Diagnostics</span>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Mylo AI Usage & Governance</h2>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
+                    Centrally govern student access to Mylo AI globally, course-wise, subject-wise, or by individual student roll number. Monitor API token consumption and real-time expenditure.
+                </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="loadAiUsageMetrics()" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+                    <i class="fa-solid fa-rotate mr-1" id="aiRefreshIcon"></i>
+                    <span>Refresh Metrics</span>
+                </button>
+                <span class="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Active Engine</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Section C: AI Usage & Financial Expenditure Dashboard KPIs -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total AI Requests</div>
+                <div class="text-2xl font-black text-slate-900" id="aiKpiTotalReqs">{{ ai_usage_metrics.total_requests or 0 }}</div>
+                <div class="text-[11px] text-slate-500 mt-1">Today: <strong id="aiKpiTodayReqs">{{ ai_usage_metrics.today_requests or 0 }}</strong></div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Token Consumption</div>
+                <div class="text-2xl font-black text-purple-700" id="aiKpiTotalTokens">{{ ai_usage_metrics.total_tokens or 0 }}</div>
+                <div class="text-[11px] text-slate-500 mt-1"><span id="aiKpiPromptTokens">{{ ai_usage_metrics.prompt_tokens or 0 }}</span> in / <span id="aiKpiCompTokens">{{ ai_usage_metrics.completion_tokens or 0 }}</span> out</div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Estimated Expenditure</div>
+                <div class="text-2xl font-black text-emerald-600" id="aiKpiCostUsd">${{ ai_usage_metrics.estimated_cost_usd or 0.0 }}</div>
+                <div class="text-[11px] text-slate-500 mt-1">Approx: <strong id="aiKpiCostInr">₹{{ ai_usage_metrics.estimated_cost_inr or 0.0 }}</strong></div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quiz Explanations</div>
+                <div class="text-2xl font-black text-indigo-600" id="aiKpiQuizReqs">{{ ai_usage_metrics.quiz_explanation_requests or 0 }}</div>
+                <div class="text-[11px] text-slate-500 mt-1">Chatbot Inquiries: <strong id="aiKpiChatReqs">{{ ai_usage_metrics.chatbot_requests or 0 }}</strong></div>
+            </div>
+        </div>
+
+        <!-- Section A & B: Core Configuration and Global / Granular Controls -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
+            <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-indigo-600"></i>
+                        <span>Mylo AI Engine & Granular Access Controls</span>
+                    </h3>
+                    <p class="text-xs text-slate-500">Configure global AI credentials and student accessibility toggles.</p>
+                </div>
+            </div>
+
+            <form onsubmit="saveMyloAiSettings(event)" class="space-y-6">
+                <!-- API Credentials & Model Selection -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">
+                            Google AI Studio API Key (Mylo AI Engine)
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-indigo-600 font-normal hover:underline ml-1">(Get Key)</a>
+                        </label>
+                        <input type="password" id="myloApiKeyInput" value="{{ branding.gemini_api_key or '' }}" placeholder="AIzaSy..."
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <p class="text-[11px] text-slate-400 mt-1">API key securely persisted in system settings.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Model Engine</label>
+                        <select id="myloModelInput" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                            <option value="gemini-2.5-flash" {% if branding.gemini_model == 'gemini-2.5-flash' %}selected{% endif %}>Gemini 2.5 Flash (Fast, high-efficiency, recommended)</option>
+                            <option value="gemini-2.5-pro" {% if branding.gemini_model == 'gemini-2.5-pro' %}selected{% endif %}>Gemini 2.5 Pro (Deep complex academic reasoning)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Global Master Toggles -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <!-- Global Student AI Toggle -->
+                    <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="block text-xs font-bold text-purple-900">Student Access</span>
+                            <span class="text-[10px] text-purple-700">Enable Mylo AI for students</span>
+                        </div>
+                        <input type="checkbox" id="myloGlobalStudentToggle" {% if branding.mylo_ai_enabled_globally != '0' %}checked{% endif %} class="w-4 h-4 text-purple-600 rounded">
+                    </div>
+
+                    <!-- Quiz Explanations Toggle -->
+                    <div class="p-3 bg-indigo-50/50 border border-indigo-200 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="block text-xs font-bold text-indigo-900">Quiz Explanations</span>
+                            <span class="text-[10px] text-indigo-700">AI-generated quiz feedback</span>
+                        </div>
+                        <input type="checkbox" id="myloQuizExpToggle" {% if branding.mylo_ai_quiz_explanations_enabled != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
+                    </div>
+
+                    <!-- Teacher AI Quiz Creator -->
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="block text-xs font-bold text-slate-800">Teacher AI Quiz</span>
+                            <span class="text-[10px] text-slate-500">Allow teachers to build AI quizzes</span>
+                        </div>
+                        <input type="checkbox" id="myloTeacherQuizToggle" {% if branding.allow_teacher_ai_quiz != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
+                    </div>
+
+                    <!-- Auto-Reply Chatbot -->
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <span class="block text-xs font-bold text-slate-800">Help Desk Auto-Reply</span>
+                            <span class="text-[10px] text-slate-500">Instant AI answers to queries</span>
+                        </div>
+                        <input type="checkbox" id="myloChatbotReplyToggle" {% if branding.gemini_auto_reply != '0' %}checked{% endif %} class="w-4 h-4 text-indigo-600 rounded">
+                    </div>
+                </div>
+
+                <!-- Course-wise AI Granular Permissions Table -->
+                <div class="space-y-3 pt-2">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Course-Level AI Permissions</h4>
+                            <p class="text-[11px] text-slate-500">Toggle student AI features or AI quiz explanations individually per course.</p>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-2xl overflow-hidden max-h-64 overflow-y-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-50 sticky top-0 text-slate-500 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="py-2.5 px-4">Course</th>
+                                    <th class="py-2.5 px-3">Subject</th>
+                                    <th class="py-2.5 px-3 text-center">Student AI Access</th>
+                                    <th class="py-2.5 px-3 text-center">Quiz Explanations</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 font-medium">
+                                {% for c in all_courses %}
+                                <tr class="hover:bg-slate-50/50">
+                                    <td class="py-2 px-4 font-bold text-slate-800">
+                                        {{ c.title }}
+                                        <span class="text-[10px] text-slate-400 font-mono block">{{ c.code }}</span>
+                                    </td>
+                                    <td class="py-2 px-3 text-slate-500">{{ c.subject or c.department }}</td>
+                                    <td class="py-2 px-3 text-center">
+                                        <input type="checkbox" class="course-ai-toggle w-4 h-4 text-indigo-600 rounded" data-course-id="{{ c.id }}"
+                                            {% if not (branding.mylo_ai_disabled_courses and (c.id|string in branding.mylo_ai_disabled_courses.split(','))) %}checked{% endif %}>
+                                    </td>
+                                    <td class="py-2 px-3 text-center">
+                                        <input type="checkbox" class="course-quiz-exp-toggle w-4 h-4 text-purple-600 rounded" data-course-id="{{ c.id }}"
+                                            {% if not (branding.mylo_ai_quiz_explanations_disabled_courses and (c.id|string in branding.mylo_ai_quiz_explanations_disabled_courses.split(','))) %}checked{% endif %}>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Subject-wise & Student-wise Restriction Inputs -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">
+                            Disabled Subjects (Comma-separated)
+                        </label>
+                        <input type="text" id="myloDisabledSubjectsInput" value="{{ branding.mylo_ai_disabled_subjects or '' }}" placeholder="e.g. History, Spanish"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <p class="text-[11px] text-slate-400 mt-1">Students enrolled in these subjects will not have AI features available.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">
+                            Restricted Individual Students (Blacklist by Roll No / User ID)
+                        </label>
+                        <input type="text" id="myloDisabledStudentsInput" value="{{ branding.mylo_ai_disabled_students or '' }}" placeholder="e.g. STU102, STU105, 2026CS01"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <p class="text-[11px] text-slate-400 mt-1">Specific students who are blocked from invoking Mylo AI.</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="testMyloConnectionLive()" id="testMyloBtn"
+                        class="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition flex items-center gap-1.5 self-start">
+                        <i class="fa-solid fa-vial"></i>
+                        <span>Test API Connection</span>
+                    </button>
+
+                    <button type="submit" id="saveMyloBtn"
+                        class="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:from-purple-700 hover:to-indigo-700 transition shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Save Mylo AI Governance Settings</span>
+                    </button>
+                </div>
+            </form>
+            <div id="myloTestResult" class="hidden p-3 rounded-2xl text-xs"></div>
+        </div>
+
+        <!-- Section C: Course-wise AI Usage & Student Leaderboard Tables -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Course-wise Usage -->
+            <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <i class="fa-solid fa-book-bookmark text-indigo-600"></i>
+                    <span>Course-wise AI Consumption</span>
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-200">
+                                <th class="py-2.5 px-3">Course</th>
+                                <th class="py-2.5 px-3 text-center">Requests</th>
+                                <th class="py-2.5 px-3 text-center">Tokens</th>
+                                <th class="py-2.5 px-3 text-right">Est. Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aiCourseUsageTableBody" class="divide-y divide-slate-100 font-medium">
+                            {% if ai_usage_metrics.course_breakdown %}
+                            {% for c in ai_usage_metrics.course_breakdown %}
+                            <tr>
+                                <td class="py-2.5 px-3 font-bold text-slate-800">{{ c.course_title }}</td>
+                                <td class="py-2.5 px-3 text-center font-bold text-indigo-700">{{ c.requests }}</td>
+                                <td class="py-2.5 px-3 text-center text-slate-600 font-mono">{{ c.tokens }}</td>
+                                <td class="py-2.5 px-3 text-right text-emerald-600 font-bold">${{ c.cost }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr><td colspan="4" class="py-6 text-center text-slate-400">No course AI usage logged yet.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Student Leaderboard -->
+            <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <i class="fa-solid fa-trophy text-amber-500"></i>
+                    <span>Top Student AI Consumers</span>
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-200">
+                                <th class="py-2.5 px-3">Student</th>
+                                <th class="py-2.5 px-3 text-center">Requests</th>
+                                <th class="py-2.5 px-3 text-center">Tokens</th>
+                                <th class="py-2.5 px-3 text-right">Est. Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aiStudentUsageTableBody" class="divide-y divide-slate-100 font-medium">
+                            {% if ai_usage_metrics.student_breakdown %}
+                            {% for s in ai_usage_metrics.student_breakdown %}
+                            <tr>
+                                <td class="py-2.5 px-3">
+                                    <div class="font-bold text-slate-800">{{ s.user_name }}</div>
+                                    <div class="text-[10px] text-slate-400 font-mono">{{ s.user_id }}</div>
+                                </td>
+                                <td class="py-2.5 px-3 text-center font-bold text-purple-700">{{ s.requests }}</td>
+                                <td class="py-2.5 px-3 text-center text-slate-600 font-mono">{{ s.tokens }}</td>
+                                <td class="py-2.5 px-3 text-right text-emerald-600 font-bold">${{ s.cost }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr><td colspan="4" class="py-6 text-center text-slate-400">No student AI requests recorded yet.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
     {% endif %}
 </div>
 
@@ -2664,59 +2951,90 @@ async function submitAdminReply(e, ticketId) {
     }
 }
 
-// Gemini AI Settings & Testing
-async function saveGeminiSettings(e) {
-    e.preventDefault();
-    const saveBtn = document.getElementById('saveGeminiBtn');
-    const origHtml = saveBtn.innerHTML;
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
+// Mylo AI Governance & Settings
+async function saveMyloAiSettings(e) {
+    if (e) e.preventDefault();
+    const saveBtn = document.getElementById('saveMyloBtn');
+    const origHtml = saveBtn ? saveBtn.innerHTML : '';
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving Configuration...';
+    }
 
-    const apiKey = document.getElementById('geminiApiKeyInput').value;
-    const model = document.getElementById('geminiModelInput').value;
-    const autoReply = document.getElementById('geminiAutoReplyToggle').checked ? '1' : '0';
-    const enabled = document.getElementById('geminiEnabledToggle').checked ? '1' : '0';
-    const allowTeacherAi = document.getElementById('allowTeacherAiQuizToggle').checked ? '1' : '0';
+    const apiKey = document.getElementById('myloApiKeyInput') ? document.getElementById('myloApiKeyInput').value : '';
+    const model = document.getElementById('myloModelInput') ? document.getElementById('myloModelInput').value : 'gemini-2.5-flash';
+    const autoReply = document.getElementById('myloChatbotReplyToggle') && document.getElementById('myloChatbotReplyToggle').checked ? '1' : '0';
+    const globalStudent = document.getElementById('myloGlobalStudentToggle') && document.getElementById('myloGlobalStudentToggle').checked ? '1' : '0';
+    const quizExp = document.getElementById('myloQuizExpToggle') && document.getElementById('myloQuizExpToggle').checked ? '1' : '0';
+    const allowTeacherAi = document.getElementById('myloTeacherQuizToggle') && document.getElementById('myloTeacherQuizToggle').checked ? '1' : '0';
+
+    // Compute unchecked courses (disabled courses)
+    const disabledCourses = [];
+    document.querySelectorAll('.course-ai-toggle').forEach(cb => {
+        if (!cb.checked) {
+            disabledCourses.push(cb.getAttribute('data-course-id'));
+        }
+    });
+
+    const disabledQuizExpCourses = [];
+    document.querySelectorAll('.course-quiz-exp-toggle').forEach(cb => {
+        if (!cb.checked) {
+            disabledQuizExpCourses.push(cb.getAttribute('data-course-id'));
+        }
+    });
+
+    const disabledSubjects = document.getElementById('myloDisabledSubjectsInput') ? document.getElementById('myloDisabledSubjectsInput').value : '';
+    const disabledStudents = document.getElementById('myloDisabledStudentsInput') ? document.getElementById('myloDisabledStudentsInput').value : '';
 
     try {
-        const res = await fetch('/api/gemini/save-settings', {
+        const res = await fetch('/api/mylo/save-settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 gemini_api_key: apiKey,
                 gemini_model: model,
                 gemini_auto_reply: autoReply,
-                gemini_enabled: enabled,
-                allow_teacher_ai_quiz: allowTeacherAi
+                gemini_enabled: '1',
+                allow_teacher_ai_quiz: allowTeacherAi,
+                mylo_ai_enabled_globally: globalStudent,
+                mylo_ai_quiz_explanations_enabled: quizExp,
+                mylo_ai_disabled_courses: disabledCourses.join(','),
+                mylo_ai_disabled_subjects: disabledSubjects,
+                mylo_ai_disabled_students: disabledStudents,
+                mylo_ai_quiz_explanations_disabled_courses: disabledQuizExpCourses.join(',')
             })
         });
         const data = await res.json();
         if (res.ok) {
-            alert('Google Gemini AI settings saved successfully!');
+            alert('Mylo AI governance & access settings saved successfully! Changes take effect immediately.');
+            loadAiUsageMetrics();
         } else {
-            alert(data.detail || 'Failed to save Gemini settings.');
+            alert(data.detail || 'Failed to save Mylo AI settings.');
         }
     } catch(err) {
         alert('Error connecting to server.');
     } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = origHtml;
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = origHtml;
+        }
     }
 }
 
-async function testGeminiConnectionLive() {
-    const testBtn = document.getElementById('testGeminiBtn');
-    const resDiv = document.getElementById('geminiTestResult');
+async function testMyloConnectionLive() {
+    const testBtn = document.getElementById('testMyloBtn');
+    const resDiv = document.getElementById('myloTestResult');
+    if (!testBtn || !resDiv) return;
     const origHtml = testBtn.innerHTML;
     testBtn.disabled = true;
-    testBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Testing...';
+    testBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Testing Engine...';
     resDiv.classList.add('hidden');
 
-    const apiKey = document.getElementById('geminiApiKeyInput').value;
-    const model = document.getElementById('geminiModelInput').value;
+    const apiKey = document.getElementById('myloApiKeyInput') ? document.getElementById('myloApiKeyInput').value : '';
+    const model = document.getElementById('myloModelInput') ? document.getElementById('myloModelInput').value : 'gemini-2.5-flash';
 
     try {
-        const res = await fetch('/api/gemini/test', {
+        const res = await fetch('/api/mylo/test', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ api_key: apiKey, model })
@@ -2725,7 +3043,7 @@ async function testGeminiConnectionLive() {
         resDiv.classList.remove('hidden');
         if (data.success) {
             resDiv.className = "p-3 rounded-2xl text-xs bg-emerald-50 border border-emerald-200 text-emerald-900";
-            resDiv.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 mr-1.5"></i> <strong>Success!</strong> ${data.message}`;
+            resDiv.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 mr-1.5"></i> <strong>Mylo AI Online!</strong> ${data.message}`;
         } else {
             resDiv.className = "p-3 rounded-2xl text-xs bg-amber-50 border border-amber-200 text-amber-900";
             resDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-600 mr-1.5"></i> ${data.error}`;
@@ -2733,11 +3051,75 @@ async function testGeminiConnectionLive() {
     } catch(err) {
         resDiv.classList.remove('hidden');
         resDiv.className = "p-3 rounded-2xl text-xs bg-red-50 border border-red-200 text-red-900";
-        resDiv.innerHTML = 'Error testing Gemini API connection.';
+        resDiv.innerHTML = 'Error testing Mylo AI API connection.';
     } finally {
         testBtn.disabled = false;
         testBtn.innerHTML = origHtml;
     }
+}
+
+async function loadAiUsageMetrics() {
+    const icon = document.getElementById('aiRefreshIcon');
+    if (icon) icon.classList.add('fa-spin');
+
+    try {
+        const res = await fetch('/api/mylo/usage-metrics');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Update KPIs
+        if (document.getElementById('aiKpiTotalReqs')) document.getElementById('aiKpiTotalReqs').innerText = data.total_requests || 0;
+        if (document.getElementById('aiKpiTodayReqs')) document.getElementById('aiKpiTodayReqs').innerText = data.today_requests || 0;
+        if (document.getElementById('aiKpiTotalTokens')) document.getElementById('aiKpiTotalTokens').innerText = (data.total_tokens || 0).toLocaleString();
+        if (document.getElementById('aiKpiPromptTokens')) document.getElementById('aiKpiPromptTokens').innerText = (data.prompt_tokens || 0).toLocaleString();
+        if (document.getElementById('aiKpiCompTokens')) document.getElementById('aiKpiCompTokens').innerText = (data.completion_tokens || 0).toLocaleString();
+        if (document.getElementById('aiKpiCostUsd')) document.getElementById('aiKpiCostUsd').innerText = `$${data.estimated_cost_usd || 0.0}`;
+        if (document.getElementById('aiKpiCostInr')) document.getElementById('aiKpiCostInr').innerText = `₹${data.estimated_cost_inr || 0.0}`;
+        if (document.getElementById('aiKpiQuizReqs')) document.getElementById('aiKpiQuizReqs').innerText = data.quiz_explanation_requests || 0;
+        if (document.getElementById('aiKpiChatReqs')) document.getElementById('aiKpiChatReqs').innerText = data.chatbot_requests || 0;
+
+        // Update Course Breakdown Table
+        const courseTbody = document.getElementById('aiCourseUsageTableBody');
+        if (courseTbody && data.course_breakdown && data.course_breakdown.length > 0) {
+            courseTbody.innerHTML = data.course_breakdown.map(c => `
+                <tr>
+                    <td class="py-2.5 px-3 font-bold text-slate-800">${c.course_title}</td>
+                    <td class="py-2.5 px-3 text-center font-bold text-indigo-700">${c.requests}</td>
+                    <td class="py-2.5 px-3 text-center text-slate-600 font-mono">${c.tokens.toLocaleString()}</td>
+                    <td class="py-2.5 px-3 text-right text-emerald-600 font-bold">$${c.cost}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Update Student Breakdown Table
+        const studentTbody = document.getElementById('aiStudentUsageTableBody');
+        if (studentTbody && data.student_breakdown && data.student_breakdown.length > 0) {
+            studentTbody.innerHTML = data.student_breakdown.map(s => `
+                <tr>
+                    <td class="py-2.5 px-3">
+                        <div class="font-bold text-slate-800">${s.user_name}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">${s.user_id}</div>
+                    </td>
+                    <td class="py-2.5 px-3 text-center font-bold text-purple-700">${s.requests}</td>
+                    <td class="py-2.5 px-3 text-center text-slate-600 font-mono">${s.tokens.toLocaleString()}</td>
+                    <td class="py-2.5 px-3 text-right text-emerald-600 font-bold">$${s.cost}</td>
+                </tr>
+            `).join('');
+        }
+    } catch(e) {
+        console.error('Failed to refresh AI metrics:', e);
+    } finally {
+        if (icon) icon.classList.remove('fa-spin');
+    }
+}
+
+// Gemini AI Settings & Testing (Legacy Alias for Governance tab)
+async function saveGeminiSettings(e) {
+    return saveMyloAiSettings(e);
+}
+
+async function testGeminiConnectionLive() {
+    return testMyloConnectionLive();
 }
 </script>
 {% endblock %}

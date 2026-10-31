@@ -1,0 +1,695 @@
+{% extends "base.html" %}
+
+{% block title %}Teacher Dashboard & Analytics - Nexus LMS{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <!-- Top Header & 2-Window Switcher -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Window 2: Teacher Dashboard</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Academic & Student Analytics</h1>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">Real-time performance metrics, live student activity, engagement analytics, and assessment diagnostics.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Window Switcher -->
+            <div class="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                <a href="/teacher" class="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+                    <i class="fa-solid fa-layer-group text-slate-400"></i>
+                    <span>Window 1: Teacher Studio</span>
+                </a>
+                <a href="/teacher/dashboard" class="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white text-indigo-700 shadow-sm">
+                    <i class="fa-solid fa-chart-pie text-indigo-600"></i>
+                    <span>Window 2: Dashboard</span>
+                </a>
+            </div>
+
+            <!-- Auto-refresh Live Indicator -->
+            <div class="hidden sm:flex items-center space-x-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-medium">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping mr-1"></span>
+                <span>Live Feed</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Bar -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <form method="GET" action="/teacher/dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
+            <!-- Course Selector -->
+            <div>
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Course View</label>
+                <div class="relative">
+                    <select name="course_id" onchange="this.form.submit()" class="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 appearance-none">
+                        <option value="" {% if not selected_course_id %}selected{% endif %}>All Assigned Courses (Consolidated)</option>
+                        {% for c in analytics.assigned_courses %}
+                        <option value="{{ c.id }}" {% if selected_course_id == c.id %}selected{% endif %}>{{ c.code }} - {{ c.title }}</option>
+                        {% endfor %}
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-3 text-[10px] text-slate-400 pointer-events-none"></i>
+                </div>
+            </div>
+
+            <!-- Date Range -->
+            <div>
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date Range</label>
+                <div class="relative">
+                    <select name="date_range" onchange="this.form.submit()" class="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 appearance-none">
+                        <option value="7d" {% if date_range == '7d' %}selected{% endif %}>Last 7 Days</option>
+                        <option value="30d" {% if date_range == '30d' %}selected{% endif %}>Last 30 Days</option>
+                        <option value="90d" {% if date_range == '90d' %}selected{% endif %}>Last 90 Days</option>
+                        <option value="all" {% if date_range == 'all' %}selected{% endif %}>All Time</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-3 text-[10px] text-slate-400 pointer-events-none"></i>
+                </div>
+            </div>
+
+            <!-- Student Search -->
+            <div class="lg:col-span-2">
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search Student</label>
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <input type="text" name="search" value="{{ search_term }}" placeholder="Search by student name or roll number..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-xs text-slate-400"></i>
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Filter</button>
+                    {% if search_term or selected_course_id %}
+                    <a href="/teacher/dashboard" class="px-3 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-200 transition flex items-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if not analytics.has_courses %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-lg mx-auto">
+        <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">
+            <i class="fa-solid fa-graduation-cap"></i>
+        </div>
+        <h3 class="text-lg font-bold text-slate-800 mb-1">No Courses Assigned</h3>
+        <p class="text-xs text-slate-500 mb-6">You currently have no courses assigned to your faculty profile. Once courses are assigned or created in Teacher Studio, your live analytics will appear here.</p>
+        <a href="/teacher" class="inline-flex items-center space-x-2 px-5 py-2.5 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 shadow-md transition">
+            <i class="fa-solid fa-plus"></i>
+            <span>Open Teacher Studio</span>
+        </a>
+    </div>
+    {% else %}
+
+    <!-- Multi-Course Comparison Section (if multiple courses or all selected) -->
+    {% if analytics.course_comparison_matrix and (not selected_course_id or analytics.course_comparison_matrix|length > 1) %}
+    <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-table-columns text-indigo-600"></i>
+                    <span>Multi-Course Comparison Matrix</span>
+                </h2>
+                <p class="text-xs text-slate-500">Side-by-side performance benchmarking across all your assigned courses.</p>
+            </div>
+            <span class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-lg">{{ analytics.course_comparison_matrix|length }} Courses</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold">
+                        <th class="py-3 px-4">Course</th>
+                        <th class="py-3 px-3 text-center">Enrolled</th>
+                        <th class="py-3 px-3 text-center">Active Rate</th>
+                        <th class="py-3 px-3 text-center">Live Now</th>
+                        <th class="py-3 px-3 text-center">Avg Quiz Score</th>
+                        <th class="py-3 px-3 text-center">Completion Rate</th>
+                        <th class="py-3 px-3 text-center">Total Learning</th>
+                        <th class="py-3 px-4 text-right">Drill Down</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium">
+                    {% for row in analytics.course_comparison_matrix %}
+                    <tr class="hover:bg-slate-50/60 transition">
+                        <td class="py-3.5 px-4">
+                            <div class="font-bold text-slate-800">{{ row.title }}</div>
+                            <div class="text-[11px] text-slate-400 font-mono">{{ row.code }} • {{ row.subject }}</div>
+                        </td>
+                        <td class="py-3.5 px-3 text-center font-bold text-slate-700">{{ row.enrolled }}</td>
+                        <td class="py-3.5 px-3 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold {% if row.active_pct >= 50 %}bg-emerald-50 text-emerald-700{% else %}bg-amber-50 text-amber-700{% endif %}">
+                                {{ row.active_pct }}%
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-3 text-center">
+                            {% if row.live > 0 %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700">
+                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping mr-1"></span>
+                                {{ row.live }}
+                            </span>
+                            {% else %}
+                            <span class="text-slate-400 font-mono">0</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3.5 px-3 text-center font-bold text-indigo-700">{{ row.avg_score }}%</td>
+                        <td class="py-3.5 px-3 text-center">
+                            <div class="w-24 mx-auto bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-indigo-600 h-2 rounded-full" style="width: {{ row.completion_rate }}%"></div>
+                            </div>
+                            <span class="text-[10px] text-slate-500 font-bold mt-1 block">{{ row.completion_rate }}%</span>
+                        </td>
+                        <td class="py-3.5 px-3 text-center text-slate-600 font-semibold">{{ row.learning_hours }} hrs</td>
+                        <td class="py-3.5 px-4 text-right">
+                            <a href="/teacher/dashboard?course_id={{ row.id }}" class="inline-flex items-center space-x-1 px-3 py-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition">
+                                <span>Focus</span>
+                                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- SECTION A: Student Performance Overview KPIs -->
+    <div class="space-y-4">
+        <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-gauge-high text-indigo-600"></i>
+                <span>Student Performance Overview</span>
+            </h2>
+            <span class="text-xs text-slate-500">Live aggregated metrics</span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <!-- Enrolled & Active -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Enrolled</div>
+                <div class="text-2xl font-black text-slate-900">{{ analytics.kpis.total_enrolled }}</div>
+                <div class="text-[11px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>{{ analytics.kpis.active_count }} Active</span>
+                    <span class="text-slate-400 font-normal">({{ analytics.kpis.inactive_count }} Inactive)</span>
+                </div>
+            </div>
+
+            <!-- Average Quiz Score -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Avg Assessment</div>
+                <div class="text-2xl font-black text-indigo-700">{{ analytics.kpis.overall_avg_score }}%</div>
+                <div class="text-[11px] text-slate-500 mt-1">Across all attempts</div>
+            </div>
+
+            <!-- Pass Percentage -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pass Percentage</div>
+                <div class="text-2xl font-black text-emerald-600">{{ analytics.kpis.pass_percentage }}%</div>
+                <div class="text-[11px] text-slate-500 mt-1">Benchmark: &ge;50%</div>
+            </div>
+
+            <!-- Score Spread -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Score Range</div>
+                <div class="text-2xl font-black text-slate-900">{{ analytics.kpis.highest_score }}%</div>
+                <div class="text-[11px] text-rose-500 font-medium mt-1">Lowest: {{ analytics.kpis.lowest_score }}%</div>
+            </div>
+
+            <!-- Course Completion Rate -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Avg Completion</div>
+                <div class="text-2xl font-black text-indigo-600">{{ analytics.kpis.overall_completion_pct }}%</div>
+                <div class="text-[11px] text-slate-500 mt-1">{{ analytics.kpis.students_completed }} Completed</div>
+            </div>
+
+            <!-- In Progress -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">In Progress</div>
+                <div class="text-2xl font-black text-amber-600">{{ analytics.kpis.students_in_progress }}</div>
+                <div class="text-[11px] text-slate-500 mt-1">Pending completion</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION B: Live Student Activity -->
+    <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>Live Student Activity (Real-Time)</span>
+                </h2>
+                <p class="text-xs text-slate-500">Students actively engaging with lessons, streaming lectures, or attempting quizzes in the last 5 minutes.</p>
+            </div>
+
+            <!-- Live Action Counters -->
+            <div class="flex flex-wrap gap-2 text-xs">
+                <span class="px-3 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-emerald-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-users text-emerald-600"></i>
+                    <span>{{ analytics.kpis.live_total }} Online Now</span>
+                </span>
+                <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-semibold rounded-xl border border-indigo-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-video text-indigo-600"></i>
+                    <span>{{ analytics.kpis.live_video_count }} Watching Videos</span>
+                </span>
+                <span class="px-2.5 py-1 bg-amber-50 text-amber-700 font-semibold rounded-xl border border-amber-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-clipboard-question text-amber-600"></i>
+                    <span>{{ analytics.kpis.live_quiz_count }} In Quizzes</span>
+                </span>
+                <span class="px-2.5 py-1 bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-book-open text-slate-600"></i>
+                    <span>{{ analytics.kpis.live_module_count }} Modules</span>
+                </span>
+            </div>
+        </div>
+
+        {% if analytics.live_students %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold">
+                        <th class="py-2.5 px-4">Student</th>
+                        <th class="py-2.5 px-3">Course</th>
+                        <th class="py-2.5 px-4">Current Real-Time Activity</th>
+                        <th class="py-2.5 px-3 text-right">Heartbeat</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium">
+                    {% for ls in analytics.live_students %}
+                    <tr class="hover:bg-slate-50/50 transition">
+                        <td class="py-3 px-4">
+                            <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                <span>{{ ls.full_name }}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-mono">{{ ls.user_id }}</div>
+                        </td>
+                        <td class="py-3 px-3">
+                            <span class="px-2 py-0.5 bg-slate-100 rounded text-slate-700 font-mono font-bold text-[11px]">{{ ls.course_code }}</span>
+                            <div class="text-[10px] text-slate-400 truncate max-w-xs">{{ ls.course_title }}</div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50/80 text-indigo-700">
+                                <i class="fa-solid {{ ls.icon }} text-indigo-500"></i>
+                                <span>{{ ls.action }}</span>
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 text-right text-emerald-600 text-[11px] font-bold">
+                            <i class="fa-solid fa-bolt mr-1"></i>Active Now
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="py-8 text-center text-slate-400 text-xs">
+            <i class="fa-solid fa-moon text-2xl text-slate-300 mb-2 block"></i>
+            No students are currently active in this course within the last 5 minutes. Real-time entries appear here when learners interact.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- SECTION C: Student Performance Rankings (Top 5 & Bottom 5) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Top 5 Performing Students -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-500"></i>
+                    <span>Top 5 Performing Students</span>
+                </h3>
+                <span class="text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">Honor Roll</span>
+            </div>
+
+            {% if analytics.top_5_students %}
+            <div class="divide-y divide-slate-100">
+                {% for st in analytics.top_5_students %}
+                <div class="py-3 flex items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <span class="w-6 h-6 rounded-full bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center shrink-0">
+                            {{ loop.index }}
+                        </span>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900">{{ st.full_name }}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">{{ st.user_id }} • {{ st.course_code }}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <div class="text-xs font-black text-indigo-700">{{ st.avg_score }}%</div>
+                            <div class="text-[10px] text-slate-400">{{ st.completion_pct }}% done • {{ st.time_spent_hours }} hrs</div>
+                        </div>
+                        <button onclick="openStudentModal({{ st.id }})" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="View Profile">
+                            <i class="fa-solid fa-id-card text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-slate-400 py-4 text-center">No student assessment scores recorded yet.</p>
+            {% endif %}
+        </div>
+
+        <!-- Bottom 5 Students (Needing Attention) -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+                    <span>Students Needing Attention</span>
+                </h3>
+                <span class="text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">Academic Intervention</span>
+            </div>
+
+            {% if analytics.bottom_5_students %}
+            <div class="divide-y divide-slate-100">
+                {% for st in analytics.bottom_5_students %}
+                <div class="py-3 flex items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <span class="w-6 h-6 rounded-full bg-rose-50 text-rose-700 text-xs font-black flex items-center justify-center shrink-0">
+                            {{ loop.index }}
+                        </span>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900">{{ st.full_name }}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">{{ st.user_id }} • {{ st.course_code }}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <div class="text-xs font-black text-rose-600">
+                                {% if st.has_attempts %}{{ st.avg_score }}%{% else %}No Quizzes{% endif %}
+                            </div>
+                            <div class="text-[10px] text-slate-400">{{ st.completion_pct }}% done • {{ st.time_spent_hours }} hrs</div>
+                        </div>
+                        <button onclick="openStudentModal({{ st.id }})" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="View Profile">
+                            <i class="fa-solid fa-id-card text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-slate-400 py-4 text-center">All enrolled students are performing within normal ranges.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- SECTION D: Learning Engagement & Usage Analytics -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Engagement Rates & Time Spent -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 pb-2 border-b border-slate-100">
+                <i class="fa-solid fa-clock-rotate-left text-indigo-600"></i>
+                <span>Engagement Metrics</span>
+            </h3>
+
+            <div class="space-y-3 text-xs">
+                <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
+                    <span class="text-slate-500">Total Learning Hours</span>
+                    <span class="font-black text-slate-800 text-sm">{{ analytics.kpis.total_learning_hours }} hrs</span>
+                </div>
+                <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
+                    <span class="text-slate-500">Avg Time per Student</span>
+                    <span class="font-bold text-slate-800">{{ analytics.kpis.avg_time_per_student_mins }} mins</span>
+                </div>
+                <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
+                    <span class="text-slate-500">Avg Daily Engagement</span>
+                    <span class="font-bold text-slate-800">{{ analytics.kpis.avg_daily_engagement_mins }} mins/day</span>
+                </div>
+                <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
+                    <span class="text-slate-500">Avg Weekly Engagement</span>
+                    <span class="font-bold text-slate-800">{{ analytics.kpis.avg_weekly_engagement_hours }} hrs/wk</span>
+                </div>
+                <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
+                    <span class="text-slate-500">Video Completion Rate</span>
+                    <span class="font-bold text-indigo-600">{{ analytics.kpis.video_completion_rate }}%</span>
+                </div>
+                <div class="flex justify-between items-center py-1.5">
+                    <span class="text-slate-500">Quiz Participation Rate</span>
+                    <span class="font-bold text-emerald-600">{{ analytics.kpis.quiz_participation_rate }}%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter-wise Engagement -->
+        <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 pb-2 border-b border-slate-100">
+                <i class="fa-solid fa-list-check text-indigo-600"></i>
+                <span>Chapter-wise Curriculum Engagement</span>
+            </h3>
+
+            {% if analytics.chapter_engagement %}
+            <div class="space-y-3.5">
+                {% for ch in analytics.chapter_engagement %}
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="font-bold text-slate-800 truncate max-w-sm">{{ ch.module_title }}</span>
+                        <div class="flex items-center gap-3">
+                            {% if ch.avg_quiz_score %}
+                            <span class="text-[11px] font-semibold text-indigo-600">Avg Quiz: {{ ch.avg_quiz_score }}%</span>
+                            {% endif %}
+                            <span class="font-bold text-slate-700">{{ ch.completion_rate }}%</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="bg-indigo-600 h-2 rounded-full transition-all" style="width: {{ ch.completion_rate }}%"></div>
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">{{ ch.lesson_count }} lessons • {{ ch.course_code }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-slate-400 py-4 text-center">No chapters found in selected course view.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Topics Engagement & Inactive Students -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Most Accessed Topics -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-3">
+            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-100">
+                <i class="fa-solid fa-arrow-trend-up text-emerald-500"></i>
+                <span>Most Accessed Lessons</span>
+            </h4>
+            {% if analytics.most_accessed_topics %}
+            <div class="space-y-2 text-xs">
+                {% for t in analytics.most_accessed_topics %}
+                <div class="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
+                    <div class="truncate mr-2">
+                        <span class="font-semibold text-slate-800 block truncate">{{ t.title }}</span>
+                        <span class="text-[10px] text-slate-400">{{ t.module_title }}</span>
+                    </div>
+                    <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-[11px] rounded shrink-0">{{ t.views }} views</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-slate-400 text-center py-2">No lesson access records yet.</p>
+            {% endif %}
+        </div>
+
+        <!-- Least Accessed Topics / Drop-off points -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-3">
+            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-100">
+                <i class="fa-solid fa-arrow-trend-down text-rose-500"></i>
+                <span>Least Accessed (Drop-Off Points)</span>
+            </h4>
+            {% if analytics.least_accessed_topics %}
+            <div class="space-y-2 text-xs">
+                {% for t in analytics.least_accessed_topics %}
+                <div class="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
+                    <div class="truncate mr-2">
+                        <span class="font-semibold text-slate-800 block truncate">{{ t.title }}</span>
+                        <span class="text-[10px] text-slate-400">{{ t.module_title }}</span>
+                    </div>
+                    <span class="px-2 py-0.5 bg-slate-100 text-slate-600 font-bold text-[11px] rounded shrink-0">{{ t.views }} views</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-slate-400 text-center py-2">No lesson records.</p>
+            {% endif %}
+        </div>
+
+        <!-- Inactive Students Alert -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-3">
+            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-100">
+                <i class="fa-solid fa-user-clock text-amber-500"></i>
+                <span>Inactive Students (&gt; 7 Days)</span>
+            </h4>
+            {% if analytics.inactive_students_list %}
+            <div class="space-y-2 text-xs">
+                {% for st in analytics.inactive_students_list %}
+                <div class="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
+                    <div class="truncate mr-2">
+                        <span class="font-semibold text-slate-800 block truncate">{{ st.full_name }}</span>
+                        <span class="text-[10px] text-slate-400 font-mono">{{ st.user_id }}</span>
+                    </div>
+                    <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded shrink-0">Inactive</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-emerald-600 font-medium text-center py-4">All students have been active recently!</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- SECTION E: Assessment Analytics & Most Difficult Questions -->
+    <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-indigo-600"></i>
+                    <span>Assessment Diagnostics & Question Accuracy</span>
+                </h3>
+                <p class="text-xs text-slate-500">Identify misconceptions and questions where students struggle most frequently.</p>
+            </div>
+            <div class="flex gap-2 text-xs">
+                <span class="px-3 py-1 bg-slate-100 rounded-lg text-slate-700 font-semibold">Total Quizzes: <strong>{{ analytics.kpis.total_quizzes }}</strong></span>
+                <span class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg font-semibold">Total Attempts: <strong>{{ analytics.kpis.total_attempts_count }}</strong></span>
+            </div>
+        </div>
+
+        {% if analytics.most_difficult_questions %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold">
+                        <th class="py-2.5 px-4">Question Text</th>
+                        <th class="py-2.5 px-3">Quiz</th>
+                        <th class="py-2.5 px-3 text-center">Correct Option</th>
+                        <th class="py-2.5 px-3 text-center">Attempts</th>
+                        <th class="py-2.5 px-3 text-center">Accuracy</th>
+                        <th class="py-2.5 px-3 text-center">Error Rate</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium">
+                    {% for q in analytics.most_difficult_questions %}
+                    <tr class="hover:bg-slate-50/50 transition">
+                        <td class="py-3 px-4 max-w-md">
+                            <span class="font-bold text-slate-800">{{ q.question_text }}</span>
+                        </td>
+                        <td class="py-3 px-3 text-slate-500">{{ q.quiz_title }}</td>
+                        <td class="py-3 px-3 text-center font-mono font-bold text-indigo-600">Option {{ q.correct_option }}</td>
+                        <td class="py-3 px-3 text-center text-slate-600">{{ q.attempts }}</td>
+                        <td class="py-3 px-3 text-center font-bold text-slate-800">{{ q.accuracy }}%</td>
+                        <td class="py-3 px-3 text-center">
+                            <span class="px-2 py-0.5 bg-rose-50 text-rose-700 font-bold rounded text-[11px]">
+                                {{ q.incorrect_pct }}% Error
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-xs text-slate-400 py-4 text-center">No quiz questions have received graded attempts yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Student Performance Profile Drill-down Modal -->
+    <div id="studentProfileModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
+                        <i class="fa-solid fa-user-graduate"></i>
+                    </div>
+                    <div>
+                        <h3 id="modalStudentName" class="font-bold text-slate-900 text-base">Student Name</h3>
+                        <p id="modalStudentId" class="text-xs text-slate-500 font-mono">ID: ...</p>
+                    </div>
+                </div>
+                <button onclick="closeStudentModal()" class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-6">
+                <!-- Overview Stats in Modal -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="p-3 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-center">
+                        <div class="text-[10px] uppercase font-bold text-indigo-500">Avg Quiz Score</div>
+                        <div id="modalAvgScore" class="text-xl font-black text-indigo-900">0%</div>
+                    </div>
+                    <div class="p-3 bg-emerald-50/70 border border-emerald-100 rounded-2xl text-center">
+                        <div class="text-[10px] uppercase font-bold text-emerald-500">Course Progress</div>
+                        <div id="modalCompletion" class="text-xl font-black text-emerald-900">0%</div>
+                    </div>
+                    <div class="p-3 bg-slate-100 rounded-2xl text-center">
+                        <div class="text-[10px] uppercase font-bold text-slate-500">Time Invested</div>
+                        <div id="modalTimeSpent" class="text-xl font-black text-slate-800">0 hrs</div>
+                    </div>
+                </div>
+
+                <!-- Recent Quiz Attempts -->
+                <div>
+                    <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-clipboard-check text-indigo-600"></i>
+                        <span>Recent Assessment Attempts</span>
+                    </h4>
+                    <div id="modalAttemptsList" class="space-y-2 text-xs">
+                        <!-- Dynamic rows -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 text-right">
+                <button onclick="closeStudentModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">
+                    Close Profile
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+
+<!-- Embedded Student Profiles JSON for Drill-down -->
+<script>
+    const studentData = {{ analytics.all_students|tojson|safe }};
+
+    function openStudentModal(studentId) {
+        const student = studentData.find(s => s.id === studentId);
+        if (!student) return;
+
+        document.getElementById('modalStudentName').innerText = student.full_name;
+        document.getElementById('modalStudentId').innerText = `Roll No: ${student.user_id} • Course: ${student.course_code}`;
+        document.getElementById('modalAvgScore').innerText = student.has_attempts ? `${student.avg_score}%` : 'N/A';
+        document.getElementById('modalCompletion').innerText = `${student.completion_pct}%`;
+        document.getElementById('modalTimeSpent').innerText = `${student.time_spent_hours} hrs`;
+
+        const attemptsContainer = document.getElementById('modalAttemptsList');
+        if (student.recent_attempts && student.recent_attempts.length > 0) {
+            attemptsContainer.innerHTML = student.recent_attempts.map(a => `
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <div class="font-bold text-slate-800">${a.quiz_title || 'Quiz'}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">${a.module_title || ''} • ${a.attempted_at || ''}</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${a.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                            ${a.score_percent}% (${a.passed ? 'PASSED' : 'RETRY'})
+                        </span>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${Math.round((a.time_taken_seconds || 0) / 60)} mins taken</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            attemptsContainer.innerHTML = '<div class="text-slate-400 text-xs py-4 text-center italic">No quiz attempts recorded for this student yet.</div>';
+        }
+
+        document.getElementById('studentProfileModal').classList.remove('hidden');
+    }
+
+    function closeStudentModal() {
+        document.getElementById('studentProfileModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

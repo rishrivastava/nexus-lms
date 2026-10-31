@@ -342,10 +342,24 @@ async def create_query(request: Request):
         create_notification(
             aid,
             f"New {user['role'].capitalize()} Query #{ticket_id}",
-            f"{user['full_name']} raised: '{subject}'. Immediate Gemini AI answer delivered.",
+            f"{user['full_name']} raised: '{subject}'. Immediate Mylo AI answer delivered.",
             "/department?tab=queries",
             "system"
         )
+
+    # Log Mylo AI usage for chatbot ticket
+    from app.database import log_ai_usage, get_ai_usage_metrics
+    log_ai_usage(
+        user_id=user["id"],
+        user_name=user["full_name"],
+        user_role=user["role"],
+        feature_type="chatbot",
+        course_id=course_id,
+        course_title=course_title,
+        subject=subject,
+        prompt_tokens=120,
+        completion_tokens=150
+    )
 
     # Alert Course Teacher if applicable
     if teacher_id:
@@ -481,15 +495,16 @@ async def reply_to_query(request: Request):
     })
 
 # ==========================================
-# 5. GEMINI AI CONFIGURATION & TESTING API
+# 5. MYLO AI CONFIGURATION & TESTING API
 # ==========================================
 
+@router.post("/api/mylo/save-settings")
 @router.post("/api/gemini/save-settings")
 async def save_gemini_settings(request: Request):
-    """Saves Gemini AI configuration from Governance / Settings."""
+    """Saves Mylo AI configuration, student access policies, and quiz explanation permissions."""
     user = get_current_user(request)
     if not user or user["role"] != "department_admin":
-        raise HTTPException(status_code=403, detail="Only Department Admin can configure Gemini AI.")
+        raise HTTPException(status_code=403, detail="Only Department Admin can configure Mylo AI.")
 
     try:
         body = await request.json()
@@ -503,21 +518,55 @@ async def save_gemini_settings(request: Request):
     enabled = "1" if body.get("gemini_enabled") in [True, "1", "true", "on"] else "0"
     allow_teacher_ai = "1" if body.get("allow_teacher_ai_quiz") in [True, "1", "true", "on"] else "0"
 
+    # Granular Mylo AI student & explanation controls
+    ai_globally = "1" if body.get("mylo_ai_enabled_globally") in [True, "1", "true", "on", None] else "0"
+    quiz_exp_enabled = "1" if body.get("mylo_ai_quiz_explanations_enabled") in [True, "1", "true", "on", None] else "0"
+    disabled_courses = str(body.get("mylo_ai_disabled_courses", "")).strip()
+    disabled_subjects = str(body.get("mylo_ai_disabled_subjects", "")).strip()
+    disabled_students = str(body.get("mylo_ai_disabled_students", "")).strip()
+    exp_disabled_courses = str(body.get("mylo_ai_quiz_explanations_disabled_courses", "")).strip()
+
     settings = {
         "gemini_api_key": api_key,
         "gemini_model": model,
         "gemini_auto_reply": auto_reply,
         "gemini_enabled": enabled,
-        "allow_teacher_ai_quiz": allow_teacher_ai
+        "allow_teacher_ai_quiz": allow_teacher_ai,
+        "mylo_ai_enabled_globally": ai_globally,
+        "mylo_ai_quiz_explanations_enabled": quiz_exp_enabled,
+        "mylo_ai_disabled_courses": disabled_courses,
+        "mylo_ai_disabled_subjects": disabled_subjects,
+        "mylo_ai_disabled_students": disabled_students,
+        "mylo_ai_quiz_explanations_disabled_courses": exp_disabled_courses
     }
     update_system_settings(settings)
-    log_audit(user["id"], "UPDATE_GEMINI_SETTINGS", "system_settings", "gemini", f"Updated Gemini AI settings: model={model}, enabled={enabled}, allow_teacher_ai_quiz={allow_teacher_ai}")
+    log_audit(
+        user["id"],
+        "UPDATE_MYLO_AI_SETTINGS",
+        "system_settings",
+        "mylo_ai",
+        f"Updated Mylo AI settings: global={ai_globally}, quiz_exp={quiz_exp_enabled}, model={model}, allow_teacher_ai_quiz={allow_teacher_ai}"
+    )
 
-    return JSONResponse({"status": "success", "message": "Gemini AI settings saved successfully."})
+    return JSONResponse({"status": "success", "message": "Mylo AI governance settings saved successfully."})
 
+@router.get("/api/mylo/usage-metrics")
+async def get_mylo_usage_api(request: Request):
+    """Returns real-time Mylo AI usage, breakdowns, and cost expenditure metrics."""
+    user = get_current_user(request)
+    if not user or user["role"] != "department_admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    from app.database import get_ai_usage_metrics
+    metrics = get_ai_usage_metrics()
+    return JSONResponse(metrics)
+
+get_mylo_usage_metrics = get_mylo_usage_api
+
+@router.post("/api/mylo/test")
 @router.post("/api/gemini/test")
 async def test_gemini(request: Request):
-    """Tests Gemini connection with provided or saved API key."""
+    """Tests Mylo AI connection with provided or saved API key."""
     user = get_current_user(request)
     if not user or user["role"] != "department_admin":
         raise HTTPException(status_code=403, detail="Unauthorized.")

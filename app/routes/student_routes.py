@@ -345,7 +345,7 @@ async def submit_quiz(request: Request, quiz_id: int):
 
 @router.post("/api/quiz/explain-answer")
 async def explain_quiz_answer(request: Request):
-    """Generates a detailed AI explanation of why the student's answer was wrong using Gemini AI."""
+    """Generates a detailed AI explanation of why the student's answer was wrong using Mylo AI."""
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -364,7 +364,7 @@ async def explain_quiz_answer(request: Request):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT qq.*, q.lesson_id, c.title as course_title 
+            SELECT qq.*, q.lesson_id, c.id as course_id, c.title as course_title, c.subject
             FROM quiz_questions qq
             JOIN quizzes q ON qq.quiz_id = q.id
             JOIN lessons l ON q.lesson_id = l.id
@@ -375,6 +375,17 @@ async def explain_quiz_answer(request: Request):
         q = cursor.fetchone()
         if not q:
             raise HTTPException(status_code=404, detail="Quiz question not found.")
+
+    # Backend enforcement of Administrator Mylo AI usage governance policies
+    from app.database import is_ai_feature_enabled, log_ai_usage
+    allowed, reason = is_ai_feature_enabled(
+        feature="quiz_explanation",
+        student_user_id=user["user_id"],
+        course_id=q["course_id"],
+        subject=q["subject"]
+    )
+    if not allowed:
+        raise HTTPException(status_code=403, detail=reason)
 
     options_map = {
         "A": q["option_a"],
@@ -394,6 +405,19 @@ async def explain_quiz_answer(request: Request):
         correct_choice_text=correct_choice_text,
         explanation=q["explanation"],
         course_title=q["course_title"]
+    )
+
+    # Log AI usage for governance & expenditure metrics
+    log_ai_usage(
+        user_id=user["id"],
+        user_name=user["full_name"],
+        user_role=user["role"],
+        feature_type="quiz_explanation",
+        course_id=q["course_id"],
+        course_title=q["course_title"],
+        subject=q["subject"],
+        prompt_tokens=180,
+        completion_tokens=220
     )
 
     return JSONResponse({

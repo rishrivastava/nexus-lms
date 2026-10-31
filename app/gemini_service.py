@@ -96,7 +96,7 @@ def answer_support_query(ticket_id: str, user_name: str, user_role: str, subject
     # Try calling live Gemini API if key is present
     if conf["api_key"] and conf["enabled"]:
         system_prompt = (
-            "You are the official AI Academic Assistant for Nexus LMS / FL4School. "
+            "You are the official Mylo AI Academic Assistant for Nexus LMS / FL4School. "
             "You provide clear, accurate, friendly, and structured responses to students and faculty. "
             "Provide helpful answers, step-by-step guidance, or explanations. "
             "Remind them that their question has also been logged with the Department Administrator/Faculty for review."
@@ -112,7 +112,7 @@ def answer_support_query(ticket_id: str, user_name: str, user_role: str, subject
         if ai_resp:
             return ai_resp
 
-    # Intelligent fallback when Gemini API key is pending or network is isolated
+    # Intelligent fallback when Mylo AI API key is pending or network is isolated
     if user_role == "student":
         return (
             f"Hello {user_name}! 🎓\n\n"
@@ -132,15 +132,15 @@ def answer_support_query(ticket_id: str, user_name: str, user_role: str, subject
         )
 
 def test_gemini_connection(api_key: str, model: str = "gemini-2.5-flash") -> dict:
-    """Tests Gemini API key validity."""
+    """Tests Mylo AI / Gemini API key validity."""
     if not api_key or not api_key.strip():
         return {"success": False, "error": "API Key is required."}
 
-    test_prompt = "Hello! Please confirm this API key is active by responding with: 'Gemini AI connection verified successfully!'"
+    test_prompt = "Hello! Please confirm this API key is active by responding with: 'Mylo AI connection verified successfully!'"
     res = call_gemini_api(test_prompt, model=model, api_key=api_key.strip())
     if res:
         return {"success": True, "message": res}
-    return {"success": False, "error": "Failed to connect to Google Gemini API. Please check your API key."}
+    return {"success": False, "error": "Failed to connect to Mylo AI / Google API. Please check your API key."}
 
 def explain_quiz_mistake(
     question_text: str,
@@ -156,7 +156,7 @@ def explain_quiz_mistake(
     
     if conf["api_key"] and conf["enabled"]:
         system_prompt = (
-            "You are an encouraging, expert Language Teacher and AI Tutor for Nexus LMS. "
+            "You are an encouraging, expert Language Teacher and AI Tutor for Nexus LMS powered by Mylo AI. "
             "A student answered a quiz question incorrectly. "
             "In 2-3 warm, clear paragraphs: "
             "1. Explain what Option (" + student_choice + ") '" + student_choice_text + "' actually means and why it does not fit here. "
@@ -175,14 +175,15 @@ def explain_quiz_mistake(
         if ai_resp:
             return ai_resp
 
-    # Fallback explanation when Gemini API is offline / unconfigured
+    # Fallback explanation when Mylo AI API is offline / unconfigured
     fallback = (
         f"**Why Option {student_choice} ('{student_choice_text}') is not the right fit:**\n"
         f"In this context, '{student_choice_text}' does not satisfy the grammatical requirement or definition asked in the question.\n\n"
         f"**Why Option {correct_choice} ('{correct_choice_text}') is correct:**\n"
         f"{explanation or f'Option {correct_choice} correctly fulfills the standard sentence structure and vocabulary rule.'}\n\n"
-        f"💡 **Tutor Study Tip:** Write down '{question_text}' alongside '{correct_choice_text}' in your language journal and review it before your next practice session!"
+        f"💡 **Mylo AI Tutor Study Tip:** Write down '{question_text}' alongside '{correct_choice_text}' in your language journal and review it before your next practice session!"
     )
+    return fallback
     return fallback
 
 def generate_ai_quiz(

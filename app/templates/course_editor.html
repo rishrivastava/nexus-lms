@@ -5,18 +5,18 @@
 {% block content %}
 <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Breadcrumb & Top Bar -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
         <a href="/teacher" class="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-indigo-600 transition">
             <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Studio
         </a>
-        <div class="flex items-center space-x-2">
+        <div class="flex flex-wrap items-center gap-2">
             <button onclick="document.getElementById('editCourseModal').classList.remove('hidden')" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm">
                 <i class="fa-solid fa-gear text-slate-400"></i>
-                <span>Course Settings</span>
+                <span>Course Settings & Metadata</span>
             </button>
             <a href="/department?tab=courses" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold hover:bg-indigo-100 transition shadow-sm">
                 <i class="fa-solid fa-user-plus"></i>
-                <span>Enrol Students from Global Pool</span>
+                <span>Enrol Students</span>
             </a>
             <a href="/course/{{ course.id }}" target="_blank" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm">
                 <i class="fa-solid fa-eye text-slate-400"></i>
@@ -33,48 +33,91 @@
     {% if request.query_params.get('msg') == 'quiz_uploaded' %}
     <div class="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center space-x-2">
         <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
-        <span>Spreadsheet quiz uploaded and published successfully! All questions and options are live.</span>
+        <span>Spreadsheet quiz uploaded and published successfully! All questions and options are live for students.</span>
     </div>
     {% elif request.query_params.get('msg') == 'ai_quiz_generated' %}
     <div class="mb-6 p-4 rounded-2xl bg-purple-50 border border-purple-200 text-purple-950 text-xs font-semibold flex items-center space-x-2">
         <i class="fa-solid fa-wand-magic-sparkles text-purple-600 text-sm"></i>
-        <span>Gemini AI quiz generated and published successfully! Ready for student assessments.</span>
+        <span>Mylo AI quiz generated and published successfully! Ready for student assessments.</span>
+    </div>
+    {% elif request.query_params.get('saved') == '1' %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center space-x-2">
+        <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+        <span>Course modifications saved successfully and immediately synced across the student interface!</span>
     </div>
     {% endif %}
 
     <!-- Course Header Banner -->
-    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-8">
-        <div class="flex items-center space-x-3 mb-2">
+    <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm mb-8 space-y-3">
+        <div class="flex flex-wrap items-center space-x-3 gap-y-1">
             <span class="px-2.5 py-0.5 rounded-md font-mono text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
                 {{ course.code }}
             </span>
             <span class="text-xs text-slate-400">&bull; {{ course.department }}</span>
+            {% if course.subject and course.subject != course.department %}
+            <span class="text-xs text-slate-400">&bull; {{ course.subject }}</span>
+            {% endif %}
+            {% if user.role == 'department_admin' %}
+            <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+                <i class="fa-solid fa-user-shield mr-1"></i> Admin Full Authority
+            </span>
+            {% endif %}
         </div>
-        <h1 class="text-2xl font-bold text-slate-900">{{ course.title }}</h1>
-        <p class="text-xs text-slate-500 mt-1 max-w-2xl">{{ course.description }}</p>
+
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">{{ course.title }}</h1>
+            {% if course.subtitle %}
+            <p class="text-sm font-semibold text-indigo-600 mt-0.5">{{ course.subtitle }}</p>
+            {% endif %}
+            <p class="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">{{ course.description }}</p>
+        </div>
+
+        {% if course.learning_path or course.instructions %}
+        <div class="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            {% if course.learning_path %}
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <span class="font-bold text-slate-700 block text-[11px] uppercase tracking-wider mb-0.5">
+                    <i class="fa-solid fa-route text-indigo-600 mr-1"></i> Learning Path & Structure
+                </span>
+                <span class="text-slate-600">{{ course.learning_path }}</span>
+            </div>
+            {% endif %}
+            {% if course.instructions %}
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <span class="font-bold text-slate-700 block text-[11px] uppercase tracking-wider mb-0.5">
+                    <i class="fa-solid fa-circle-info text-indigo-600 mr-1"></i> Course Instructions & Metadata
+                </span>
+                <span class="text-slate-600">{{ course.instructions }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- Curriculum Modules & Lessons -->
     <div class="space-y-6">
         <div class="flex flex-wrap justify-between items-center gap-3">
-            <h2 class="text-lg font-bold text-slate-900">Curriculum Modules</h2>
+            <div>
+                <h2 class="text-lg font-bold text-slate-900">Curriculum Structure & Modules</h2>
+                <p class="text-xs text-slate-500">Add, edit, or delete chapters, video lessons, reading documents, and quizzes.</p>
+            </div>
             <div class="flex flex-wrap items-center gap-2">
                 <button onclick="openSpreadsheetModal()"
                     class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold hover:bg-emerald-100 shadow-2xs transition">
                     <i class="fa-solid fa-file-excel text-emerald-600"></i>
-                    <span>Upload Spreadsheet Quiz</span>
+                    <span>Upload Excel Quiz</span>
                 </button>
                 {% if user.role == 'department_admin' or allow_teacher_ai_quiz == '1' %}
                 <button onclick="openAiQuizModal()"
                     class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:from-purple-700 hover:to-indigo-700 shadow-sm transition">
                     <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
-                    <span>Generate Quiz with Gemini AI</span>
+                    <span>Generate Quiz with Mylo AI</span>
                 </button>
                 {% endif %}
                 <button onclick="document.getElementById('addModuleModal').classList.remove('hidden')"
                     class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
                     <i class="fa-solid fa-plus"></i>
-                    <span>Add Module</span>
+                    <span>Add Chapter / Module</span>
                 </button>
             </div>
         </div>
@@ -82,90 +125,159 @@
         {% if modules %}
             {% for mod in modules %}
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div class="p-4 bg-slate-50/70 border-b border-slate-200 flex justify-between items-center">
-                    <div class="flex items-center space-x-2">
-                        <span class="w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">
+                <!-- Module Header -->
+                <div class="p-4 bg-slate-50/80 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="flex items-center space-x-2.5">
+                        <span class="w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0">
                             {{ loop.index }}
                         </span>
-                        <h3 class="font-bold text-slate-800 text-sm">{{ mod.title }}</h3>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <span>{{ mod.title }}</span>
+                                <button onclick="openEditModuleModal({{ mod.id }}, '{{ mod.title|replace('\'', '\\\'') }}', '{{ (mod.description or '')|replace('\'', '\\\'') }}')" class="text-slate-400 hover:text-indigo-600 text-xs" title="Edit Chapter Title">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button onclick="deleteModule({{ mod.id }}, '{{ mod.title|replace('\'', '\\\'') }}')" class="text-slate-400 hover:text-rose-600 text-xs" title="Delete Chapter">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </h3>
+                            {% if mod.description %}
+                            <p class="text-[11px] text-slate-400 mt-0.5">{{ mod.description }}</p>
+                            {% endif %}
+                        </div>
                     </div>
 
-                    <!-- Add Content Dropdown / Action Buttons -->
+                    <!-- Module Content Action Buttons -->
                     <div class="flex flex-wrap items-center gap-1.5">
-                        <button onclick="openAddLessonModal({{ mod.id }}, 'youtube')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-red-600 hover:border-red-300 rounded-lg text-xs font-semibold transition" title="Add Video Lesson">
+                        <button onclick="openAddLessonModal({{ mod.id }}, 'youtube')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-red-600 hover:border-red-300 rounded-lg text-xs font-semibold transition" title="Add Video Lecture">
                             <i class="fa-brands fa-youtube"></i> <span>Video</span>
                         </button>
                         <button onclick="openAddLessonModal({{ mod.id }}, 'pdf')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-sky-600 hover:border-sky-300 rounded-lg text-xs font-semibold transition" title="Upload PDF Material">
                             <i class="fa-solid fa-file-pdf"></i> <span>PDF</span>
                         </button>
-                        <button onclick="openAddLessonModal({{ mod.id }}, 'quiz')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-purple-600 hover:border-purple-300 rounded-lg text-xs font-semibold transition" title="Create Blank Quiz">
+                        <button onclick="openAddLessonModal({{ mod.id }}, 'quiz')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-purple-600 hover:border-purple-300 rounded-lg text-xs font-semibold transition" title="Create Assessment Quiz">
                             <i class="fa-solid fa-clipboard-question"></i> <span>Quiz</span>
                         </button>
                         <button onclick="openSpreadsheetModal({{ mod.id }})" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-semibold transition" title="Upload Excel/CSV Spreadsheet Quiz">
                             <i class="fa-solid fa-file-excel text-emerald-600"></i> <span>Excel Quiz</span>
                         </button>
                         {% if user.role == 'department_admin' or allow_teacher_ai_quiz == '1' %}
-                        <button onclick="openAiQuizModal({{ mod.id }})" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-semibold transition" title="Auto-generate Quiz with Gemini AI">
-                            <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i> <span>AI Quiz</span>
+                        <button onclick="openAiQuizModal({{ mod.id }})" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-semibold transition" title="Auto-generate Quiz with Mylo AI">
+                            <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i> <span>Mylo AI Quiz</span>
                         </button>
                         {% endif %}
                     </div>
                 </div>
 
-                <!-- Lessons in this Module -->
+                <!-- Lessons & Quizzes inside this Module -->
                 <div class="p-4 divide-y divide-slate-100">
                     {% if mod.lessons %}
                         {% for les in mod.lessons %}
-                        <div class="py-3 first:pt-0 last:pb-0 flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <span class="w-8 h-8 rounded-lg flex items-center justify-center {% if les.content_type == 'youtube' %}bg-red-50 text-red-500{% elif les.content_type == 'pdf' %}bg-sky-50 text-sky-500{% else %}bg-purple-50 text-purple-500{% endif %}">
-                                    {% if les.content_type == 'youtube' %}
-                                        <i class="fa-brands fa-youtube text-sm"></i>
-                                    {% elif les.content_type == 'pdf' %}
-                                        <i class="fa-solid fa-file-pdf text-sm"></i>
-                                    {% else %}
-                                        <i class="fa-solid fa-clipboard-question text-sm"></i>
-                                    {% endif %}
-                                </span>
-                                <div>
-                                    <p class="font-bold text-slate-900 text-xs">{{ les.title }}</p>
-                                    <div class="flex items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
-                                        <span class="capitalize">{{ les.content_type }}</span>
-                                        <span>&bull;</span>
-                                        <span>{{ les.duration_minutes }} mins</span>
-                                        {% if les.content_type == 'quiz' %}
-                                            <span>&bull;</span>
-                                            <span class="text-purple-600 font-semibold">{{ les.question_count }} Questions (Pass: {{ les.passing_score }}%)</span>
+                        <div class="py-3.5 first:pt-0 last:pb-0 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <span class="w-8 h-8 rounded-lg flex items-center justify-center {% if les.content_type == 'youtube' %}bg-red-50 text-red-500{% elif les.content_type == 'pdf' %}bg-sky-50 text-sky-500{% else %}bg-purple-50 text-purple-500{% endif %}">
+                                        {% if les.content_type == 'youtube' %}
+                                            <i class="fa-brands fa-youtube text-sm"></i>
+                                        {% elif les.content_type == 'pdf' %}
+                                            <i class="fa-solid fa-file-pdf text-sm"></i>
+                                        {% else %}
+                                            <i class="fa-solid fa-clipboard-question text-sm"></i>
                                         {% endif %}
+                                    </span>
+                                    <div>
+                                        <p class="font-bold text-slate-900 text-xs">{{ les.title }}</p>
+                                        <div class="flex flex-wrap items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
+                                            <span class="capitalize font-semibold text-slate-600">{{ les.content_type }}</span>
+                                            <span>&bull;</span>
+                                            <span>{{ les.duration_minutes }} mins</span>
+                                            {% if les.subtitle %}
+                                            <span>&bull;</span>
+                                            <span class="text-indigo-600 font-medium">{{ les.subtitle }}</span>
+                                            {% endif %}
+                                            {% if les.content_type == 'quiz' %}
+                                                <span>&bull;</span>
+                                                <span class="text-purple-600 font-semibold">{{ les.question_count }} Questions (Pass: {{ les.passing_score }}%)</span>
+                                            {% endif %}
+                                        </div>
                                     </div>
+                                </div>
+
+                                <!-- Action Buttons for Lesson -->
+                                <div class="flex items-center space-x-1.5">
+                                    {% if les.content_type == 'quiz' %}
+                                    <button onclick="openAddQuestionModal({{ les.quiz_id }})" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 text-xs font-semibold hover:bg-purple-100 transition border border-purple-200">
+                                        <i class="fa-solid fa-plus text-[10px]"></i>
+                                        <span>Add Question</span>
+                                    </button>
+                                    <button onclick="openEditQuizModal({{ les.quiz_id }}, '{{ les.title|replace('\'', '\\\'') }}', {{ les.passing_score }}, {{ les.duration_minutes }})" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit Quiz Settings">
+                                        <i class="fa-solid fa-pen text-xs"></i>
+                                    </button>
+                                    {% else %}
+                                    <button onclick="openEditLessonModal({{ les.id }}, '{{ les.title|replace('\'', '\\\'') }}', '{{ (les.subtitle or '')|replace('\'', '\\\'') }}', '{{ (les.description or '')|replace('\'', '\\\'') }}', {{ les.duration_minutes }}, '{{ les.content_value|replace('\'', '\\\'') }}', '{{ les.content_type }}')" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit Lesson Details">
+                                        <i class="fa-solid fa-pen text-xs"></i>
+                                    </button>
+                                    {% endif %}
+                                    <button onclick="deleteLesson({{ les.id }}, '{{ les.title|replace('\'', '\\\'') }}')" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Delete Lesson">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
                                 </div>
                             </div>
 
-                            {% if les.content_type == 'quiz' %}
-                            <button onclick="openAddQuestionModal({{ les.quiz_id }})" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 text-xs font-semibold hover:bg-purple-100 transition border border-purple-200">
-                                <i class="fa-solid fa-plus text-[10px]"></i>
-                                <span>Add Question</span>
-                            </button>
+                            <!-- If Quiz, show Questions List accordion if questions exist -->
+                            {% if les.content_type == 'quiz' and les.questions %}
+                            <details class="text-xs bg-purple-50/40 rounded-xl border border-purple-100 p-2.5 mt-2">
+                                <summary class="font-bold text-purple-900 cursor-pointer select-none">
+                                    View / Manage {{ les.questions|length }} MCQ Questions
+                                </summary>
+                                <div class="mt-2.5 space-y-2 pt-2 border-t border-purple-100">
+                                    {% for q in les.questions %}
+                                    <div class="p-2.5 bg-white rounded-lg border border-purple-100 flex items-start justify-between gap-2">
+                                        <div class="space-y-1">
+                                            <div class="font-bold text-slate-800">Q{{ loop.index }}: {{ q.question_text }}</div>
+                                            <div class="grid grid-cols-2 gap-x-3 text-[11px] text-slate-600">
+                                                <span>A: {{ q.option_a }}</span>
+                                                <span>B: {{ q.option_b }}</span>
+                                                <span>C: {{ q.option_c }}</span>
+                                                <span>D: {{ q.option_d }}</span>
+                                            </div>
+                                            <div class="text-[10px] text-emerald-700 font-bold">
+                                                Correct Answer: Option {{ q.correct_option }}
+                                                {% if q.explanation %} • Explanation: {{ q.explanation }}{% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-1 shrink-0">
+                                            <button onclick="openEditQuestionModal({{ q.id }}, '{{ q.question_text|replace('\'', '\\\'') }}', '{{ q.option_a|replace('\'', '\\\'') }}', '{{ q.option_b|replace('\'', '\\\'') }}', '{{ q.option_c|replace('\'', '\\\'') }}', '{{ q.option_d|replace('\'', '\\\'') }}', '{{ q.correct_option }}', '{{ (q.explanation or '')|replace('\'', '\\\'') }}')" class="p-1 text-slate-400 hover:text-indigo-600 text-xs" title="Edit Question">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </button>
+                                            <button onclick="deleteQuestion({{ q.id }})" class="p-1 text-slate-400 hover:text-rose-600 text-xs" title="Delete Question">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </details>
                             {% endif %}
                         </div>
                         {% endfor %}
                     {% else %}
                         <div class="py-6 text-center text-slate-400 text-xs">
-                            No lessons added to this module yet. Click a button above to add a video, PDF, or quiz.
+                            No lessons added to this chapter yet. Use the buttons above to add a video lecture, reading PDF, or assessment quiz.
                         </div>
                     {% endif %}
                 </div>
             </div>
             {% endfor %}
         {% else %}
-            <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+            <div class="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-md mx-auto">
                 <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-3">
                     <i class="fa-solid fa-folder-plus text-xl"></i>
                 </div>
-                <h3 class="font-bold text-slate-800 text-sm">No Modules Yet</h3>
+                <h3 class="font-bold text-slate-800 text-sm">No Curriculum Modules Yet</h3>
                 <p class="text-xs text-slate-400 mt-1 mb-4">Organize your course into chapters or modules first.</p>
                 <button onclick="document.getElementById('addModuleModal').classList.remove('hidden')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">
-                    Add First Module
+                    Add First Chapter / Module
                 </button>
             </div>
         {% endif %}
@@ -176,16 +288,20 @@
 <div id="addModuleModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-base font-bold text-slate-900">Add Curriculum Module</h3>
+            <h3 class="text-base font-bold text-slate-900">Add Curriculum Module / Chapter</h3>
             <button onclick="document.getElementById('addModuleModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
         <form action="/teacher/course/{{ course.id }}/module" method="POST" class="space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Module Title</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Module Title *</label>
                 <input type="text" name="title" required placeholder="e.g. Chapter 1: Foundations & Architecture"
                     class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Module Description / Overview</label>
+                <textarea name="description" rows="2" placeholder="Brief outline of concepts covered in this chapter" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
             </div>
             <div class="flex justify-end space-x-2 pt-2">
                 <button type="button" onclick="document.getElementById('addModuleModal').classList.add('hidden')" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
@@ -195,23 +311,53 @@
     </div>
 </div>
 
+<!-- Modal: Edit Module -->
+<div id="editModuleModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-base font-bold text-slate-900">Edit Module / Chapter</h3>
+            <button onclick="document.getElementById('editModuleModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <form id="editModuleForm" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Module Title *</label>
+                <input type="text" id="editModTitle" name="title" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Module Description</label>
+                <textarea id="editModDesc" name="description" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button type="button" onclick="document.getElementById('editModuleModal').classList.add('hidden')" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">Update Chapter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Modal: Add YouTube Video -->
 <div id="addYoutubeModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-base font-bold text-slate-900 flex items-center"><i class="fa-brands fa-youtube text-red-500 mr-2"></i> Add YouTube Video</h3>
+            <h3 class="text-base font-bold text-slate-900 flex items-center"><i class="fa-brands fa-youtube text-red-500 mr-2"></i> Add YouTube Video Lecture</h3>
             <button onclick="document.getElementById('addYoutubeModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form id="youtubeForm" action="/teacher/course/{{ course.id }}/lesson/youtube" method="POST" class="space-y-4">
             <input type="hidden" name="course_id" value="{{ course.id }}">
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Video Title</label>
-                <input type="text" name="title" required placeholder="e.g. Deep Dive into TCP/IP" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Video Title *</label>
+                <input type="text" name="title" required placeholder="e.g. Master Class: Spanish Irregular Verbs" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
             </div>
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">YouTube URL or Video ID</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Subtitle / Key Takeaway</label>
+                <input type="text" name="subtitle" placeholder="e.g. Stem-changing verbs in the present indicative" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">YouTube URL or Video ID *</label>
                 <input type="text" name="youtube_url" required placeholder="e.g. https://www.youtube.com/watch?v=..." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                <p class="text-[11px] text-slate-400 mt-1">Unlisted or public YouTube URLs are supported.</p>
+                <p class="text-[11px] text-slate-400 mt-1">Unlisted, educational, and public YouTube URLs are supported.</p>
             </div>
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Estimated Duration (Minutes)</label>
@@ -219,7 +365,7 @@
             </div>
             <div class="flex justify-end space-x-2 pt-2">
                 <button type="button" onclick="document.getElementById('addYoutubeModal').classList.add('hidden')" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button type="submit" class="px-4 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700">Add Video Lesson</button>
+                <button type="submit" class="px-4 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700">Add Video Lecture</button>
             </div>
         </form>
     </div>
@@ -235,11 +381,11 @@
         <form id="pdfForm" action="/teacher/course/{{ course.id }}/lesson/pdf" method="POST" enctype="multipart/form-data" class="space-y-4">
             <input type="hidden" name="course_id" value="{{ course.id }}">
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Document Title</label>
-                <input type="text" name="title" required placeholder="e.g. Week 2 Lecture Notes" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Document Title *</label>
+                <input type="text" name="title" required placeholder="e.g. Chapter 1 Comprehensive Guide" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
             </div>
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Select PDF File</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Select PDF File *</label>
                 <input type="file" name="pdf_file" accept=".pdf" required class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
             </div>
             <div>
@@ -264,7 +410,7 @@
         <form id="quizFormModal" action="/teacher/course/{{ course.id }}/lesson/quiz" method="POST" class="space-y-4">
             <input type="hidden" name="course_id" value="{{ course.id }}">
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Quiz Title</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Quiz Title *</label>
                 <input type="text" name="title" required placeholder="e.g. Chapter 1 Quiz" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
             </div>
             <div>
@@ -283,6 +429,69 @@
     </div>
 </div>
 
+<!-- Modal: Edit Lesson -->
+<div id="editLessonModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-base font-bold text-slate-900">Edit Lesson Details</h3>
+            <button onclick="document.getElementById('editLessonModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="editLessonForm" method="POST" class="space-y-3.5">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Lesson Title *</label>
+                <input type="text" id="editLesTitle" name="title" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Subtitle / Key Takeaway</label>
+                <input type="text" id="editLesSubtitle" name="subtitle" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div id="editLesContentValueContainer">
+                <label class="block text-xs font-bold text-slate-700 mb-1" id="editLesContentLabel">Video URL / Content Link</label>
+                <input type="text" id="editLesContentVal" name="content_value" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Duration (Minutes)</label>
+                <input type="number" id="editLesDuration" name="duration_minutes" min="1" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button type="button" onclick="document.getElementById('editLessonModal').classList.add('hidden')" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">Update Lesson</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Quiz -->
+<div id="editQuizModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-base font-bold text-slate-900">Edit Quiz Configuration</h3>
+            <button onclick="document.getElementById('editQuizModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="editQuizForm" method="POST" class="space-y-3.5">
+            <input type="hidden" name="course_id" value="{{ course.id }}">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Quiz Title *</label>
+                <input type="text" id="editQuizTitle" name="title" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Passing Score (%)</label>
+                    <input type="number" id="editQuizPass" name="passing_score" min="1" max="100" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Time Limit (Mins)</label>
+                    <input type="number" id="editQuizDuration" name="duration_minutes" min="1" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button type="button" onclick="document.getElementById('editQuizModal').classList.add('hidden')" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700">Save Quiz Settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Modal: Add Question to Quiz -->
 <div id="addQuestionModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
@@ -293,8 +502,8 @@
         <form id="questionForm" method="POST" class="space-y-3">
             <input type="hidden" name="course_id" value="{{ course.id }}">
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Question Text</label>
-                <textarea name="question_text" rows="2" required placeholder="e.g. Which HTTP method is idempotent?" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Question Text *</label>
+                <textarea name="question_text" rows="2" required placeholder="e.g. Which Spanish verb form is used for 'They speak'?" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -316,7 +525,7 @@
             </div>
             <div class="grid grid-cols-2 gap-3 pt-1">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Correct Option</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Correct Option *</label>
                     <select name="correct_option" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                         <option value="A">Option A</option>
                         <option value="B">Option B</option>
@@ -325,13 +534,67 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Explanation (Optional)</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Pedagogical Explanation</label>
                     <input type="text" name="explanation" placeholder="Why this option is correct" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
             </div>
             <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button type="button" onclick="document.getElementById('addQuestionModal').classList.add('hidden')" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
                 <button type="submit" class="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700">Add Question</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Question -->
+<div id="editQuestionModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-base font-bold text-slate-900">Edit MCQ Question</h3>
+            <button onclick="document.getElementById('editQuestionModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="editQuestionForm" method="POST" class="space-y-3">
+            <input type="hidden" name="course_id" value="{{ course.id }}">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Question Text *</label>
+                <textarea id="eqText" name="question_text" rows="2" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-0.5">Option A</label>
+                    <input type="text" id="eqA" name="option_a" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-0.5">Option B</label>
+                    <input type="text" id="eqB" name="option_b" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-0.5">Option C</label>
+                    <input type="text" id="eqC" name="option_c" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-0.5">Option D</label>
+                    <input type="text" id="eqD" name="option_d" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Correct Option *</label>
+                    <select id="eqCorrect" name="correct_option" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option value="A">Option A</option>
+                        <option value="B">Option B</option>
+                        <option value="C">Option C</option>
+                        <option value="D">Option D</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Explanation</label>
+                    <input type="text" id="eqExp" name="explanation" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('editQuestionModal').classList.add('hidden')" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700">Update Question</button>
             </div>
         </form>
     </div>
@@ -418,7 +681,7 @@
     </div>
 </div>
 
-<!-- Modal: Gemini AI Quiz Generator -->
+<!-- Modal: Mylo AI Quiz Generator -->
 <div id="aiQuizModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4">
         <div class="flex justify-between items-start">
@@ -427,8 +690,8 @@
                     <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-slate-900">Generate Quiz with Gemini AI</h3>
-                    <p class="text-[11px] text-slate-500">Provide a curriculum topic and AI will craft questions live</p>
+                    <h3 class="text-base font-bold text-slate-900">Generate Quiz with Mylo AI</h3>
+                    <p class="text-[11px] text-slate-500">Provide a curriculum topic and Mylo AI will craft questions live</p>
                 </div>
             </div>
             <button onclick="document.getElementById('aiQuizModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -487,19 +750,19 @@
                 <button type="button" onclick="document.getElementById('aiQuizModal').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
                 <button type="submit" id="aiGenerateBtn" class="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-100 transition flex items-center gap-1.5">
                     <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
-                    <span>Generate Quiz with AI</span>
+                    <span>Generate Quiz with Mylo AI</span>
                 </button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Modal: Edit Course Settings -->
+<!-- Modal: Edit Course Settings & Metadata -->
 <div id="editCourseModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center border-b border-slate-100 pb-3">
             <h3 class="text-base font-bold text-slate-900 flex items-center">
-                <i class="fa-solid fa-gear text-indigo-600 mr-2"></i> Edit Course Details
+                <i class="fa-solid fa-gear text-indigo-600 mr-2"></i> Edit Course Details & Metadata
             </h3>
             <button onclick="document.getElementById('editCourseModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
                 <i class="fa-solid fa-xmark text-lg"></i>
@@ -510,6 +773,12 @@
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Course Title *</label>
                 <input type="text" name="title" value="{{ course.title }}" required
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Course Subtitle / Tagline</label>
+                <input type="text" name="subtitle" value="{{ course.subtitle or '' }}" placeholder="e.g. Master everyday conversational proficiency"
                     class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
             </div>
 
@@ -526,6 +795,33 @@
                 </div>
             </div>
 
+            <!-- Administrator Faculty Reassignment Field -->
+            {% if user.role == 'department_admin' %}
+            <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-2xl">
+                <label class="block text-xs font-bold text-purple-900 mb-1 flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-shield text-purple-600"></i>
+                    <span>Assign Faculty / Teacher (Admin Authority)</span>
+                </label>
+                <select name="teacher_id" class="w-full px-3 py-2 border border-purple-200 rounded-xl text-xs bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-purple-500">
+                    {% for t in teachers_list %}
+                    <option value="{{ t.id }}" {% if t.id == course.teacher_id %}selected{% endif %}>{{ t.full_name }} ({{ t.email }})</option>
+                    {% endfor %}
+                </select>
+                <p class="text-[10px] text-purple-700 mt-1">Reassigning changes course ownership immediately.</p>
+            </div>
+            {% endif %}
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Learning Path & Course Structure</label>
+                <input type="text" name="learning_path" value="{{ course.learning_path or '' }}" placeholder="e.g. Level 1 Beginner -> Level 2 Conversational -> Level 3 Advanced"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Course-Level Instructions & Guidelines</label>
+                <textarea name="instructions" rows="2" placeholder="Instructions shown to students before beginning the course" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">{{ course.instructions or '' }}</textarea>
+            </div>
+
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Course Description</label>
                 <textarea name="description" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">{{ course.description }}</textarea>
@@ -539,10 +835,10 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Publish Status</label>
-                    <select name="status" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        <option value="published" {% if course.status == 'published' or course.is_published %}selected{% endif %}>Published (Active)</option>
-                        <option value="draft" {% if course.status == 'draft' %}selected{% endif %}>Draft (Hidden from students)</option>
-                        <option value="archived" {% if course.status == 'archived' %}selected{% endif %}>Archived</option>
+                    <select name="status_val" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option value="published" {% if course.status == 'published' or course.is_published == 1 %}selected{% endif %}>Published (Active)</option>
+                        <option value="draft" {% if course.status == 'draft' or course.is_published == 0 %}selected{% endif %}>Draft (Hidden from students)</option>
+                        <option value="archived" {% if course.status == 'archived' or course.is_published == 2 %}selected{% endif %}>Archived</option>
                     </select>
                 </div>
             </div>
@@ -562,7 +858,7 @@
     </div>
 </div>
 
-<!-- Modal: Course Deletion & Archival (PRD Section 4: 3 Choices) -->
+<!-- Modal: Course Deletion & Archival -->
 <div id="courseDeleteModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
         <div class="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -656,9 +952,88 @@ function openAddLessonModal(moduleId, type) {
     }
 }
 
+function openEditModuleModal(moduleId, title, desc) {
+    document.getElementById('editModuleForm').action = `/teacher/module/${moduleId}/edit`;
+    document.getElementById('editModTitle').value = title;
+    document.getElementById('editModDesc').value = desc || '';
+    document.getElementById('editModuleModal').classList.remove('hidden');
+}
+
+function deleteModule(moduleId, title) {
+    if (confirm(`Are you sure you want to delete chapter '${title}'? All lessons inside it will be removed.`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/teacher/module/${moduleId}/delete`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function openEditLessonModal(lessonId, title, subtitle, desc, duration, contentVal, contentType) {
+    document.getElementById('editLessonForm').action = `/teacher/lesson/${lessonId}/edit`;
+    document.getElementById('editLesTitle').value = title;
+    document.getElementById('editLesSubtitle').value = subtitle || '';
+    document.getElementById('editLesDuration').value = duration || 10;
+    const contentValInput = document.getElementById('editLesContentVal');
+    const contentContainer = document.getElementById('editLesContentValueContainer');
+    if (contentType === 'youtube') {
+        contentContainer.classList.remove('hidden');
+        document.getElementById('editLesContentLabel').innerText = 'YouTube Video URL or ID';
+        contentValInput.value = contentVal || '';
+    } else {
+        contentContainer.classList.add('hidden');
+    }
+    document.getElementById('editLessonModal').classList.remove('hidden');
+}
+
+function deleteLesson(lessonId, title) {
+    if (confirm(`Are you sure you want to delete lesson '${title}'?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/teacher/lesson/${lessonId}/delete`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function openEditQuizModal(quizId, title, passingScore, duration) {
+    document.getElementById('editQuizForm').action = `/teacher/quiz/${quizId}/edit`;
+    document.getElementById('editQuizTitle').value = title;
+    document.getElementById('editQuizPass').value = passingScore;
+    document.getElementById('editQuizDuration').value = duration;
+    document.getElementById('editQuizModal').classList.remove('hidden');
+}
+
 function openAddQuestionModal(quizId) {
     document.getElementById('questionForm').action = `/teacher/quiz/${quizId}/question`;
     document.getElementById('addQuestionModal').classList.remove('hidden');
+}
+
+function openEditQuestionModal(questionId, text, a, b, c, d, correct, exp) {
+    document.getElementById('editQuestionForm').action = `/teacher/question/${questionId}/edit`;
+    document.getElementById('eqText').value = text;
+    document.getElementById('eqA').value = a;
+    document.getElementById('eqB').value = b;
+    document.getElementById('eqC').value = c;
+    document.getElementById('eqD').value = d;
+    document.getElementById('eqCorrect').value = correct;
+    document.getElementById('eqExp').value = exp || '';
+    document.getElementById('editQuestionModal').classList.remove('hidden');
+}
+
+function deleteQuestion(questionId) {
+    if (confirm('Are you sure you want to delete this question?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/teacher/question/${questionId}/delete`;
+        const cInput = document.createElement('input');
+        cInput.type = 'hidden';
+        cInput.name = 'course_id';
+        cInput.value = '{{ course.id }}';
+        form.appendChild(cInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
 }
 
 function openSpreadsheetModal(moduleId) {
@@ -693,7 +1068,7 @@ function submitAiQuizForm(e) {
     const btn = document.getElementById('aiGenerateBtn');
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Generating Quiz with Gemini...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Generating Quiz with Mylo AI...';
     }
 }
 </script>

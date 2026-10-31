@@ -102,6 +102,9 @@ def init_db():
         course_cols = {row["name"] for row in cursor.fetchall()}
         course_new_cols = {
             "subject": "TEXT",
+            "subtitle": "TEXT",
+            "learning_path": "TEXT",
+            "instructions": "TEXT",
             "status": "TEXT DEFAULT 'published'",
             "archived_at": "TIMESTAMP",
             "deleted_at": "TIMESTAMP"
@@ -118,10 +121,15 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             course_id INTEGER NOT NULL,
             title TEXT NOT NULL,
+            description TEXT,
             position INTEGER DEFAULT 1,
             FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
         );
         """)
+        cursor.execute("PRAGMA table_info(modules)")
+        mod_cols = {row["name"] for row in cursor.fetchall()}
+        if "description" not in mod_cols:
+            cursor.execute("ALTER TABLE modules ADD COLUMN description TEXT")
         
         # 4. Lessons (Video, PDF, or Quiz)
         # content_type: 'youtube', 'pdf', 'quiz'
@@ -130,6 +138,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             module_id INTEGER NOT NULL,
             title TEXT NOT NULL,
+            subtitle TEXT,
+            description TEXT,
             content_type TEXT NOT NULL,                -- 'youtube', 'pdf', 'quiz'
             content_value TEXT,                        -- YouTube URL/ID or uploaded PDF filename or instructions
             position INTEGER DEFAULT 1,
@@ -137,6 +147,12 @@ def init_db():
             FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE
         );
         """)
+        cursor.execute("PRAGMA table_info(lessons)")
+        les_cols = {row["name"] for row in cursor.fetchall()}
+        if "subtitle" not in les_cols:
+            cursor.execute("ALTER TABLE lessons ADD COLUMN subtitle TEXT")
+        if "description" not in les_cols:
+            cursor.execute("ALTER TABLE lessons ADD COLUMN description TEXT")
         
         # 5. Quizzes
         cursor.execute("""
@@ -339,7 +355,7 @@ def init_db():
             subject TEXT NOT NULL,                      -- query subject/topic
             category TEXT DEFAULT 'General',            -- 'Academic', 'Technical', 'General'
             message TEXT NOT NULL,                      -- original query text
-            ai_response TEXT,                           -- instant Gemini AI response
+            ai_response TEXT,                           -- instant Mylo AI response
             admin_reply TEXT,                           -- reply from admin or teacher
             replied_by TEXT,                            -- name/id of replier
             replied_at TIMESTAMP,
@@ -351,6 +367,28 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_user ON support_queries(user_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_status ON support_queries(status);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_visibility ON support_queries(visibility);")
+
+        # 17. Mylo AI Usage Logs & Cost Tracking Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ai_usage_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            user_name TEXT,
+            user_role TEXT,
+            course_id INTEGER,
+            course_title TEXT,
+            subject TEXT,
+            feature_type TEXT NOT NULL,                 -- 'quiz_explanation', 'quiz_generation', 'chatbot'
+            prompt_tokens INTEGER DEFAULT 0,
+            completion_tokens INTEGER DEFAULT 0,
+            total_tokens INTEGER DEFAULT 0,
+            estimated_cost_usd REAL DEFAULT 0.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_logs_user ON ai_usage_logs(user_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_logs_course ON ai_usage_logs(course_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_logs_feature ON ai_usage_logs(feature_type);")
 
         # Default system branding and settings
         default_settings = {
@@ -382,7 +420,13 @@ def init_db():
             "gemini_model": "gemini-2.5-flash",
             "gemini_auto_reply": "1",
             "gemini_enabled": "1",
-            "allow_teacher_ai_quiz": "1"
+            "allow_teacher_ai_quiz": "1",
+            "mylo_ai_enabled_globally": "1",
+            "mylo_ai_quiz_explanations_enabled": "1",
+            "mylo_ai_disabled_courses": "",
+            "mylo_ai_disabled_subjects": "",
+            "mylo_ai_disabled_students": "",
+            "mylo_ai_quiz_explanations_disabled_courses": ""
         }
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (k, v))
@@ -551,4 +595,142 @@ def update_notification_settings(settings: dict):
         for k, v in settings.items():
             is_en = 1 if v.get("is_enabled") else 0
             cursor.execute("UPDATE notification_settings SET is_enabled = ? WHERE event_type = ?", (is_en, k))
+
+
+# ==========================================
+# MYLO AI USAGE LOGGING & GOVERNANCE HELPERS
+# ==========================================
+
+def is_ai_feature_enabled(feature: str, student_user_id: str = None, course_id: int = None, subject: str = None) -> tuple:
+    """
+    Checks if a student / course / subject has access to Mylo AI features.
+    Returns (allowed: bool, reason: str).
+    """
+    settings = get_system_settings()
+
+    # 1. Global Student Mylo AI toggle
+    if settings.get("mylo_ai_enabled_globally", "1") == "0":
+        return False, "Mylo AI access is currently disabled for students by the administrator."
+
+    # 2. Individual student blacklist
+    disabled_students = [s.strip().lower() for s in settings.get("mylo_ai_disabled_students", "").split(",") if s.strip()]
+    if student_user_id and student_user_id.strip().lower() in disabled_students:
+        return False, f"Mylo AI access is disabled for student account '{student_user_id}' by administrative policy."
+
+    # 3. Subject-wise blacklist
+    disabled_subjects = [s.strip().lower() for s in settings.get("mylo_ai_disabled_subjects", "").split(",") if s.strip()]
+    if subject and subject.strip().lower() in disabled_subjects:
+        return False, f"Mylo AI is disabled for subject '{subject}' by administrative policy."
+
+    # 4. Course-wise blacklist
+    disabled_courses = [c.strip() for c in settings.get("mylo_ai_disabled_courses", "").split(",") if c.strip()]
+    if course_id and str(course_id) in disabled_courses:
+        return False, "Mylo AI is disabled for this course by administrative policy."
+
+    # 5. Quiz explanations specific controls
+    if feature == "quiz_explanation":
+        if settings.get("mylo_ai_quiz_explanations_enabled", "1") == "0":
+            return False, "Mylo AI-generated quiz explanations are currently disabled by the administrator."
+
+        disabled_exp_courses = [c.strip() for c in settings.get("mylo_ai_quiz_explanations_disabled_courses", "").split(",") if c.strip()]
+        if course_id and str(course_id) in disabled_exp_courses:
+            return False, "Mylo AI quiz explanations are disabled for this course by administrative policy."
+
+    return True, "Allowed"
+
+def log_ai_usage(user_id: int, user_name: str, user_role: str, feature_type: str, course_id: int = None, course_title: str = None, subject: str = None, prompt_tokens: int = 150, completion_tokens: int = 250):
+    """Logs Mylo AI token consumption and estimated API expenditure."""
+    try:
+        total_tokens = prompt_tokens + completion_tokens
+        # Gemini / Mylo 2.5 Flash pricing: approx $0.075 per 1M input tokens, $0.30 per 1M output tokens
+        cost_usd = round((prompt_tokens * 0.000000075) + (completion_tokens * 0.0000003), 6)
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO ai_usage_logs (user_id, user_name, user_role, course_id, course_title, subject, feature_type, prompt_tokens, completion_tokens, total_tokens, estimated_cost_usd)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, user_name, user_role, course_id, course_title, subject, feature_type, prompt_tokens, completion_tokens, total_tokens, cost_usd))
+    except Exception as e:
+        print(f"Error logging Mylo AI usage: {e}")
+
+def get_ai_usage_metrics() -> dict:
+    """Computes comprehensive Mylo AI usage, breakdowns, and cost analytics."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Overall totals
+        cursor.execute("""
+            SELECT COUNT(*) as total_requests,
+                   COALESCE(SUM(total_tokens), 0) as total_tokens,
+                   COALESCE(SUM(estimated_cost_usd), 0.0) as total_cost_usd
+            FROM ai_usage_logs
+        """)
+        totals = dict(cursor.fetchone())
+        totals["total_cost_inr"] = round(totals["total_cost_usd"] * 84.5, 2)
+        totals["total_cost_usd"] = round(totals["total_cost_usd"], 4)
+
+        # Feature breakdown
+        cursor.execute("""
+            SELECT feature_type, COUNT(*) as count, COALESCE(SUM(total_tokens), 0) as tokens
+            FROM ai_usage_logs
+            GROUP BY feature_type
+        """)
+        feature_breakdown = {r["feature_type"]: dict(r) for r in cursor.fetchall()}
+
+        # Course-wise usage
+        cursor.execute("""
+            SELECT course_id, COALESCE(course_title, 'General / Unassigned') as title,
+                   COUNT(*) as requests, COALESCE(SUM(total_tokens), 0) as tokens,
+                   COALESCE(SUM(estimated_cost_usd), 0.0) as cost_usd
+            FROM ai_usage_logs
+            GROUP BY course_id, course_title
+            ORDER BY requests DESC LIMIT 10
+        """)
+        course_usage = [dict(r) for r in cursor.fetchall()]
+
+        # Subject-wise usage
+        cursor.execute("""
+            SELECT COALESCE(subject, 'General') as subject,
+                   COUNT(*) as requests, COALESCE(SUM(total_tokens), 0) as tokens
+            FROM ai_usage_logs
+            GROUP BY subject
+            ORDER BY requests DESC LIMIT 10
+        """)
+        subject_usage = [dict(r) for r in cursor.fetchall()]
+
+        # Student-wise usage leaderboard
+        cursor.execute("""
+            SELECT user_id, user_name, user_role,
+                   COUNT(*) as requests, COALESCE(SUM(total_tokens), 0) as tokens
+            FROM ai_usage_logs
+            WHERE user_role = 'student'
+            GROUP BY user_id, user_name, user_role
+            ORDER BY requests DESC LIMIT 10
+        """)
+        student_usage = [dict(r) for r in cursor.fetchall()]
+
+        # Recent 25 requests log
+        cursor.execute("""
+            SELECT * FROM ai_usage_logs ORDER BY created_at DESC LIMIT 25
+        """)
+        recent_logs = [dict(r) for r in cursor.fetchall()]
+
+        return {
+            "totals": totals,
+            "total_requests": totals["total_requests"],
+            "total_tokens": totals["total_tokens"],
+            "prompt_tokens": totals["total_tokens"] // 2,
+            "completion_tokens": totals["total_tokens"] // 2,
+            "estimated_cost_usd": totals["total_cost_usd"],
+            "estimated_cost_inr": totals["total_cost_inr"],
+            "quiz_explanation_requests": feature_breakdown.get("quiz_explanation", {}).get("count", 0),
+            "chatbot_requests": feature_breakdown.get("chatbot", {}).get("count", 0),
+            "feature_breakdown": feature_breakdown,
+            "course_breakdown": course_usage,
+            "course_usage": course_usage,
+            "subject_usage": subject_usage,
+            "student_breakdown": student_usage,
+            "student_usage": student_usage,
+            "recent_logs": recent_logs
+        }
 

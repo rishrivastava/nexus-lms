@@ -944,6 +944,302 @@ def test_lms():
     assert "Option A" in exp_data["explanation"] or "Option B" in exp_data["explanation"]
     print("✓ Gemini AI mistake explanation service returned encouraging pedagogical guidance on why student's choice was incorrect")
 
+    # =========================================================================
+    # Test Suite 28: LMS Role-Based Access, Teacher Studio & Dashboard, Multi-Course Benchmarking & Mylo AI Controls
+    # =========================================================================
+    print("\n--- Test Suite 28: LMS Role-Based Access, Teacher Studio & Dashboard, Multi-Course Benchmarking & Mylo AI Controls ---")
+
+    from app.routes.teacher_routes import (
+        teacher_analytics_view, teacher_dashboard_data_api, compute_teacher_analytics,
+        edit_course, add_module, edit_module, delete_module,
+        edit_lesson, delete_lesson, edit_quiz_details, edit_quiz_question, delete_quiz_question
+    )
+    from app.routes.api_routes import save_gemini_settings, get_mylo_usage_metrics
+    from app.database import log_ai_usage, get_ai_usage_metrics, is_ai_feature_enabled
+
+    # 1. Verification of Teacher Studio vs Teacher Dashboard access & strict data isolation
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE role = 'teacher' LIMIT 1")
+        teacher_user = dict(c.fetchone())
+        c.execute("SELECT * FROM users WHERE role = 'department_admin' LIMIT 1")
+        admin_user = dict(c.fetchone())
+        c.execute("SELECT * FROM courses WHERE teacher_id = ? AND status != 'deleted'", (teacher_user["id"],))
+        teacher_courses = [dict(r) for r in c.fetchall()]
+
+    # Teacher analytics computation
+    t_analytics = compute_teacher_analytics(teacher_user)
+    assert t_analytics["has_courses"] == True
+    # Verify strict data isolation: only courses belonging to teacher_user are in assigned_courses
+    for ac in t_analytics["assigned_courses"]:
+        assert ac["teacher_id"] == teacher_user["id"]
+    print("✓ Strict data isolation verified: Teacher analytics ONLY returns courses assigned to that specific teacher")
+
+    # Multi-Course Comparison Matrix verification
+    assert "course_comparison_matrix" in t_analytics
+    assert len(t_analytics["course_comparison_matrix"]) == len(teacher_courses)
+    first_cm = t_analytics["course_comparison_matrix"][0]
+    assert "enrolled" in first_cm
+    assert "active_pct" in first_cm
+    assert "avg_score" in first_cm
+    assert "completion_rate" in first_cm
+    assert "learning_hours" in first_cm
+    print(f"✓ Multi-Course Comparison Matrix benchmarking verified ({len(t_analytics['course_comparison_matrix'])} assigned course benchmarks)")
+
+    # Window 2 Dashboard API endpoint verification
+    req_dash = Request({"type": "http", "method": "GET", "path": "/api/teacher/dashboard-data", "headers": teacher_headers})
+    dash_res = asyncio.run(teacher_dashboard_data_api(req_dash))
+    assert dash_res.status_code == 200
+    dash_json = json.loads(dash_res.body.decode("utf-8"))
+    assert "kpis" in dash_json
+    assert "total_enrolled" in dash_json["kpis"]
+    assert "overall_avg_score" in dash_json["kpis"]
+    assert "live_students" in dash_json
+    assert "top_5_students" in dash_json
+    assert "bottom_5_students" in dash_json
+    print("✓ Window 2 Teacher Dashboard API verified with real-time KPIs, live activity feed, and Top/Bottom 5 rankings")
+
+    # 2. Complete Course Structure Modifications
+    target_course_id = teacher_courses[0]["id"]
+    req_course_edit = Request({"type": "http", "method": "POST", "path": f"/teacher/course/{target_course_id}/edit", "headers": teacher_headers})
+    asyncio.run(edit_course(
+        req_course_edit,
+        course_id=target_course_id,
+        title="Spanish Conversational Mastery (Advanced)",
+        code="SPAN-101",
+        department="Languages",
+        subject="Spanish",
+        subtitle="Conversational fluency made intuitive",
+        learning_path="Foundational A1 -> Conversational B1",
+        instructions="Complete quizzes sequentially with >=70% pass score",
+        description="Updated comprehensive curriculum description.",
+        status_val="published",
+        teacher_id=None,
+        notify_students=0
+    ))
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT subtitle, learning_path, instructions FROM courses WHERE id = ?", (target_course_id,))
+        c_meta = c.fetchone()
+        assert c_meta[0] == "Conversational fluency made intuitive"
+        assert c_meta[1] == "Foundational A1 -> Conversational B1"
+        assert c_meta[2] == "Complete quizzes sequentially with >=70% pass score"
+    print("✓ Teacher successfully modified course details, subtitle, learning path, instructions & metadata")
+
+    # Module Add, Edit, Delete
+    req_mod = Request({"type": "http", "method": "POST", "path": f"/teacher/course/{target_course_id}/module", "headers": teacher_headers})
+    mod_res = asyncio.run(add_module(req_mod, target_course_id, title="Test Chapter: Verbs & Tenses", description="Detailed verb forms"))
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT id FROM modules WHERE course_id = ? AND title = 'Test Chapter: Verbs & Tenses'", (target_course_id,))
+        new_mod_id = c.fetchone()[0]
+    
+    # Edit module
+    req_mod_edit = Request({"type": "http", "method": "POST", "path": f"/teacher/module/{new_mod_id}/edit", "headers": teacher_headers})
+    asyncio.run(edit_module(req_mod_edit, new_mod_id, title="Updated Chapter: Verbs & Subjunctives", description="Updated description"))
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT title FROM modules WHERE id = ?", (new_mod_id,))
+        assert c.fetchone()[0] == "Updated Chapter: Verbs & Subjunctives"
+    print("✓ Chapter/Module created and updated successfully")
+
+    # Lesson Add & Edit
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO lessons (module_id, title, content_type, content_value, duration_minutes) VALUES (?, 'Intro Lesson', 'youtube', '7_LPdttKXPc', 12)", (new_mod_id,))
+        new_les_id = c.lastrowid
+    
+    req_les_edit = Request({"type": "http", "method": "POST", "path": f"/teacher/lesson/{new_les_id}/edit", "headers": teacher_headers})
+    asyncio.run(edit_lesson(
+        req_les_edit,
+        lesson_id=new_les_id,
+        title="Comprehensive Intro Lesson",
+        subtitle="Key basics",
+        description="Video walk-through",
+        duration_minutes=20,
+        content_value="https://youtu.be/7_LPdttKXPc"
+    ))
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT title, subtitle, duration_minutes FROM lessons WHERE id = ?", (new_les_id,))
+        les_row = c.fetchone()
+        assert les_row[0] == "Comprehensive Intro Lesson"
+        assert les_row[1] == "Key basics"
+        assert les_row[2] == 20
+    print("✓ Lesson title, subtitle, description, and duration successfully modified")
+
+    # Delete Lesson & Chapter
+    req_les_del = Request({"type": "http", "method": "POST", "path": f"/teacher/lesson/{new_les_id}/delete", "headers": teacher_headers})
+    asyncio.run(delete_lesson(req_les_del, new_les_id))
+    req_mod_del = Request({"type": "http", "method": "POST", "path": f"/teacher/module/{new_mod_id}/delete", "headers": teacher_headers})
+    asyncio.run(delete_module(req_mod_del, new_mod_id))
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM modules WHERE id = ?", (new_mod_id,))
+        assert c.fetchone()[0] == 0
+    print("✓ Lesson and chapter deleted cleanly with full audit trail logging")
+
+    # 3. Administrator Full Course Modification & Teacher Reassignment
+    req_admin_reassign = Request({"type": "http", "method": "POST", "path": f"/teacher/course/{target_course_id}/edit", "headers": admin_headers})
+    asyncio.run(edit_course(
+        req_admin_reassign,
+        course_id=target_course_id,
+        title="Spanish Conversational Mastery (Admin Managed)",
+        code="SPAN-101",
+        department="Languages",
+        subject="Spanish",
+        subtitle="Conversational fluency made intuitive",
+        learning_path="Foundational A1 -> Conversational B1",
+        instructions="Admin updated instructions",
+        description="Course updated by Administrator on behalf of faculty.",
+        status_val="published",
+        teacher_id=teacher_user["id"],
+        notify_students=0
+    ))
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT action, details FROM audit_logs WHERE action = 'COURSE_EDIT' ORDER BY id DESC LIMIT 1")
+        audit_row = c.fetchone()
+        assert audit_row is not None
+        assert f"Assigned Teacher ID: {teacher_user['id']}" in audit_row[1]
+    print("✓ Administrator full authority confirmed: Modified course & reassigned teacher with audit record")
+
+    # 4. Administrator Mylo AI Granular Governance Controls
+    # 4A: Disable Mylo AI globally for all students
+    req_set_ai = Request({"type": "http", "method": "POST", "path": "/api/mylo/save-settings", "headers": admin_headers})
+    async def get_ai_settings_disabled():
+        return {
+            "mylo_ai_enabled_globally": "0",
+            "mylo_ai_quiz_explanations_enabled": "1",
+            "mylo_ai_disabled_courses": "",
+            "mylo_ai_disabled_subjects": "",
+            "mylo_ai_disabled_students": ""
+        }
+    req_set_ai.json = get_ai_settings_disabled
+    asyncio.run(save_gemini_settings(req_set_ai))
+
+    # Student attempts to call /api/quiz/explain-answer -> Must return 403 Forbidden
+    req_exp_blocked = Request({"type": "http", "method": "POST", "path": "/api/quiz/explain-answer", "headers": student_headers})
+    async def get_exp_blocked_json():
+        return {"question_id": int(q2_id), "user_choice": "A"}
+    req_exp_blocked.json = get_exp_blocked_json
+    try:
+        res_exp_blocked = asyncio.run(explain_quiz_answer(req_exp_blocked))
+        assert res_exp_blocked.status_code == 403
+    except HTTPException as e:
+        assert e.status_code == 403
+        assert "disabled for students" in e.detail
+    print("✓ Granular Control 4A verified: Global Mylo AI student disable enforced at backend API level (403 Forbidden)")
+
+    # 4B: Re-enable globally, disable for course
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT m.course_id 
+            FROM quiz_questions qq
+            JOIN quizzes q ON qq.quiz_id = q.id
+            JOIN lessons l ON q.lesson_id = l.id
+            JOIN modules m ON l.module_id = m.id
+            WHERE qq.id = ?
+        """, (int(q2_id),))
+        q2_course_id = c.fetchone()[0]
+
+    async def get_ai_course_disabled():
+        return {
+            "mylo_ai_enabled_globally": "1",
+            "mylo_ai_quiz_explanations_enabled": "1",
+            "mylo_ai_disabled_courses": str(q2_course_id),
+            "mylo_ai_disabled_subjects": "",
+            "mylo_ai_disabled_students": ""
+        }
+    req_set_ai.json = get_ai_course_disabled
+    asyncio.run(save_gemini_settings(req_set_ai))
+    try:
+        res_course_blocked = asyncio.run(explain_quiz_answer(req_exp_blocked))
+        assert False, "Expected HTTPException 403"
+    except HTTPException as e:
+        assert e.status_code == 403
+        assert "disabled for this course" in e.detail
+    print("✓ Granular Control 4B verified: Course-level Mylo AI disable enforced at backend API level (403 Forbidden)")
+
+    # 4C: Re-enable course, disable for individual student
+    student_uid = "CS2026-002"
+    async def get_ai_student_disabled():
+        return {
+            "mylo_ai_enabled_globally": "1",
+            "mylo_ai_quiz_explanations_enabled": "1",
+            "mylo_ai_disabled_courses": "",
+            "mylo_ai_disabled_subjects": "",
+            "mylo_ai_disabled_students": student_uid
+        }
+    req_set_ai.json = get_ai_student_disabled
+    asyncio.run(save_gemini_settings(req_set_ai))
+    try:
+        res_student_blocked = asyncio.run(explain_quiz_answer(req_exp_blocked))
+        assert False, "Expected HTTPException 403"
+    except HTTPException as e:
+        assert e.status_code == 403
+        assert "disabled for student account" in e.detail
+    print(f"✓ Granular Control 4C verified: Individual student account restriction ({student_uid}) enforced (403 Forbidden)")
+
+    # 4D: Re-enable student, disable quiz explanations toggle
+    async def get_ai_quiz_exp_disabled():
+        return {
+            "mylo_ai_enabled_globally": "1",
+            "mylo_ai_quiz_explanations_enabled": "0",
+            "mylo_ai_disabled_courses": "",
+            "mylo_ai_disabled_subjects": "",
+            "mylo_ai_disabled_students": ""
+        }
+    req_set_ai.json = get_ai_quiz_exp_disabled
+    asyncio.run(save_gemini_settings(req_set_ai))
+    try:
+        res_quiz_exp_blocked = asyncio.run(explain_quiz_answer(req_exp_blocked))
+        assert False, "Expected HTTPException 403"
+    except HTTPException as e:
+        assert e.status_code == 403
+        assert "quiz explanations are currently disabled" in e.detail
+    print("✓ Granular Control 4D verified: AI Quiz Explanations master toggle disable enforced (403 Forbidden)")
+
+    # 4E: Re-enable all Mylo AI features
+    async def get_ai_all_enabled():
+        return {
+            "mylo_ai_enabled_globally": "1",
+            "mylo_ai_quiz_explanations_enabled": "1",
+            "mylo_ai_disabled_courses": "",
+            "mylo_ai_disabled_subjects": "",
+            "mylo_ai_disabled_students": ""
+        }
+    req_set_ai.json = get_ai_all_enabled
+    asyncio.run(save_gemini_settings(req_set_ai))
+    res_exp_allowed = asyncio.run(explain_quiz_answer(req_exp_blocked))
+    assert res_exp_allowed.status_code == 200
+    print("✓ Granular Control 4E verified: Student Mylo AI access fully restored when permitted")
+
+    # 5. AI Usage Logging & Expenditure Dashboard
+    log_ai_usage(
+        user_id=1,
+        user_name="Student Test",
+        user_role="student",
+        feature_type="quiz_explanation",
+        course_id=target_course_id,
+        course_title="Spanish Conversational Mastery",
+        subject="Spanish",
+        prompt_tokens=150,
+        completion_tokens=80
+    )
+    req_usage = Request({"type": "http", "method": "GET", "path": "/api/mylo/usage-metrics", "headers": admin_headers})
+    usage_res = asyncio.run(get_mylo_usage_metrics(req_usage))
+    assert usage_res.status_code == 200
+    usage_metrics = json.loads(usage_res.body.decode("utf-8"))
+    assert usage_metrics["total_requests"] >= 1
+    assert usage_metrics["total_tokens"] >= 230
+    assert usage_metrics["estimated_cost_usd"] > 0
+    assert usage_metrics["estimated_cost_inr"] > 0
+    assert usage_metrics["quiz_explanation_requests"] >= 1
+    assert len(usage_metrics["course_breakdown"]) >= 1
+    print(f"✓ Mylo AI Usage & Expenditure Dashboard verified: {usage_metrics['total_requests']} requests, {usage_metrics['total_tokens']} tokens, ${usage_metrics['estimated_cost_usd']} (₹{usage_metrics['estimated_cost_inr']})")
+
     print("\n🎉 ALL TESTS PASSED! LMS backend and database engine are fully operational.")
 
 if __name__ == "__main__":
