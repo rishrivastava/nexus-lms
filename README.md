@@ -150,28 +150,14 @@ Dedicated **Integrations & Data Export** panel in settings:
 
 ## 🚀 Running the Application
 
-### Start Command
-```bash
-cd /Users/rocket/.gemini/antigravity/scratch/lms
-./start.sh
+
 ```
 The server runs at: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
-### Running Unit & Integration Tests
-```bash
-cd /Users/rocket/.gemini/antigravity/scratch/lms
-./venv/bin/python3 test_app.py
-```
+
 
 ---
 
-## 🔑 Default Provisioned Accounts
-
-| Role | User ID / Login | Default Password | Primary Dashboard |
-| :--- | :--- | :--- | :--- |
-| **Department Head / Admin** | `DEPT-HEAD` | `admin123` | `/department` |
-| **Teacher / Faculty** | `T-ALAN` | `teacher123` | `/teacher` |
-| **Student** | `CS2026-002` | `welcome123` *(prompts password setup)* | `/student` |
 
 ---
 
@@ -179,11 +165,3 @@ cd /Users/rocket/.gemini/antigravity/scratch/lms
 
 Upload files via the **Import Students (CSV / Excel)** modal.
 
-Expected headers:
-```csv
-Serial NO. (UNIQUE NO.),STUDENT NAME,FATHER'/GUARDIAN, NAME,SCHOOL NAME,UDISE CODE,BLOCK,DISTRICT,STATE,PINCODE,COURSE
-```
-Sample Row:
-```csv
-KA-2026-101,Aarav Kumar,Ramesh Kumar,Govt Model High School,29280100101,North Block,Bengaluru,Karnataka,560001,CS-201
-```
