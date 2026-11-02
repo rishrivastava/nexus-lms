@@ -548,14 +548,22 @@ def get_system_settings() -> dict:
         rows = cursor.fetchall()
         return {r["key"]: r["value"] for r in rows}
 
-def update_system_settings(settings: dict):
-    with get_db() as conn:
+def update_system_settings(settings: dict, conn=None):
+    if conn:
         cursor = conn.cursor()
         for k, v in settings.items():
             cursor.execute("""
                 INSERT INTO system_settings (key, value) VALUES (?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = ?
             """, (k, str(v), str(v)))
+    else:
+        with get_db() as c:
+            cursor = c.cursor()
+            for k, v in settings.items():
+                cursor.execute("""
+                    INSERT INTO system_settings (key, value) VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = ?
+                """, (k, str(v), str(v)))
 
 def get_dashboard_permissions() -> list:
     with get_db() as conn:

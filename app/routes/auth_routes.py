@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from app.templates_config import templates
-from app.database import get_db, UPLOAD_DIR, update_system_settings
+from app.database import get_db, UPLOAD_DIR, update_system_settings, log_audit
 from app.auth import verify_password, hash_password, create_access_token, get_current_user
 from app.utils import normalize_name
 import os
@@ -311,7 +311,17 @@ async def update_profile(
 
         # If admin changed department, update system settings branding as well
         if user["role"] == "department_admin" and clean_dept:
-            update_system_settings({"department_name": clean_dept})
+            update_system_settings({"department_name": clean_dept}, conn=conn)
+
+        # Audit log profile modification
+        log_audit(
+            user["id"],
+            "UPDATE_PROFILE",
+            "users",
+            str(user["id"]),
+            f"User updated profile: Name='{clean_name}', Role='{user['role']}'",
+            conn=conn
+        )
 
         # Password update if requested
         if isinstance(new_password, str) and new_password.strip():
