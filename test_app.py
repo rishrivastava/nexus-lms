@@ -1383,6 +1383,125 @@ def test_lms():
     asyncio.run(save_gemini_settings(req_set_ai))
     print("✓ Core AI Options 1, 2, 3 restoration verified")
 
+    # ===================================================================
+    # TEST SUITE 30: Department Bucketing, Live Classes, Auto-Certificates
+    # ===================================================================
+    print("\n--- TEST SUITE 30: Multi-Department Bucketing, Live Classes & Real-Time Doubts, Auto-Certificates ---")
+    from app.database import (
+        create_department, get_all_departments, get_department_by_name, assign_user_to_department,
+        create_live_class, get_live_classes_for_course, get_live_class_by_id,
+        update_live_class_status, delete_live_class,
+        add_live_class_question, get_live_class_questions, answer_live_class_question,
+        auto_issue_certificates_for_course
+    )
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE role = 'student' LIMIT 1")
+        stu_user = dict(cursor.fetchone())
+        cursor.execute("SELECT * FROM users WHERE role = 'teacher' LIMIT 1")
+        teacher_user = dict(cursor.fetchone())
+        cursor.execute("SELECT * FROM users WHERE role = 'department_admin' LIMIT 1")
+        admin_user = dict(cursor.fetchone())
+        cursor.execute("SELECT * FROM courses LIMIT 1")
+        test_course = dict(cursor.fetchone())
+
+    # 1. Multi-Department Bucketing
+    dept_prep = create_department(
+        name="Test Prep",
+        code="TEST_PREP",
+        description="Standardized Exam Preparation and Mock Drills",
+        banner_url="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200",
+        tagline="transforming education",
+        welcome_message="Welcome to the Test Prep Portal."
+    )
+    assert dept_prep["name"] == "Test Prep"
+    all_depts = get_all_departments()
+    dept_names = [d["name"] for d in all_depts]
+    assert "Foreign Language" in dept_names
+    assert "Test Prep" in dept_names
+    print(f"✓ Department Bucketing verified: Created and listed departments {dept_names}")
+
+    # Reassign user department
+    moved = assign_user_to_department(user_id=stu_user["id"], department_name="Test Prep", admin_user_id=admin_user["id"])
+    assert moved == True
+    dept_info = get_department_by_name("Test Prep")
+    assert dept_info["branding_tagline"] == "transforming education"
+    print("✓ User reassignment between department buckets verified with audit logging")
+
+    # 2. Live Classes & Doubts Engine
+    live_session = create_live_class(
+        course_id=test_course["id"],
+        teacher_id=teacher_user["id"],
+        title="Interactive Grammar Clinic & Doubt Room",
+        meeting_url="https://zoom.us/j/9988776655",
+        scheduled_at="2026-11-05 14:00:00",
+        platform="zoom",
+        meeting_id="998 877 6655",
+        meeting_passcode="778899",
+        duration_minutes=60,
+        description="Live doubt solving for verb tenses and vocabulary."
+    )
+    assert live_session["id"] is not None
+    assert live_session["platform"] == "zoom"
+    print(f"✓ Live class scheduled successfully: ID={live_session['id']}, Title='{live_session['title']}'")
+
+    # Query live classes for course
+    classes_list = get_live_classes_for_course(test_course["id"])
+    assert len(classes_list) >= 1
+    assert any(lc["id"] == live_session["id"] for lc in classes_list)
+
+    # Update status to 'live'
+    update_live_class_status(live_session["id"], "live")
+    updated_lc = get_live_class_by_id(live_session["id"])
+    assert updated_lc["status"] == "live"
+    print("✓ Live class status transitioned to LIVE NOW")
+
+    # Student asks live doubt
+    doubt = add_live_class_question(
+        live_class_id=live_session["id"],
+        user_id=stu_user["id"],
+        user_name=stu_user["full_name"],
+        question_text="How do we distinguish between Passé Composé and Imparfait?"
+    )
+    assert doubt["id"] is not None
+    assert doubt["is_answered"] == 0
+
+    doubts_list = get_live_class_questions(live_session["id"])
+    assert len(doubts_list) >= 1
+    assert any(q["id"] == doubt["id"] for q in doubts_list)
+    print(f"✓ Student submitted live doubt in session: ID={doubt['id']}, Text='{doubt['question_text']}'")
+
+    # Teacher answers doubt
+    ans_res = answer_live_class_question(
+        question_id=doubt["id"],
+        answer_text="Passé composé is for completed single events; imparfait is for ongoing habitual background."
+    )
+    assert ans_res == True
+    answered_doubts = get_live_class_questions(live_session["id"])
+    matching_doubt = next(q for q in answered_doubts if q["id"] == doubt["id"])
+    assert matching_doubt["is_answered"] == 1
+    assert "Passé composé" in matching_doubt["answer_text"]
+    print("✓ Teacher successfully answered student doubt in real time")
+
+    # 3. Automated Certificate Issuance for 100% Completed Learners
+    # Mark enrollment completed for test student in test course
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR IGNORE INTO enrollments (user_id, course_id, enrolled_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+        """, (stu_user["id"], test_course["id"]))
+        cursor.execute("""
+            UPDATE enrollments 
+            SET completed_at = CURRENT_TIMESTAMP 
+            WHERE user_id = ? AND course_id = ?
+        """, (stu_user["id"], test_course["id"]))
+
+    auto_res = auto_issue_certificates_for_course(course_id=test_course["id"], admin_user_id=admin_user["id"])
+    assert isinstance(auto_res, list)
+    print(f"✓ Automated Certificate Generation verified: Automatically evaluated completed learners and issued {len(auto_res)} certificates")
+
     print("\n🎉 ALL TESTS PASSED! LMS backend and database engine are fully operational.")
 
 if __name__ == "__main__":

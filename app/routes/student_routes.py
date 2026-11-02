@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, status, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.templates_config import templates
-from app.database import get_db
+from app.database import (
+    get_db,
+    get_live_classes_for_course,
+    get_live_class_by_id,
+    add_live_class_question,
+    get_live_class_questions,
+    get_department_by_name
+)
 from app.auth import get_current_user
 from app.utils import extract_youtube_id
 from app.gemini_service import explain_quiz_mistake
+from typing import Optional
 import os
 import json
 
@@ -25,6 +33,16 @@ async def student_dashboard(request: Request):
         return RedirectResponse(url="/login", status_code=303)
     if user["must_change_password"]:
         return RedirectResponse(url="/setup-account", status_code=303)
+
+    dept_name = user.get("department") or "Foreign Language"
+    department_info = get_department_by_name(dept_name)
+    if not department_info:
+        department_info = {
+            "name": dept_name,
+            "branding_tagline": "transforming education",
+            "banner_url": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&auto=format&fit=crop&q=80",
+            "welcome_message": f"Welcome to the {dept_name} Learning Portal."
+        }
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -54,10 +72,25 @@ async def student_dashboard(request: Request):
             c["progress_percent"] = round((comp / tot * 100) if tot > 0 else 0)
             courses.append(c)
 
+        # Fetch upcoming & live classes for the student's enrolled courses
+        cursor.execute("""
+            SELECT lc.*, c.title as course_title, c.code as course_code, u.full_name as teacher_name,
+                   (SELECT COUNT(*) FROM live_class_questions WHERE live_class_id = lc.id) as question_count
+            FROM live_classes lc
+            JOIN courses c ON lc.course_id = c.id
+            JOIN users u ON lc.teacher_id = u.id
+            JOIN enrollments e ON e.course_id = c.id
+            WHERE e.user_id = ? AND lc.status IN ('scheduled', 'live')
+            ORDER BY lc.scheduled_at ASC
+        """, (user["id"],))
+        upcoming_live_classes = [dict(r) for r in cursor.fetchall()]
+
     return templates.TemplateResponse("student_dashboard.html", {
         "request": request,
         "user": user,
-        "courses": courses
+        "courses": courses,
+        "department_info": department_info,
+        "upcoming_live_classes": upcoming_live_classes
     })
 
 @router.get("/course/{course_id}", response_class=HTMLResponse)
@@ -156,6 +189,9 @@ async def course_player(request: Request, course_id: int, lesson_id: int = None)
         if active_lesson and active_lesson["content_type"] == "youtube":
             youtube_id = extract_youtube_id(active_lesson["content_value"])
 
+        # Fetch live classes for this course
+        live_classes = get_live_classes_for_course(course_id)
+
     return templates.TemplateResponse("course_player.html", {
         "request": request,
         "user": user,
@@ -163,7 +199,8 @@ async def course_player(request: Request, course_id: int, lesson_id: int = None)
         "modules": modules,
         "active_lesson": active_lesson,
         "youtube_id": youtube_id,
-        "quiz_data": quiz_data
+        "quiz_data": quiz_data,
+        "live_classes": live_classes
     })
 
 @router.post("/api/lesson/{lesson_id}/complete")
@@ -210,6 +247,12 @@ async def mark_lesson_complete(request: Request, lesson_id: int):
                     SET completed_at = CURRENT_TIMESTAMP 
                     WHERE user_id = ? AND course_id = ? AND completed_at IS NULL
                 """, (user["id"], course_id))
+                # Automatically generate authentic certificate for completed student
+                from app.database import issue_certificate
+                try:
+                    issue_certificate(student_id=user["id"], course_id=course_id, conn=conn)
+                except Exception:
+                    pass
 
     return JSONResponse({"status": "success", "lesson_id": lesson_id, "is_completed": True})
 
@@ -330,6 +373,37 @@ async def submit_quiz(request: Request, quiz_id: int):
                     completed_at = CURRENT_TIMESTAMP
             """, (user["id"], quiz["lesson_id"]))
 
+            # Check if all lessons in the course are completed
+            cursor.execute("""
+                SELECT m.course_id 
+                FROM lessons l 
+                JOIN modules m ON l.module_id = m.id 
+                WHERE l.id = ?
+            """, (quiz["lesson_id"],))
+            q_course = cursor.fetchone()
+            if q_course:
+                qc_id = q_course[0]
+                cursor.execute("""
+                    SELECT 
+                        (SELECT COUNT(*) FROM lessons l JOIN modules m ON l.module_id = m.id WHERE m.course_id = ?) as total,
+                        (SELECT COUNT(*) FROM lesson_progress lp 
+                         JOIN lessons l ON lp.lesson_id = l.id 
+                         JOIN modules m ON l.module_id = m.id 
+                         WHERE m.course_id = ? AND lp.user_id = ? AND lp.is_completed = 1) as completed
+                """, (qc_id, qc_id, user["id"]))
+                counts = cursor.fetchone()
+                if counts and counts[0] > 0 and counts[0] == counts[1]:
+                    cursor.execute("""
+                        UPDATE enrollments 
+                        SET completed_at = CURRENT_TIMESTAMP 
+                        WHERE user_id = ? AND course_id = ? AND completed_at IS NULL
+                    """, (user["id"], qc_id))
+                    from app.database import issue_certificate
+                    try:
+                        issue_certificate(student_id=user["id"], course_id=qc_id, conn=conn)
+                    except Exception:
+                        pass
+
     return JSONResponse({
         "score_percent": score_percent,
         "correct_count": correct_count,
@@ -425,3 +499,76 @@ async def explain_quiz_answer(request: Request):
         "question_id": question_id,
         "explanation": explanation_text
     })
+
+# ===================================================================
+# LIVE CLASSROOM & DOUBT-CLEARING VIEWS
+# ===================================================================
+
+@router.get("/course/{course_id}/live/{live_class_id}", response_class=HTMLResponse)
+async def live_classroom(request: Request, course_id: int, live_class_id: int):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    live_class = get_live_class_by_id(live_class_id)
+    if not live_class or live_class["course_id"] != course_id:
+        raise HTTPException(status_code=404, detail="Live class session not found")
+
+    # Access check: enrolled student, or teacher/admin
+    if user["role"] == "student":
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM enrollments WHERE user_id = ? AND course_id = ?", (user["id"], course_id))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+    questions = get_live_class_questions(live_class_id)
+
+    # YouTube embed handling
+    youtube_embed_url = None
+    if live_class["platform"] == "youtube_live" or "youtube.com" in live_class["meeting_url"] or "youtu.be" in live_class["meeting_url"]:
+        yt_id = extract_youtube_id(live_class["meeting_url"])
+        if yt_id:
+            youtube_embed_url = f"https://www.youtube.com/embed/{yt_id}?autoplay=1&rel=0"
+
+    dept_name = user.get("department") or "Foreign Language"
+    department_info = get_department_by_name(dept_name)
+
+    return templates.TemplateResponse("live_classroom.html", {
+        "request": request,
+        "user": user,
+        "live_class": live_class,
+        "questions": questions,
+        "youtube_embed_url": youtube_embed_url,
+        "department_info": department_info
+    })
+
+@router.post("/api/live-classes/{live_class_id}/questions")
+async def post_live_class_question(request: Request, live_class_id: int):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    question_text = (body.get("question_text") or "").strip()
+    if not question_text:
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+    
+    q = add_live_class_question(
+        live_class_id=live_class_id,
+        user_id=user["id"],
+        user_name=user["full_name"],
+        question_text=question_text
+    )
+    return JSONResponse({"status": "success", "question": q})
+
+@router.get("/api/live-classes/{live_class_id}/questions")
+async def fetch_live_class_questions(request: Request, live_class_id: int):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    questions = get_live_class_questions(live_class_id)
+    return JSONResponse({"status": "success", "questions": questions})
+

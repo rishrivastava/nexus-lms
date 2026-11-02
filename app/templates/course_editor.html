@@ -48,28 +48,37 @@
     {% endif %}
 
     <!-- Course Header Banner -->
-    <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm mb-8 space-y-3">
-        <div class="flex flex-wrap items-center space-x-3 gap-y-1">
-            <span class="px-2.5 py-0.5 rounded-md font-mono text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                {{ course.code }}
-            </span>
-            <span class="text-xs text-slate-400">&bull; {{ course.department }}</span>
-            {% if course.subject and course.subject != course.department %}
-            <span class="text-xs text-slate-400">&bull; {{ course.subject }}</span>
-            {% endif %}
-            {% if user.role == 'department_admin' %}
-            <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-100">
-                <i class="fa-solid fa-user-shield mr-1"></i> Admin Full Authority
-            </span>
-            {% endif %}
-        </div>
+    <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm mb-8 space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="space-y-3 flex-1">
+                <div class="flex flex-wrap items-center space-x-3 gap-y-1">
+                    <span class="px-2.5 py-0.5 rounded-md font-mono text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {{ course.code }}
+                    </span>
+                    <span class="text-xs text-slate-400">&bull; {{ course.department }}</span>
+                    {% if course.subject and course.subject != course.department %}
+                    <span class="text-xs text-slate-400">&bull; {{ course.subject }}</span>
+                    {% endif %}
+                </div>
 
-        <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">{{ course.title }}</h1>
-            {% if course.subtitle %}
-            <p class="text-sm font-semibold text-indigo-600 mt-0.5">{{ course.subtitle }}</p>
-            {% endif %}
-            <p class="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">{{ course.description }}</p>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">{{ course.title }}</h1>
+                    {% if course.subtitle %}
+                    <p class="text-sm font-semibold text-indigo-600 mt-0.5">{{ course.subtitle }}</p>
+                    {% endif %}
+                    <p class="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">{{ course.description }}</p>
+                </div>
+            </div>
+
+            <!-- Course Poster / Thumbnail Card -->
+            <div class="shrink-0">
+                <div class="w-36 h-24 sm:w-48 sm:h-28 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm relative group">
+                    <img id="coursePosterImg" src="{{ course.thumbnail_url or 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80' }}" alt="{{ course.title }}" onerror="this.src='https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80'" class="w-full h-full object-cover">
+                    <button type="button" onclick="document.getElementById('editCourseModal').classList.remove('hidden')" class="absolute inset-0 bg-slate-900/50 text-white opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-xs font-bold gap-1 backdrop-blur-2xs cursor-pointer">
+                        <i class="fa-solid fa-camera"></i> Change Poster
+                    </button>
+                </div>
+            </div>
         </div>
 
         {% if course.learning_path or course.instructions %}
@@ -90,6 +99,88 @@
                 <span class="text-slate-600">{{ course.instructions }}</span>
             </div>
             {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Live Classes & Interactive Sessions Management Panel -->
+    <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm mb-8 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+                <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-tower-broadcast text-rose-500"></i>
+                    <span>Live Classes & Real-Time Doubts</span>
+                </h2>
+                <p class="text-xs text-slate-500">Conduct interactive lectures via Zoom, Google Meet, or YouTube Live. Students can ask live doubts.</p>
+            </div>
+            <button onclick="document.getElementById('scheduleLiveClassModal').classList.remove('hidden')"
+                class="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 shadow-sm transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Schedule Live Class</span>
+            </button>
+        </div>
+
+        {% if live_classes %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for lc in live_classes %}
+            <div class="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 hover:bg-slate-50 transition flex flex-col justify-between space-y-3">
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider text-[10px] {% if lc.status == 'live' %}bg-red-100 text-red-700 animate-pulse{% elif lc.status == 'completed' %}bg-slate-200 text-slate-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                            {% if lc.status == 'live' %}
+                            <i class="fa-solid fa-circle text-[7px]"></i> LIVE NOW
+                            {% elif lc.status == 'completed' %}
+                            <i class="fa-solid fa-check text-[9px]"></i> Completed
+                            {% else %}
+                            <i class="fa-regular fa-clock text-[9px]"></i> {{ lc.platform|title }}
+                            {% endif %}
+                        </span>
+                        <span class="text-slate-400 text-[11px]">{{ lc.scheduled_at }}</span>
+                    </div>
+
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm">{{ lc.title }}</h4>
+                        {% if lc.description %}
+                        <p class="text-xs text-slate-500 line-clamp-2 mt-0.5">{{ lc.description }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex items-center gap-3 text-xs text-slate-500 pt-1">
+                        <span><i class="fa-regular fa-clock text-slate-400 mr-1"></i>{{ lc.duration_minutes }}m</span>
+                        <span>&bull;</span>
+                        <span><i class="fa-solid fa-comments text-indigo-500 mr-1"></i>{{ lc.question_count }} Doubts</span>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
+                    <a href="/course/{{ course.id }}/live/{{ lc.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition">
+                        <i class="fa-solid fa-door-open text-[11px]"></i>
+                        <span>Enter Live Class & Doubts</span>
+                    </a>
+
+                    <div class="flex items-center gap-1">
+                        {% if lc.status != 'live' and lc.status != 'completed' %}
+                        <button onclick="setLiveClassStatus({{ lc.id }}, 'live')" class="px-2.5 py-1.5 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 font-bold text-[11px] border border-red-200" title="Go Live">
+                            Go Live
+                        </button>
+                        {% elif lc.status == 'live' %}
+                        <button onclick="setLiveClassStatus({{ lc.id }}, 'completed')" class="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-[11px] border border-emerald-200" title="Mark Completed">
+                            End Class
+                        </button>
+                        {% endif %}
+                        <button onclick="deleteLiveClassSession({{ lc.id }})" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg" title="Delete Session">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 px-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
+            <i class="fa-solid fa-video text-slate-300 text-2xl mb-2"></i>
+            <p class="text-xs text-slate-600 font-medium">No live sessions scheduled yet for this course.</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Click "Schedule Live Class" above to create an interactive lecture with real-time doubts.</p>
         </div>
         {% endif %}
     </div>
@@ -769,7 +860,7 @@
             </button>
         </div>
 
-        <form action="/teacher/course/{{ course.id }}/edit" method="POST" class="space-y-4">
+        <form action="/teacher/course/{{ course.id }}/edit" method="POST" enctype="multipart/form-data" class="space-y-4">
             <input type="hidden" name="department" value="{{ course.department or course.subject or 'Foreign Language' }}">
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Course Title *</label>
@@ -781,6 +872,19 @@
                 <label class="block text-xs font-bold text-slate-700 mb-1">Course Subtitle / Tagline</label>
                 <input type="text" name="subtitle" value="{{ course.subtitle or '' }}" placeholder="e.g. Master everyday conversational proficiency"
                     class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <!-- Course Poster / Thumbnail (Upload + URL) -->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Course Poster / Thumbnail</label>
+                <div class="flex items-center gap-3">
+                    <img id="editCourseThumbnailPreview" src="{{ course.thumbnail_url or 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80' }}" onerror="this.src='https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80'" alt="Poster Preview" class="w-20 h-14 rounded-xl object-cover border border-slate-200 bg-slate-100 shrink-0">
+                    <div class="flex-1 space-y-1.5">
+                        <input type="file" name="thumbnail_file" accept="image/*" onchange="previewThumbnailFile(this, 'editCourseThumbnailPreview')" class="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        <input type="url" name="thumbnail_url" id="editThumbnailUrlInput" value="{{ course.thumbnail_url }}" placeholder="Or paste image URL (https://...)" class="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" oninput="document.getElementById('editCourseThumbnailPreview').src = this.value">
+                    </div>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1">Upload a poster image file from your device or paste an image URL.</p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -854,6 +958,82 @@
             <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button type="button" onclick="document.getElementById('editCourseModal').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">Cancel</button>
                 <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Schedule Live Class -->
+<div id="scheduleLiveClassModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-tower-broadcast text-rose-600 mr-2"></i> Schedule Live Class
+            </h3>
+            <button onclick="document.getElementById('scheduleLiveClassModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form id="scheduleLiveClassForm" onsubmit="handleScheduleLiveClass(event)" class="space-y-4">
+            <input type="hidden" name="course_id" value="{{ course.id }}">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Session Title *</label>
+                <input type="text" name="title" required placeholder="e.g. Live Grammar Workshop & Doubts"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Platform *</label>
+                    <select name="platform" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500">
+                        <option value="zoom">Zoom</option>
+                        <option value="google_meet">Google Meet</option>
+                        <option value="youtube_live">YouTube Live</option>
+                        <option value="teams">Microsoft Teams</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Duration (Mins)</label>
+                    <input type="number" name="duration_minutes" value="60" min="15" max="300"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Meeting / Stream URL *</label>
+                <input type="url" name="meeting_url" required placeholder="https://zoom.us/j/... or https://meet.google.com/... or https://youtube.com/live/..."
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Meeting ID (Optional)</label>
+                    <input type="text" name="meeting_id" placeholder="e.g. 845 2314 9901"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Passcode (Optional)</label>
+                    <input type="text" name="meeting_passcode" placeholder="e.g. 123456"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Scheduled Date & Time *</label>
+                <input type="datetime-local" name="scheduled_at" required
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Session Description / Agenda</label>
+                <textarea name="description" rows="2" placeholder="Topics covered, guidelines, preparation requirements..."
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('scheduleLiveClassModal').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" id="saveLiveClassBtn" class="px-5 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition">Schedule Session</button>
             </div>
         </form>
     </div>
@@ -1073,6 +1253,87 @@ function submitAiQuizForm(e) {
     }
     if (window.showMyloLoader) {
         window.showMyloLoader('Mylo AI is generating quiz questions...', 'Analyzing curriculum topic & drafting interactive questions');
+    }
+}
+
+// Course Poster & Thumbnail Preview
+function previewThumbnailFile(input, previewId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById(previewId);
+            if (preview) preview.src = e.target.result;
+            const posterImg = document.getElementById('coursePosterImg');
+            if (posterImg) posterImg.src = e.target.result;
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+async function handleScheduleLiveClass(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn = document.getElementById('saveLiveClassBtn');
+    btn.disabled = true;
+    btn.innerText = 'Scheduling...';
+
+    const formData = new FormData(form);
+    const payload = {};
+    formData.forEach((val, key) => { payload[key] = val; });
+
+    try {
+        const res = await fetch('/api/live-classes/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert(data.detail || 'Failed to schedule live class');
+            btn.disabled = false;
+            btn.innerText = 'Schedule Session';
+        }
+    } catch (err) {
+        alert('Error scheduling live class');
+        btn.disabled = false;
+        btn.innerText = 'Schedule Session';
+    }
+}
+
+async function setLiveClassStatus(id, newStatus) {
+    try {
+        const res = await fetch(`/api/live-classes/${id}/status`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Failed to update status');
+        }
+    } catch (err) {
+        alert('Network error');
+    }
+}
+
+async function deleteLiveClassSession(id) {
+    if (!confirm('Are you sure you want to delete this live class session?')) return;
+    try {
+        const res = await fetch(`/api/live-classes/${id}/delete`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Failed to delete live class');
+        }
+    } catch (err) {
+        alert('Network error');
     }
 }
 

@@ -9,7 +9,8 @@ from app.database import (
     revoke_certificate,
     reissue_certificate,
     list_certificates,
-    get_student_certificates
+    get_student_certificates,
+    auto_issue_certificates_for_course
 )
 from app.auth import get_current_user
 from typing import Optional
@@ -125,6 +126,26 @@ async def issue_certificate_api(
             grade_score=grade_score
         )
         return JSONResponse({"status": "success", "message": "Certificate issued successfully", "data": cert})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/api/certificates/auto-issue-completed")
+async def auto_issue_completed_api(
+    request: Request,
+    course_id: Optional[int] = Form(None)
+):
+    """
+    Automates certificate issuance for all students who have completed 100% of a course.
+    """
+    admin = require_admin(request)
+    try:
+        new_certs = auto_issue_certificates_for_course(course_id=course_id, admin_user_id=admin["id"])
+        return JSONResponse({
+            "status": "success",
+            "count": len(new_certs),
+            "message": f"Successfully auto-issued {len(new_certs)} certificate(s) to completed learners.",
+            "data": new_certs
+        })
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

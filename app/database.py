@@ -422,22 +422,82 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_cert_student ON certificates(student_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_cert_course ON certificates(course_id);")
 
+        # 18. Departments Table (Bucketing for isolated sub-environments)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS departments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,                  -- e.g. "Foreign Language", "Test Prep"
+            code TEXT UNIQUE NOT NULL,                  -- e.g. "FOREIGN_LANG", "TEST_PREP"
+            description TEXT,
+            banner_url TEXT,
+            branding_tagline TEXT DEFAULT 'transforming education',
+            welcome_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # Seed initial core departments (Foreign Language and Test Prep)
+        cursor.execute("""
+        INSERT OR IGNORE INTO departments (name, code, description, banner_url, branding_tagline, welcome_message)
+        VALUES 
+        ('Foreign Language', 'FOREIGN_LANG', 'World Languages, Linguistic Proficiency & Conversational Fluency', 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&auto=format&fit=crop&q=80', 'transforming education', 'Welcome to the Foreign Language Learning Portal. Master world languages with curated modules, interactive videos, and speaking practice.'),
+        ('Test Prep', 'TEST_PREP', 'Standardized Exam Preparation, Mock Drills & Competitive Testing', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&auto=format&fit=crop&q=80', 'transforming education', 'Welcome to the Test Prep Portal. Accelerate your performance with targeted practice tests, analytics, and instructor-led strategies.')
+        """)
+
+        # 19. Live Classes & Sessions Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS live_classes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            platform TEXT NOT NULL DEFAULT 'zoom',      -- 'zoom', 'google_meet', 'youtube_live', 'teams'
+            meeting_url TEXT NOT NULL,
+            meeting_id TEXT,
+            meeting_passcode TEXT,
+            scheduled_at TIMESTAMP NOT NULL,
+            duration_minutes INTEGER DEFAULT 60,
+            status TEXT DEFAULT 'scheduled',            -- 'scheduled', 'live', 'completed', 'cancelled'
+            recording_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        """)
+
+        # 20. Live Class Interactive Q&A / Doubt Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS live_class_questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            live_class_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            user_name TEXT NOT NULL,
+            question_text TEXT NOT NULL,
+            is_answered INTEGER DEFAULT 0,
+            answer_text TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (live_class_id) REFERENCES live_classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        """)
+
         # Default system branding and settings
         default_settings = {
             "platform_name": "Nexus LMS",
-            "platform_tagline": "Language learning made easy",
+            "platform_tagline": "transforming education",
             "institution_name": "Leadership Boulevard Pvt Ltd",
             "department_name": "Foreign Language",
-            "department_tagline": "Pioneering in Language Teaching",
+            "department_tagline": "transforming education",
             "brand_color": "#1e3a8a",
             "secondary_brand_color": "#0284c7",
             "welcome_message": "Welcome to the Foreign Language Learning Portal. Master world languages with curated modules, interactive videos, and speaking practice.",
             "login_help_text": "Enter your User ID / Serial Number and password to access your portal.",
             "login_user_id_placeholder": "e.g. Serial Number or ID",
             "login_button_text": "Sign In",
-            "login_footer_text": "Accredited Foreign Language Learning Portal",
-            "logo_icon": "fa-language",
-            "logo_image_url": "",
+            "login_footer_text": "Leadership Boulevard Pvt Ltd • transforming education",
+            "logo_icon": "fa-graduation-cap",
+            "logo_image_url": "/static/images/lead_group_logo.png",
             "department_banner_url": "",
             "contact_email": "info@fl4schools.com",
             "contact_phone": "+91 9540594033",
@@ -1023,5 +1083,272 @@ def get_student_certificates(student_id: int) -> list:
             ORDER BY id DESC
         """, (student_id,))
         return [dict(r) for r in cursor.fetchall()]
+
+# ===================================================================
+# AUTOMATED CERTIFICATE ISSUANCE ENGINE
+# ===================================================================
+
+def auto_issue_certificates_for_course(course_id: int = None, admin_user_id: int = None) -> list:
+    """
+    Automates certificate generation for all students who have completed 100% of a course.
+    If course_id is None, checks across all active courses.
+    Returns list of newly issued certificates.
+    """
+    newly_issued = []
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Query target courses
+        if course_id:
+            cursor.execute("SELECT id, title, code FROM courses WHERE id = ? AND status != 'deleted'", (course_id,))
+        else:
+            cursor.execute("SELECT id, title, code FROM courses WHERE status != 'deleted'")
+        courses = [dict(c) for c in cursor.fetchall()]
+
+        for c in courses:
+            cid = c["id"]
+            # Count total lessons in course
+            cursor.execute("""
+                SELECT COUNT(*) FROM lessons l 
+                JOIN modules m ON l.module_id = m.id 
+                WHERE m.course_id = ?
+            """, (cid,))
+            total_lessons = cursor.fetchone()[0] or 0
+
+            if total_lessons == 0:
+                continue
+
+            # Find all enrolled students who finished all lessons
+            cursor.execute("""
+                SELECT u.id as student_id, u.user_id, u.full_name,
+                       (SELECT COUNT(*) FROM lesson_progress lp 
+                        JOIN lessons l ON lp.lesson_id = l.id 
+                        JOIN modules m ON l.module_id = m.id 
+                        WHERE m.course_id = ? AND lp.user_id = u.id AND lp.is_completed = 1) as completed_count
+                FROM enrollments e
+                JOIN users u ON e.user_id = u.id
+                WHERE e.course_id = ? AND u.role = 'student'
+            """, (cid, cid))
+            enrolled = cursor.fetchall()
+
+            for student in enrolled:
+                comp = student["completed_count"]
+                if comp >= total_lessons:
+                    # Check if student already has a verified certificate for this course
+                    cursor.execute("""
+                        SELECT id FROM certificates 
+                        WHERE student_id = ? AND course_id = ? AND status = 'verified'
+                    """, (student["student_id"], cid))
+                    if not cursor.fetchone():
+                        cert = issue_certificate(
+                            student_id=student["student_id"],
+                            course_id=cid,
+                            admin_user_id=admin_user_id,
+                            grade_score=100.0,
+                            conn=conn
+                        )
+                        newly_issued.append(cert)
+
+    return newly_issued
+
+# ===================================================================
+# MULTI-DEPARTMENT BUCKETS MANAGEMENT
+# ===================================================================
+
+def get_all_departments(conn=None) -> list:
+    """Returns all department records with teacher, student, and course counts."""
+    should_close = False
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        should_close = True
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT d.*,
+                   (SELECT COUNT(*) FROM users WHERE role = 'teacher' AND department = d.name) as teachers_count,
+                   (SELECT COUNT(*) FROM users WHERE role = 'student' AND department = d.name) as students_count,
+                   (SELECT COUNT(*) FROM courses WHERE department = d.name AND status != 'deleted') as courses_count
+            FROM departments d
+            ORDER BY d.id ASC
+        """)
+        return [dict(r) for r in cursor.fetchall()]
+    finally:
+        if should_close:
+            conn.close()
+
+def get_department_by_name(name: str, conn=None) -> dict:
+    """Retrieves department branding and banner by name."""
+    should_close = False
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        should_close = True
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM departments WHERE name = ? COLLATE NOCASE", (name.strip(),))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        # Default fallback
+        return {
+            "name": name,
+            "code": name.upper().replace(" ", "_"),
+            "description": f"{name} Academic Department",
+            "banner_url": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&auto=format&fit=crop&q=80",
+            "branding_tagline": "transforming education",
+            "welcome_message": f"Welcome to the {name} Portal."
+        }
+    finally:
+        if should_close:
+            conn.close()
+
+def create_department(name: str, code: str = None, description: str = "", banner_url: str = "", tagline: str = "transforming education", welcome_message: str = "") -> dict:
+    """Creates a new isolated department bucket or updates existing."""
+    clean_name = name.strip()
+    clean_code = code.strip().upper().replace(" ", "_") if code and code.strip() else clean_name.upper().replace(" ", "_")[:12]
+    clean_banner = banner_url.strip() if banner_url and banner_url.strip() else "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&auto=format&fit=crop&q=80"
+    clean_tagline = tagline.strip() if tagline and tagline.strip() else "transforming education"
+    clean_welcome = welcome_message.strip() if welcome_message and welcome_message.strip() else f"Welcome to the {clean_name} Learning Portal."
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM departments WHERE name = ? OR code = ?", (clean_name, clean_code))
+        existing = cursor.fetchone()
+        if existing:
+            cursor.execute("""
+                UPDATE departments 
+                SET description = ?, banner_url = ?, branding_tagline = ?, welcome_message = ?
+                WHERE id = ?
+            """, (description.strip() or existing["description"], clean_banner or existing["banner_url"], clean_tagline, clean_welcome, existing["id"]))
+            cursor.execute("SELECT * FROM departments WHERE id = ?", (existing["id"],))
+            return dict(cursor.fetchone())
+
+        cursor.execute("""
+            INSERT INTO departments (name, code, description, banner_url, branding_tagline, welcome_message)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (clean_name, clean_code, description.strip(), clean_banner, clean_tagline, clean_welcome))
+        dept_id = cursor.lastrowid
+        cursor.execute("SELECT * FROM departments WHERE id = ?", (dept_id,))
+        return dict(cursor.fetchone())
+
+def assign_user_to_department(user_id: int, department_name: str, admin_user_id: int = None) -> bool:
+    """Moves a student or teacher into a specific department bucket."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET department = ? WHERE id = ?", (department_name.strip(), user_id))
+        if admin_user_id:
+            log_audit(admin_user_id, "ASSIGN_DEPARTMENT", "users", str(user_id), f"Moved user #{user_id} into department '{department_name}'", conn=conn)
+        return True
+
+# ===================================================================
+# LIVE CLASSES & DOUBT ENGINE
+# ===================================================================
+
+def get_live_classes_for_course(course_id: int) -> list:
+    """Retrieves all scheduled, live, or completed classes for a course."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT lc.*, u.full_name as teacher_name, c.title as course_title, c.code as course_code,
+                   (SELECT COUNT(*) FROM live_class_questions WHERE live_class_id = lc.id) as question_count
+            FROM live_classes lc
+            JOIN users u ON lc.teacher_id = u.id
+            JOIN courses c ON lc.course_id = c.id
+            WHERE lc.course_id = ?
+            ORDER BY lc.scheduled_at ASC
+        """, (course_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_live_class_by_id(live_class_id: int) -> dict:
+    """Retrieves full details of a specific live class session."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT lc.*, u.full_name as teacher_name, c.title as course_title, c.code as course_code
+            FROM live_classes lc
+            JOIN users u ON lc.teacher_id = u.id
+            JOIN courses c ON lc.course_id = c.id
+            WHERE lc.id = ?
+        """, (live_class_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+def create_live_class(
+    course_id: int,
+    teacher_id: int,
+    title: str,
+    meeting_url: str,
+    scheduled_at: str,
+    platform: str = "zoom",
+    meeting_id: str = "",
+    meeting_passcode: str = "",
+    duration_minutes: int = 60,
+    description: str = ""
+) -> dict:
+    """Creates a new live class entry for a course."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO live_classes (
+                course_id, teacher_id, title, description, platform,
+                meeting_url, meeting_id, meeting_passcode, scheduled_at, duration_minutes, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+        """, (
+            course_id, teacher_id, title.strip(), description.strip(), platform.lower().strip(),
+            meeting_url.strip(), meeting_id.strip(), meeting_passcode.strip(), scheduled_at.strip(), duration_minutes
+        ))
+        new_id = cursor.lastrowid
+        cursor.execute("SELECT * FROM live_classes WHERE id = ?", (new_id,))
+        return dict(cursor.fetchone())
+
+def update_live_class_status(live_class_id: int, status: str) -> bool:
+    """Updates live class status (e.g. 'scheduled', 'live', 'completed', 'cancelled')."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE live_classes SET status = ? WHERE id = ?", (status.strip().lower(), live_class_id))
+        return True
+
+def delete_live_class(live_class_id: int) -> bool:
+    """Deletes a live class and its doubts."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM live_classes WHERE id = ?", (live_class_id,))
+        return True
+
+def add_live_class_question(live_class_id: int, user_id: int, user_name: str, question_text: str) -> dict:
+    """Submits a real-time question or doubt in a live class session."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO live_class_questions (live_class_id, user_id, user_name, question_text)
+            VALUES (?, ?, ?, ?)
+        """, (live_class_id, user_id, user_name.strip(), question_text.strip()))
+        qid = cursor.lastrowid
+        cursor.execute("SELECT * FROM live_class_questions WHERE id = ?", (qid,))
+        return dict(cursor.fetchone())
+
+def get_live_class_questions(live_class_id: int) -> list:
+    """Retrieves all student questions/doubts submitted in a live class."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM live_class_questions
+            WHERE live_class_id = ?
+            ORDER BY id ASC
+        """, (live_class_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def answer_live_class_question(question_id: int, answer_text: str) -> bool:
+    """Marks a live class question as answered with optional explanation."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE live_class_questions
+            SET is_answered = 1, answer_text = ?
+            WHERE id = ?
+        """, (answer_text.strip(), question_id))
+        return True
+
 
 

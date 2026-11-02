@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Request, Form, UploadFile, File, HTTPException, status, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.templates_config import templates
-from app.database import get_db, UPLOAD_DIR, log_audit, notify_users
+from app.database import (
+    get_db, UPLOAD_DIR, log_audit, notify_users,
+    get_live_classes_for_course, get_department_by_name, get_all_departments
+)
 from app.auth import get_current_user
 from app.gemini_service import generate_ai_quiz
 import os
@@ -44,27 +47,53 @@ async def teacher_dashboard(request: Request):
                 ORDER BY c.created_at DESC
             """)
         else:
+            user_dept = user.get("department") or "Foreign Language"
             cursor.execute("""
                 SELECT c.*, u.full_name as teacher_name,
                        (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) as enrolled_count,
                        (SELECT COUNT(*) FROM lessons l JOIN modules m ON l.module_id = m.id WHERE m.course_id = c.id) as lesson_count
                 FROM courses c
                 JOIN users u ON c.teacher_id = u.id
-                WHERE c.teacher_id = ? AND c.status != 'deleted'
+                WHERE c.teacher_id = ? AND (c.department = ? OR ? = '') AND c.status != 'deleted'
                 ORDER BY c.created_at DESC
-            """, (user["id"],))
+            """, (user["id"], user_dept, user_dept))
             
         courses = [dict(c) for c in cursor.fetchall()]
 
-        # Student queries visible to teachers (visibility == 'teachers_and_admin')
-        cursor.execute("""
-            SELECT * FROM support_queries 
-            WHERE visibility = 'teachers_and_admin' 
-            ORDER BY created_at DESC 
-            LIMIT 50
-        """)
+        # Student queries visible to teachers (filtered by department bucket)
+        user_dept = user.get("department") or ""
+        if user["role"] == "department_admin" or not user_dept:
+            cursor.execute("""
+                SELECT * FROM support_queries 
+                WHERE visibility = 'teachers_and_admin' 
+                ORDER BY created_at DESC 
+                LIMIT 50
+            """)
+        else:
+            cursor.execute("""
+                SELECT sq.* FROM support_queries sq
+                JOIN users u ON sq.user_id = u.user_id
+                WHERE sq.visibility = 'teachers_and_admin' AND u.department = ?
+                ORDER BY sq.created_at DESC 
+                LIMIT 50
+            """, (user_dept,))
         student_queries = [dict(q) for q in cursor.fetchall()]
         open_student_queries = sum(1 for q in student_queries if q["status"] == "open")
+
+        # Department info & branding
+        dept_info = get_department_by_name(user.get("department") or "Foreign Language")
+        all_departments = get_all_departments()
+
+        # Teacher live classes
+        cursor.execute("""
+            SELECT lc.*, c.title as course_title, c.code as course_code,
+                   (SELECT COUNT(*) FROM live_class_questions WHERE live_class_id = lc.id) as question_count
+            FROM live_classes lc
+            JOIN courses c ON lc.course_id = c.id
+            WHERE (lc.teacher_id = ? OR ? = 'department_admin')
+            ORDER BY lc.scheduled_at ASC
+        """, (user["id"], user["role"]))
+        teacher_live_classes = [dict(r) for r in cursor.fetchall()]
 
     return templates.TemplateResponse("teacher_dashboard.html", {
         "request": request,
@@ -72,6 +101,9 @@ async def teacher_dashboard(request: Request):
         "courses": courses,
         "student_queries": student_queries,
         "open_student_queries": open_student_queries,
+        "department_info": dept_info,
+        "all_departments": all_departments,
+        "live_classes": teacher_live_classes,
         "active_tab": "studio"
     })
 
@@ -554,11 +586,26 @@ async def create_course(
     department: str = Form(...),
     description: str = Form(...),
     subject: str = Form(None),
-    thumbnail_url: str = Form(None)
+    thumbnail_url: str = Form(None),
+    thumbnail_file: Optional[UploadFile] = File(None)
 ):
     user = require_teacher_or_admin(request)
     
-    thumb = thumbnail_url.strip() if thumbnail_url else "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60"
+    thumb = thumbnail_url.strip() if thumbnail_url and thumbnail_url.strip() else ""
+    if isinstance(thumbnail_file, UploadFile) and thumbnail_file.filename:
+        ext = os.path.splitext(thumbnail_file.filename)[1].lower()
+        if ext in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
+            courses_dir = os.path.join(UPLOAD_DIR, "courses")
+            os.makedirs(courses_dir, exist_ok=True)
+            safe_name = f"course_{uuid.uuid4().hex[:8]}{ext}"
+            file_path = os.path.join(courses_dir, safe_name)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(thumbnail_file.file, buffer)
+            thumb = f"/static/uploads/courses/{safe_name}"
+
+    if not thumb:
+        thumb = "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60"
+
     subj = subject.strip() if subject and subject.strip() else department.strip()
 
     with get_db() as conn:
@@ -590,6 +637,7 @@ async def edit_course(
     instructions: Optional[str] = Form(None),
     description: Optional[str] = Form(""),
     thumbnail_url: Optional[str] = Form(None),
+    thumbnail_file: Optional[UploadFile] = File(None),
     duration_hours: Optional[int] = Form(None),
     status_val: str = Form("published"),
     teacher_id: Optional[int] = Form(None),
@@ -624,7 +672,19 @@ async def edit_course(
         if cursor.fetchone():
             raise HTTPException(status_code=400, detail=f"A course with code '{code.strip().upper()}' already exists. Please choose a unique code.")
 
-        thumb = thumbnail_url.strip() if thumbnail_url else course["thumbnail_url"]
+        thumb = course["thumbnail_url"]
+        if isinstance(thumbnail_file, UploadFile) and thumbnail_file.filename:
+            ext = os.path.splitext(thumbnail_file.filename)[1].lower()
+            if ext in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
+                courses_dir = os.path.join(UPLOAD_DIR, "courses")
+                os.makedirs(courses_dir, exist_ok=True)
+                safe_name = f"course_{uuid.uuid4().hex[:8]}{ext}"
+                file_path = os.path.join(courses_dir, safe_name)
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(thumbnail_file.file, buffer)
+                thumb = f"/static/uploads/courses/{safe_name}"
+        elif thumbnail_url and thumbnail_url.strip():
+            thumb = thumbnail_url.strip()
         dept = department.strip() if department and department.strip() else (course["department"] or "Foreign Language")
         subj = subject.strip() if subject and subject.strip() else dept
         desc = description.strip() if description else (course["description"] or "")
@@ -808,13 +868,16 @@ async def course_editor(request: Request, course_id: int):
         ai_quiz_row = cursor.fetchone()
         allow_teacher_ai_quiz = ai_quiz_row[0] if ai_quiz_row else "1"
 
+        live_classes = get_live_classes_for_course(course_id)
+
     return templates.TemplateResponse("course_editor.html", {
         "request": request,
         "user": user,
         "course": dict(course),
         "modules": modules,
         "teachers_list": teachers_list,
-        "allow_teacher_ai_quiz": allow_teacher_ai_quiz
+        "allow_teacher_ai_quiz": allow_teacher_ai_quiz,
+        "live_classes": live_classes
     })
 
 @router.post("/teacher/course/{course_id}/module")
@@ -1745,7 +1808,6 @@ async def ai_generate_course_quiz(
         passing_score=passing_score, duration_minutes=duration_minutes
     )
 
-
 @router.post("/teacher/module/{module_id}/quiz/ai-generate")
 async def ai_generate_module_quiz(
     request: Request,
@@ -1762,3 +1824,72 @@ async def ai_generate_module_quiz(
         topic=topic, num_questions=num_questions, difficulty=difficulty,
         passing_score=passing_score, duration_minutes=duration_minutes
     )
+
+# ===================================================================
+# LIVE CLASS MANAGEMENT ENDPOINTS
+# ===================================================================
+
+@router.post("/api/live-classes/create")
+async def api_create_live_class(
+    request: Request,
+    course_id: int = Form(...),
+    title: str = Form(...),
+    platform: str = Form("zoom"),
+    meeting_url: str = Form(...),
+    scheduled_at: str = Form(...),
+    meeting_id: Optional[str] = Form(""),
+    meeting_passcode: Optional[str] = Form(""),
+    duration_minutes: int = Form(60),
+    description: Optional[str] = Form("")
+):
+    user = require_teacher_or_admin(request)
+    from app.database import create_live_class
+    try:
+        new_class = create_live_class(
+            course_id=course_id,
+            teacher_id=user["id"],
+            title=title,
+            meeting_url=meeting_url,
+            scheduled_at=scheduled_at,
+            platform=platform,
+            meeting_id=meeting_id or "",
+            meeting_passcode=meeting_passcode or "",
+            duration_minutes=duration_minutes,
+            description=description or ""
+        )
+        return JSONResponse({"status": "success", "data": new_class, "message": "Live class scheduled successfully!"})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/api/live-classes/{live_class_id}/status")
+async def api_update_live_class_status(
+    request: Request,
+    live_class_id: int,
+    status: str = Form(...)
+):
+    user = require_teacher_or_admin(request)
+    from app.database import update_live_class_status
+    update_live_class_status(live_class_id, status)
+    return JSONResponse({"status": "success", "message": f"Live class marked as {status}"})
+
+@router.post("/api/live-classes/{live_class_id}/delete")
+async def api_delete_live_class(
+    request: Request,
+    live_class_id: int
+):
+    user = require_teacher_or_admin(request)
+    from app.database import delete_live_class
+    delete_live_class(live_class_id)
+    return JSONResponse({"status": "success", "message": "Live class deleted successfully."})
+
+@router.post("/api/live-classes/questions/{question_id}/answer")
+async def api_answer_live_class_question(
+    request: Request,
+    question_id: int,
+    answer_text: str = Form(...)
+):
+    user = require_teacher_or_admin(request)
+    from app.database import answer_live_class_question
+    answer_live_class_question(question_id, answer_text)
+    return JSONResponse({"status": "success", "message": "Question answered successfully."})
+

@@ -213,11 +213,44 @@
         </div>
 
         <!-- Right: Syllabus Curriculum Sidebar (4 Cols) -->
-        <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">
-            <div class="p-4 border-b border-slate-100 bg-slate-50/50">
-                <h3 class="font-bold text-slate-900 text-sm">Course Syllabus</h3>
-                <p class="text-xs text-slate-400">Step-by-step learning modules</p>
+        <div class="lg:col-span-4 space-y-4">
+            {% if live_classes %}
+            <!-- Live Sessions Card -->
+            <div class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-md border border-indigo-900/50">
+                <div class="flex items-center justify-between mb-2.5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-tower-broadcast text-rose-400 animate-pulse"></i> Live Sessions & Doubts
+                    </span>
+                    <span class="text-[10px] bg-white/10 px-2 py-0.5 rounded-full font-mono">{{ live_classes|length }}</span>
+                </div>
+                <div class="space-y-2">
+                    {% for lc in live_classes %}
+                    <a href="/course/{{ course.id }}/live/{{ lc.id }}" class="block p-2.5 rounded-xl bg-white/10 hover:bg-white/15 transition border border-white/10">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-white truncate max-w-[180px]">{{ lc.title }}</span>
+                            {% if lc.status == 'live' %}
+                            <span class="px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold animate-pulse">LIVE NOW</span>
+                            {% elif lc.status == 'completed' %}
+                            <span class="text-[10px] text-slate-400">Completed</span>
+                            {% else %}
+                            <span class="text-[10px] text-indigo-200 capitalize font-medium">{{ lc.platform }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-[11px] text-slate-300 mt-1 flex items-center justify-between">
+                            <span><i class="fa-regular fa-clock text-[10px]"></i> {{ lc.scheduled_at }}</span>
+                            <span class="text-indigo-300 font-semibold text-[10px]">Join Class →</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
             </div>
+            {% endif %}
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">
+                <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                    <h3 class="font-bold text-slate-900 text-sm">Course Syllabus</h3>
+                    <p class="text-xs text-slate-400">Step-by-step learning modules</p>
+                </div>
 
             <div class="divide-y divide-slate-100 max-h-[75vh] overflow-y-auto">
                 {% for mod in modules %}

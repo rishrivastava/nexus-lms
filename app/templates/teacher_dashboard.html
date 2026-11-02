@@ -3,94 +3,148 @@
 {% block title %}Teacher Studio - Nexus LMS{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Header -->
-    <!-- Header with Studio / Dashboard Switcher -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4 pb-4 border-b border-slate-200">
-        <div>
-            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
-                <i class="fa-solid fa-chalkboard-user"></i>
-                <span>Teacher Studio</span>
-            </div>
-            <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Course Management Studio</h1>
-            <p class="text-xs sm:text-sm text-slate-500 mt-1">Design curricula, edit structure, upload video lectures, attach reading documents, and author quizzes.</p>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <!-- Department Banner & Faculty Header -->
+    <div class="relative rounded-3xl overflow-hidden shadow-xl border border-slate-200/80">
+        <div class="absolute inset-0 bg-cover bg-center" style="background-image: url('{{ department_info.banner_url if department_info and department_info.banner_url else 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&auto=format&fit=crop&q=80' }}');">
+            <div class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-indigo-950/85 to-slate-900/80"></div>
         </div>
+        <div class="relative z-10 p-6 sm:p-8 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div>
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 text-indigo-200 text-xs font-semibold backdrop-blur-sm mb-2 border border-white/10">
+                    <i class="fa-solid fa-chalkboard-user text-indigo-300"></i>
+                    <span>{{ department_info.name if department_info else (user.department or 'Foreign Language') }} Faculty Studio</span>
+                    <span>•</span>
+                    <span class="italic text-indigo-300">{{ department_info.branding_tagline if department_info else 'transforming education' }}</span>
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Course Management Studio</h1>
+                <p class="mt-1 text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
+                    {{ department_info.welcome_message if department_info and department_info.welcome_message else "Design curricula, edit structure, upload video lectures, conduct live classes, and manage student learning." }}
+                </p>
+            </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-            <button onclick="document.getElementById('createCourseModal').classList.remove('hidden')"
-                class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition">
-                <i class="fa-solid fa-plus text-xs"></i>
-                <span>Create New Course</span>
-            </button>
+            <div class="flex items-center gap-3 shrink-0">
+                <button onclick="document.getElementById('createCourseModal').classList.remove('hidden')"
+                    class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Create New Course</span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Courses List -->
-    {% if courses %}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {% for course in courses %}
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
-                <div>
-                    <div class="h-40 w-full bg-slate-100 relative">
-                        <img src="{{ course.thumbnail_url }}" alt="{{ course.title }}" class="w-full h-full object-cover">
-                        <span class="absolute top-3 left-3 px-2 py-0.5 bg-slate-900/80 backdrop-blur-sm text-white font-mono text-xs font-bold rounded">
-                            {{ course.code }}
+    <!-- Live Classes Quick Summary (if any) -->
+    {% if live_classes %}
+    <div class="space-y-4">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-tower-broadcast text-rose-500"></i>
+                <span>Active & Scheduled Live Classes</span>
+            </h2>
+            <span class="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 px-3 py-1 rounded-full">
+                {{ live_classes|length }} Session{{ 's' if live_classes|length != 1 else '' }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for lc in live_classes %}
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between space-y-3">
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="px-2 py-0.5 rounded font-bold uppercase text-[10px] {% if lc.status == 'live' %}bg-red-50 text-red-600 animate-pulse{% elif lc.status == 'completed' %}bg-slate-100 text-slate-700{% else %}bg-indigo-50 text-indigo-700{% endif %}">
+                            {{ lc.status|upper }} • {{ lc.platform|title }}
                         </span>
+                        <span class="text-slate-400 font-mono text-[11px]">{{ lc.course_code }}</span>
                     </div>
-
-                    <div class="p-5">
-                        <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
-                            <span>{{ course.department }}</span>
-                            <span class="font-medium text-slate-700">{{ course.teacher_name }}</span>
-                        </div>
-                        <h3 class="text-base font-bold text-slate-900 line-clamp-1 mb-2">{{ course.title }}</h3>
-                        <p class="text-xs text-slate-500 line-clamp-2 mb-4">{{ course.description }}</p>
-
-                        <div class="grid grid-cols-2 gap-2 text-center text-xs py-2 px-3 bg-slate-50 rounded-xl border border-slate-100 mb-2">
-                            <div>
-                                <span class="block font-bold text-slate-800 text-sm">{{ course.enrolled_count }}</span>
-                                <span class="text-slate-400 text-[11px]">Enrolled Students</span>
-                            </div>
-                            <div>
-                                <span class="block font-bold text-slate-800 text-sm">{{ course.lesson_count }}</span>
-                                <span class="text-slate-400 text-[11px]">Total Lessons</span>
-                            </div>
-                        </div>
-                    </div>
+                    <h4 class="font-bold text-slate-900 text-sm line-clamp-1">{{ lc.title }}</h4>
+                    <p class="text-[11px] text-slate-500"><i class="fa-regular fa-clock mr-1"></i>{{ lc.scheduled_at }} ({{ lc.duration_minutes }}m)</p>
                 </div>
-
-                <div class="p-5 pt-0 space-y-2">
-                    <a href="/teacher/course/{{ course.id }}" class="w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 transition">
-                        <i class="fa-solid fa-pen-to-square"></i>
-                        <span>Edit Curriculum & Content</span>
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <a href="/course/{{ lc.course_id }}/live/{{ lc.id }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                        <span>Enter Doubt Room</span>
+                        <i class="fa-solid fa-arrow-right text-[10px]"></i>
                     </a>
-                    <div class="grid grid-cols-2 gap-2">
-                        <a href="/department?tab=courses" class="flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-[11px] font-semibold text-slate-600 hover:bg-slate-50 border border-slate-200 transition">
-                            <i class="fa-solid fa-users text-indigo-500"></i>
-                            <span>Cohorts</span>
-                        </a>
-                        <button onclick="openCourseDeleteModal({{ course.id }}, '{{ course.title|replace('\'', '\\\'') }}', '{{ course.code }}')" class="flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-[11px] font-semibold text-red-600 hover:bg-red-50 border border-red-200 transition">
-                            <i class="fa-solid fa-trash-can"></i>
-                            <span>Archive / Delete</span>
-                        </button>
-                    </div>
+                    <span class="text-[11px] text-slate-400 font-semibold">{{ lc.question_count }} doubts</span>
                 </div>
             </div>
             {% endfor %}
         </div>
-    {% else %}
-        <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto">
-            <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <i class="fa-solid fa-book text-xl"></i>
-            </div>
-            <h3 class="font-bold text-slate-800 text-base">No Courses Created Yet</h3>
-            <p class="text-xs text-slate-500 mt-1 mb-4">Start by creating your first course, adding YouTube video lectures, and creating quizzes.</p>
-            <button onclick="document.getElementById('createCourseModal').classList.remove('hidden')" class="inline-flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">
-                <i class="fa-solid fa-plus"></i>
-                <span>Create Course Now</span>
-            </button>
-        </div>
+    </div>
     {% endif %}
+
+    <!-- Courses List -->
+    <div class="space-y-4">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-900">Assigned Courses</h2>
+            <span class="text-xs text-slate-500 font-medium">{{ courses|length }} Courses managed</span>
+        </div>
+
+        {% if courses %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for course in courses %}
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition">
+                    <div>
+                        <div class="h-40 w-full bg-slate-100 relative">
+                            <img src="{{ course.thumbnail_url or 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80' }}" alt="{{ course.title }}" onerror="this.src='https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80'" class="w-full h-full object-cover">
+                            <span class="absolute top-3 left-3 px-2 py-0.5 bg-slate-900/80 backdrop-blur-sm text-white font-mono text-xs font-bold rounded">
+                                {{ course.code }}
+                            </span>
+                        </div>
+
+                        <div class="p-5">
+                            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                                <span>{{ course.department }}</span>
+                                <span class="font-medium text-slate-700">{{ course.teacher_name }}</span>
+                            </div>
+                            <h3 class="text-base font-bold text-slate-900 line-clamp-1 mb-2">{{ course.title }}</h3>
+                            <p class="text-xs text-slate-500 line-clamp-2 mb-4">{{ course.description }}</p>
+
+                            <div class="grid grid-cols-2 gap-2 text-center text-xs py-2 px-3 bg-slate-50 rounded-xl border border-slate-100 mb-2">
+                                <div>
+                                    <span class="block font-bold text-slate-800 text-sm">{{ course.enrolled_count }}</span>
+                                    <span class="text-slate-400 text-[11px]">Enrolled Students</span>
+                                </div>
+                                <div>
+                                    <span class="block font-bold text-slate-800 text-sm">{{ course.lesson_count }}</span>
+                                    <span class="text-slate-400 text-[11px]">Total Lessons</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 pt-0 space-y-2">
+                        <a href="/teacher/course/{{ course.id }}" class="w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 transition">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                            <span>Edit Curriculum & Live Classes</span>
+                        </a>
+                        <div class="grid grid-cols-2 gap-2">
+                            <a href="/department?tab=courses" class="flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-[11px] font-semibold text-slate-600 hover:bg-slate-50 border border-slate-200 transition">
+                                <i class="fa-solid fa-users text-indigo-500"></i>
+                                <span>Cohorts</span>
+                            </a>
+                            <button onclick="openCourseDeleteModal({{ course.id }}, '{{ course.title|replace('\'', '\\\'') }}', '{{ course.code }}')" class="flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-[11px] font-semibold text-red-600 hover:bg-red-50 border border-red-200 transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>Archive / Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto">
+                <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-book text-xl"></i>
+                </div>
+                <h3 class="font-bold text-slate-800 text-base">No Courses Created Yet</h3>
+                <p class="text-xs text-slate-500 mt-1 mb-4">Start by creating your first course, adding video lectures, and scheduling live classes.</p>
+                <button onclick="document.getElementById('createCourseModal').classList.remove('hidden')" class="inline-flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Create Course Now</span>
+                </button>
+            </div>
+        {% endif %}
+    </div>
 
     <!-- Student Queries (Chatbot Help Desk) Card -->
     <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-5">
@@ -173,44 +227,60 @@
 
 <!-- Create Course Modal -->
 <div id="createCourseModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-slate-900">Create New Course</h3>
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200">
+        <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-plus-circle text-indigo-600"></i>
+                <span>Create New Course</span>
+            </h3>
             <button onclick="document.getElementById('createCourseModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
         </div>
 
-        <form action="/teacher/course/create" method="POST" class="space-y-4">
+        <form action="/teacher/course/create" method="POST" enctype="multipart/form-data" class="space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Course Title</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Course Title *</label>
                 <input type="text" name="title" required placeholder="e.g. Distributed Database Architecture"
                     class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
             </div>
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Course Code</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Course Code *</label>
                     <input type="text" name="code" required placeholder="e.g. CS-301"
                         class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Department</label>
-                    <input type="text" name="department" value="{{ user.department }}" required
-                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Department Bucket *</label>
+                    <select name="department" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        {% if all_departments %}
+                            {% for d in all_departments %}
+                            <option value="{{ d.name }}" {% if d.name == user.department %}selected{% endif %}>{{ d.name }}</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="{{ user.department or 'Foreign Language' }}">{{ user.department or 'Foreign Language' }}</option>
+                        {% endif %}
+                    </select>
                 </div>
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Description</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Description *</label>
                 <textarea name="description" rows="3" required placeholder="Brief summary of what students will learn..."
                     class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
             </div>
 
+            <!-- Course Poster Upload + URL -->
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Cover Image URL (Optional)</label>
-                <input type="url" name="thumbnail_url" placeholder="https://..."
-                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Course Poster / Thumbnail</label>
+                <div class="flex items-center gap-3">
+                    <img id="createThumbnailPreview" src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80" alt="Preview" class="w-20 h-14 rounded-xl object-cover border border-slate-200 bg-slate-100 shrink-0">
+                    <div class="flex-1 space-y-1.5">
+                        <input type="file" name="thumbnail_file" accept="image/*" onchange="previewThumbnailFile(this, 'createThumbnailPreview')" class="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        <input type="url" name="thumbnail_url" placeholder="Or paste image URL (https://...)" class="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" oninput="document.getElementById('createThumbnailPreview').src = this.value">
+                    </div>
+                </div>
             </div>
 
             <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
@@ -219,7 +289,7 @@
                     Cancel
                 </button>
                 <button type="submit"
-                    class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm">
+                    class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
                     Create Course
                 </button>
             </div>
@@ -295,6 +365,17 @@
 </div>
 
 <script>
+function previewThumbnailFile(input, previewId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById(previewId);
+            if (preview) preview.src = e.target.result;
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
 async function openCourseDeleteModal(courseId, title, code) {
     document.getElementById('delModalCourseTitle').innerText = `${code} - ${title}`;
     document.getElementById('courseDeleteForm').action = `/teacher/course/${courseId}/delete`;

@@ -104,6 +104,10 @@
             <i class="fa-solid fa-award text-emerald-600"></i>
             <span>Certificates & Verification</span>
         </button>
+        <button onclick="switchTab('departments')" id="tabBtn-departments" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-shapes text-indigo-600"></i>
+            <span>Departments & Buckets</span>
+        </button>
         <button onclick="switchTab('conflicts')" id="tabBtn-conflicts" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-user-shield"></i>
             <span>Conflicts {% if student_conflicts %}<span class="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px]">{{ student_conflicts|length }}</span>{% endif %}</span>
@@ -2288,10 +2292,14 @@ in
                     Centrally generate unique certificate IDs (e.g., <code class="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-xs">LBPL-2026-000001</code>), embed dynamic verification QR codes, track public scan count, revoke credentials, and reissue with audit history.
                 </p>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                <button type="button" onclick="openAutoIssueCertModal()" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-sm transition">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                    <span>Auto-Issue for Completed Learners</span>
+                </button>
                 <button type="button" onclick="openIssueCertModal()" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-sm transition">
                     <i class="fa-solid fa-plus"></i>
-                    <span>Issue Certificate</span>
+                    <span>Manual Issue</span>
                 </button>
             </div>
         </div>
@@ -2442,6 +2450,156 @@ in
                         {% endif %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TAB: DEPARTMENTS & BUCKETS MANAGEMENT                     -->
+    <!-- ========================================================= -->
+    <div id="tab-departments" class="tab-content hidden space-y-6">
+        <!-- Header Banner -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
+                    <i class="fa-solid fa-shapes"></i>
+                    <span>Leadership Boulevard Pvt Ltd • Multi-Tenancy Bucketing</span>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Department Buckets & Environment Isolation</h2>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl leading-relaxed">
+                    Departments act as isolated environments (e.g. <strong>Foreign Language</strong>, <strong>Test Prep</strong>). Teachers and students in one bucket cannot access or see courses, learners, or analytics of another bucket. Only Administrators can create departments and reassign users.
+                </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="document.getElementById('createDepartmentModal').classList.remove('hidden')" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Create Department Bucket</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Department Bucket Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for d in department_buckets %}
+            <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                <div>
+                    <!-- Banner Header -->
+                    <div class="h-32 sm:h-36 w-full relative overflow-hidden bg-slate-900">
+                        <img src="{{ d.banner_url or 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&auto=format&fit=crop&q=80' }}" alt="{{ d.name }}" class="w-full h-full object-cover opacity-60">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+                        <div class="absolute top-3 left-4 flex items-center gap-2">
+                            <span class="px-2.5 py-0.5 rounded-md font-mono text-[11px] font-bold bg-white/20 backdrop-blur-md text-white border border-white/20">
+                                {{ d.code }}
+                            </span>
+                            {% if d.name == selected_dept %}
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500 text-white shadow-xs">
+                                Current Active Scope
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="absolute bottom-3 left-4 right-4">
+                            <h3 class="text-xl font-bold text-white tracking-tight">{{ d.name }}</h3>
+                            <p class="text-xs text-indigo-200 italic">{{ d.branding_tagline or 'transforming education' }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Details & Description -->
+                    <div class="p-5 space-y-4">
+                        <p class="text-xs text-slate-600 leading-relaxed">{{ d.description or 'Academic department bucket isolating faculty, courses, and students.' }}</p>
+                        
+                        {% if d.welcome_message %}
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+                            <span class="font-bold text-slate-700 block mb-0.5">Welcome Banner Text:</span>
+                            {{ d.welcome_message }}
+                        </div>
+                        {% endif %}
+
+                        <!-- Counters -->
+                        <div class="grid grid-cols-3 gap-2 text-center py-2 px-3 bg-indigo-50/50 rounded-2xl border border-indigo-100/60">
+                            <div>
+                                <span class="block font-bold text-indigo-900 text-base">{{ d.courses_count }}</span>
+                                <span class="text-slate-500 text-[10px] font-medium uppercase tracking-wider">Courses</span>
+                            </div>
+                            <div>
+                                <span class="block font-bold text-indigo-900 text-base">{{ d.teachers_count }}</span>
+                                <span class="text-slate-500 text-[10px] font-medium uppercase tracking-wider">Faculty</span>
+                            </div>
+                            <div>
+                                <span class="block font-bold text-indigo-900 text-base">{{ d.students_count }}</span>
+                                <span class="text-slate-500 text-[10px] font-medium uppercase tracking-wider">Students</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 pt-0">
+                    <a href="/department?dept={{ d.name }}" class="w-full flex items-center justify-center space-x-1.5 py-2 px-4 rounded-xl text-xs font-bold {% if d.name == selected_dept %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %} transition">
+                        <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i>
+                        <span>Switch Filter to {{ d.name }}</span>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- User Reassignment Card (Bucket Relocation) -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-users-gear text-indigo-600"></i>
+                    <span>Assign or Reassign User to Department Bucket</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Admin-controlled: Move a teacher or student between Foreign Language, Test Prep, or another department bucket.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                <!-- Move Faculty Form -->
+                <form action="/department/users/assign-department" method="POST" class="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3">
+                    <span class="text-xs font-bold text-indigo-900 uppercase tracking-wider block">Move Faculty / Teacher</span>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Select Teacher *</label>
+                        <select name="user_id" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500">
+                            {% for t in teachers %}
+                            <option value="{{ t.id }}">{{ t.full_name }} ({{ t.department or 'Unassigned' }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Target Department Bucket *</label>
+                        <select name="department_name" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500">
+                            {% for d in department_buckets %}
+                            <option value="{{ d.name }}">{{ d.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition">
+                        Reassign Faculty Bucket
+                    </button>
+                </form>
+
+                <!-- Move Student Form -->
+                <form action="/department/users/assign-department" method="POST" class="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3">
+                    <span class="text-xs font-bold text-indigo-900 uppercase tracking-wider block">Move Student</span>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Select Student *</label>
+                        <select name="user_id" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500">
+                            {% for s in students %}
+                            <option value="{{ s.id }}">{{ s.full_name }} - {{ s.user_id }} ({{ s.department }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Target Department Bucket *</label>
+                        <select name="department_name" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500">
+                            {% for d in department_buckets %}
+                            <option value="{{ d.name }}">{{ d.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition">
+                        Reassign Student Bucket
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -3023,6 +3181,117 @@ in
     </div>
 </div>
 
+<!-- Modal: Auto-Issue Certificates for Completed Learners -->
+<div id="autoIssueCertModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-wand-magic-sparkles text-indigo-600 mr-2"></i> Auto-Issue for 100% Completed Learners
+            </h3>
+            <button onclick="closeAutoIssueCertModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs text-indigo-900 space-y-1">
+            <span class="font-bold flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-check text-indigo-600"></i> Automated Certificate Issuance
+            </span>
+            <p class="text-indigo-800 text-[11px] leading-relaxed">
+                Scans all enrollments in the selected course(s). Every student who completed 100% of the lessons and passed the final quizzes will automatically receive an authentic verifiable certificate (<code class="font-mono bg-white/70 px-1 rounded text-indigo-900 font-bold">LBPL-2026-XXXXXX</code> + QR verification code).
+            </p>
+        </div>
+
+        <form onsubmit="handleAutoIssueCerts(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Target Course *</label>
+                <select id="autoCertCourseSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium">
+                    <option value="">All Courses in Active Department (Batch Auto-Issue)</option>
+                    {% for c in all_courses %}
+                    <option value="{{ c.id }}">{{ c.code }} - {{ c.title }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-[10px] text-slate-400 mt-1">Leave as "All Courses" to batch-issue credentials across all completed curricula.</p>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeAutoIssueCertModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" id="autoIssueSubmitBtn" class="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+                    Run Auto-Issue Now
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Create Department Bucket -->
+<div id="createDepartmentModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-shapes text-indigo-600 mr-2"></i> Create Department Bucket
+            </h3>
+            <button onclick="document.getElementById('createDepartmentModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <p class="text-xs text-slate-500">
+            Create an isolated sub-environment bucket (e.g. <strong>Test Prep</strong>, <strong>Foreign Language</strong>, <strong>STEM & Robotics</strong>).
+        </p>
+
+        <form action="/department/departments/create" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Department Name *</label>
+                <input type="text" name="name" required placeholder="e.g. Test Prep"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Department Code</label>
+                    <input type="text" name="code" placeholder="e.g. TEST_PREP"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs uppercase font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Branding Tagline</label>
+                    <input type="text" name="branding_tagline" value="transforming education" required
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Banner Image URL (Optional)</label>
+                <input type="url" name="banner_url" placeholder="https://images.unsplash.com/photo-..."
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Department Description</label>
+                <textarea name="description" rows="2" placeholder="Academic purpose, scope, and target learner group..."
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Student & Faculty Welcome Message</label>
+                <textarea name="welcome_message" rows="2" placeholder="Welcome message displayed on student and teacher dashboards..."
+                    class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('createDepartmentModal').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                    Create Bucket
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 // Tab Switching
 function switchTab(tabId) {
@@ -3478,6 +3747,49 @@ async function testGeminiConnectionLive() {
 // =========================================================
 // Certificate Management & QR Verification Controls
 // =========================================================
+
+function openAutoIssueCertModal() {
+    const modal = document.getElementById('autoIssueCertModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeAutoIssueCertModal() {
+    const modal = document.getElementById('autoIssueCertModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function handleAutoIssueCerts(e) {
+    if (e) e.preventDefault();
+    const courseIdVal = document.getElementById('autoCertCourseSelect').value;
+    const btn = document.getElementById('autoIssueSubmitBtn');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Scanning enrollments & issuing credentials...';
+    }
+
+    try {
+        const res = await fetch('/api/certificates/auto-issue-completed', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ course_id: courseIdVal ? parseInt(courseIdVal) : null })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            alert(`Automated Certificate Issuance Complete!\n\n${data.issued_count} new authentic certificates issued.\nTotal eligible 100% completed learners: ${data.eligible_count}`);
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Could not auto-issue certificates.');
+        }
+    } catch (err) {
+        alert('Server connection error during automated certificate generation.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+}
 
 function openIssueCertModal() {
     const modal = document.getElementById('issueCertModal');

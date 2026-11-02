@@ -5,7 +5,7 @@ from app.database import (
     get_db, get_system_settings, update_system_settings, UPLOAD_DIR,
     log_audit, get_dashboard_permissions, update_dashboard_permissions,
     get_notification_settings, update_notification_settings, get_ai_usage_metrics,
-    list_certificates
+    list_certificates, get_all_departments, create_department, assign_user_to_department
 )
 from app.auth import get_current_user, hash_password
 from app.utils import normalize_name, generate_unique_student_id
@@ -772,7 +772,8 @@ async def department_dashboard(
         "open_queries_count": open_queries_count,
         "last_rejected_count": len(LAST_IMPORT_REJECTED),
         "ai_usage_metrics": get_ai_usage_metrics(),
-        "certificates": list_certificates()
+        "certificates": list_certificates(),
+        "department_buckets": get_all_departments()
     })
 
 @router.post("/department/courses/assign")
@@ -1682,3 +1683,49 @@ async def resolve_student_conflict(
             log_audit(user["id"], "REJECT_CONFLICT", "student_conflicts", str(conflict_id), f"Rejected conflict claim for {conflict['student_name']}")
 
     return RedirectResponse(url="/department?tab=students&conflict_resolved=1", status_code=303)
+
+# ===================================================================
+# MULTI-DEPARTMENT BUCKETING & ISOLATION MANAGEMENT
+# ===================================================================
+
+@router.post("/department/departments/create")
+async def handle_create_department(
+    request: Request,
+    name: str = Form(...),
+    code: str = Form(""),
+    description: str = Form(""),
+    banner_url: str = Form(""),
+    branding_tagline: str = Form("transforming education"),
+    welcome_message: str = Form("")
+):
+    """Admin-only: Creates an isolated department bucket."""
+    user = require_dept_admin(request)
+    
+    clean_name = name.strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Department name cannot be empty")
+
+    new_dept = create_department(
+        name=clean_name,
+        code=code,
+        description=description,
+        banner_url=banner_url,
+        tagline=branding_tagline or "transforming education",
+        welcome_message=welcome_message or f"Welcome to the {clean_name} Learning Portal."
+    )
+    log_audit(user["id"], "CREATE_DEPARTMENT", "departments", str(new_dept.get("id")), f"Created new department bucket '{clean_name}'")
+    return RedirectResponse(url="/department?tab=departments&dept_created=1", status_code=303)
+
+@router.post("/department/users/assign-department")
+async def handle_assign_user_department(
+    request: Request,
+    user_id: int = Form(...),
+    department_name: str = Form(...)
+):
+    """Admin-only: Moves or reassigns a teacher or student to a department bucket."""
+    user = require_dept_admin(request)
+    success = assign_user_to_department(user_id=user_id, department_name=department_name, admin_user_id=user["id"])
+    if not success:
+        raise HTTPException(status_code=400, detail="Could not assign user to department")
+    return RedirectResponse(url="/department?tab=departments&user_assigned=1", status_code=303)
+

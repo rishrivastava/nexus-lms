@@ -232,9 +232,13 @@
                                     <p class="text-xs sm:text-sm font-bold text-slate-900 leading-tight group-hover:text-indigo-600 transition">{{ user.full_name }}</p>
                                     <p class="text-[11px] text-slate-500 font-medium">ID: {{ user.user_id }} &bull; <span class="capitalize font-semibold {% if user.role == 'department_admin' %}text-indigo-600{% elif user.role == 'teacher' %}text-sky-600{% elif user.role == 'dashboard_viewer' %}text-purple-600{% else %}text-slate-600{% endif %}">{{ user.designation or user.role.replace('_', ' ') }}</span>{% if user.role == 'student' and user.enrolled_courses_summary %} &bull; <span class="text-indigo-600 font-medium hidden xl:inline" title="Enrolled: {{ user.enrolled_courses_summary }}">{{ user.enrolled_courses_summary }}</span>{% endif %}</p>
                                 </div>
+                                {% if user.avatar_url %}
+                                <img src="{{ user.avatar_url }}" alt="{{ user.full_name }}" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover border border-slate-200 group-hover:border-indigo-300 transition shadow-xs">
+                                {% else %}
                                 <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs sm:text-sm group-hover:border-indigo-300 transition">
                                     {{ user.full_name[0] }}
                                 </div>
+                                {% endif %}
                             </a>
                             <a href="/logout" title="Sign Out" class="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition">
                                 <i class="fa-solid fa-right-from-bracket text-sm"></i>

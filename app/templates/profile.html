@@ -281,18 +281,17 @@
         <form action="/profile/update" method="POST" enctype="multipart/form-data" class="space-y-5">
             <!-- Profile Avatar Upload -->
             <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
-                {% if user.avatar_url %}
-                <img src="{{ user.avatar_url }}" alt="Avatar" class="w-14 h-14 rounded-xl object-cover border border-slate-200 shadow-sm shrink-0">
-                {% else %}
-                <div class="w-14 h-14 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
-                    {{ user.full_name[:2].upper() }}
+                <div class="relative shrink-0">
+                    <img id="avatarPreviewImg" src="{{ user.avatar_url or '' }}" alt="Avatar Preview" class="w-16 h-16 rounded-xl object-cover border-2 border-indigo-200 shadow-sm {% if not user.avatar_url %}hidden{% endif %}">
+                    <div id="avatarFallbackDiv" class="w-16 h-16 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-xl shadow-sm {% if user.avatar_url %}hidden{% endif %}">
+                        {{ user.full_name[:2].upper() }}
+                    </div>
                 </div>
-                {% endif %}
                 <div class="flex-1 w-full text-center sm:text-left space-y-1">
                     <label class="block text-xs font-bold text-slate-800">Profile Picture / Avatar</label>
-                    <input type="file" name="avatar_file" accept=".png,.jpg,.jpeg,.svg,.webp"
-                        class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-indigo-100 file:text-indigo-800">
-                    <span class="text-[10px] text-slate-400 block">Accepted formats: PNG, JPG, SVG, WebP.</span>
+                    <input type="file" name="avatar_file" id="avatarFileInput" accept=".png,.jpg,.jpeg,.svg,.webp" onchange="previewAvatar(this)"
+                        class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-indigo-100 file:text-indigo-800 cursor-pointer">
+                    <span class="text-[10px] text-slate-400 block">Accepted formats: PNG, JPG, SVG, WebP. Picture updates immediately across the platform upon save.</span>
                 </div>
             </div>
 
@@ -430,4 +429,24 @@
     </div>
 
 </div>
+
+<script>
+function previewAvatar(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('avatarPreviewImg');
+            const fallback = document.getElementById('avatarFallbackDiv');
+            if (preview) {
+                preview.src = e.target.result;
+                preview.classList.remove('hidden');
+            }
+            if (fallback) {
+                fallback.classList.add('hidden');
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
 {% endblock %}

@@ -6,22 +6,14 @@
 {% set brand = get_branding() %}
 <div class="min-h-[80vh] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
     <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        {% if brand.logo_image_url %}
-            <div class="flex justify-center mb-4">
-                <img src="{{ brand.logo_image_url }}" alt="Logo" class="max-h-16 max-w-[220px] object-contain">
-            </div>
-        {% else %}
-            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 mb-4 shadow-inner">
-                <i class="fa-solid {{ brand.logo_icon or 'fa-graduation-cap' }} text-2xl"></i>
-            </div>
-        {% endif %}
-        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ brand.platform_name or 'Nexus LMS' }}</h2>
-        <p class="mt-1 text-sm font-semibold text-indigo-600">{{ brand.platform_tagline or 'Language learning made easy' }}</p>
-        <p class="mt-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            {{ brand.institution_name or 'Leadership Boulevard Pvt Ltd' }}{% if brand.department_name %} &bull; {{ brand.department_name }}{% endif %}
-        </p>
+        <!-- LEAD Group Official Logo from leadgroup.co.in -->
+        <div class="flex justify-center mb-4">
+            <img src="/static/images/lead_group_logo.png" alt="LEAD Group Logo" class="h-14 sm:h-16 max-w-[240px] object-contain drop-shadow-sm">
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Leadership Boulevard Pvt Ltd</h2>
+        <p class="mt-1 text-sm font-bold text-indigo-600 uppercase tracking-widest">transforming education</p>
         <p class="mt-2 text-xs text-slate-500 max-w-sm mx-auto">
-            {{ brand.login_help_text or brand.welcome_message or 'Enter your User ID / Serial Number and password to access your portal.' }}
+            {{ brand.login_help_text or 'Enter your User ID / Serial Number and password to access your portal.' }}
         </p>
     </div>
 

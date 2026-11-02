@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}{{ live_class.title }} - Live Classroom - Nexus LMS{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- Top Bar Navigation & Session Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-500 mb-1">
+                <a href="/course/{{ live_class.course_id }}" class="hover:text-indigo-600 transition flex items-center gap-1 font-medium">
+                    <i class="fa-solid fa-arrow-left text-[10px]"></i>
+                    <span>Back to {{ live_class.course_code }}</span>
+                </a>
+                <span>•</span>
+                <span class="font-medium text-slate-700">{{ live_class.course_title }}</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{{ live_class.title }}</h1>
+                {% if live_class.status == 'live' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold animate-pulse">
+                    <span class="w-2 h-2 rounded-full bg-red-600"></span>
+                    <span>LIVE NOW</span>
+                </span>
+                {% elif live_class.status == 'completed' %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
+                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                    <span>Completed</span>
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
+                    <i class="fa-regular fa-clock"></i>
+                    <span>Scheduled</span>
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="flex items-center space-x-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
+                <i class="fa-solid fa-chalkboard-user text-indigo-600"></i>
+                <span class="text-slate-500">Faculty:</span>
+                <span class="font-bold text-slate-800">{{ live_class.teacher_name }}</span>
+            </div>
+            {% if user.role in ['teacher', 'department_admin'] %}
+            <div class="flex items-center gap-1.5">
+                {% if live_class.status != 'live' %}
+                <button onclick="updateStatus('live')" class="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center gap-1">
+                    <i class="fa-solid fa-broadcast-tower"></i> Go Live
+                </button>
+                {% else %}
+                <button onclick="updateStatus('completed')" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1">
+                    <i class="fa-solid fa-check"></i> End Session
+                </button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Main Grid: Stream/Launch Card on Left, Live Doubts / Q&A on Right -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left Column: Video Embed or Interactive Launcher -->
+        <div class="lg:col-span-8 space-y-6">
+            {% if youtube_embed_url %}
+            <!-- YouTube Live Stream Player -->
+            <div class="bg-black rounded-2xl overflow-hidden shadow-xl aspect-video border border-slate-800">
+                <iframe src="{{ youtube_embed_url }}" class="w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+            </div>
+            {% else %}
+            <!-- Zoom / Google Meet / External Platform Launcher -->
+            <div class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden border border-indigo-900/40">
+                <div class="absolute -right-12 -bottom-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div class="max-w-xl space-y-6 relative z-10">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold uppercase tracking-wider text-indigo-300">
+                        {% if live_class.platform == 'zoom' %}
+                        <i class="fa-solid fa-video text-blue-400"></i> Zoom Meeting
+                        {% elif live_class.platform == 'google_meet' %}
+                        <i class="fa-solid fa-users-viewfinder text-emerald-400"></i> Google Meet
+                        {% elif live_class.platform == 'teams' %}
+                        <i class="fa-solid fa-people-group text-purple-400"></i> Microsoft Teams
+                        {% else %}
+                        <i class="fa-solid fa-tower-broadcast text-rose-400"></i> Live Interactive Session
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">{{ live_class.title }}</h2>
+                        <p class="text-sm text-slate-300 mt-2 leading-relaxed">
+                            {{ live_class.description or "Join this real-time interactive class with your instructor. Ask doubts in real time via the Live Doubts Box on the right." }}
+                        </p>
+                    </div>
+
+                    <!-- Meeting Details Badges -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div class="bg-white/5 border border-white/10 rounded-2xl p-3">
+                            <span class="text-slate-400 block text-[11px]">Scheduled Time</span>
+                            <span class="font-semibold text-slate-100 flex items-center gap-1.5 mt-0.5">
+                                <i class="fa-regular fa-calendar-days text-indigo-400"></i>
+                                {{ live_class.scheduled_at }}
+                            </span>
+                        </div>
+                        <div class="bg-white/5 border border-white/10 rounded-2xl p-3">
+                            <span class="text-slate-400 block text-[11px]">Session Duration</span>
+                            <span class="font-semibold text-slate-100 flex items-center gap-1.5 mt-0.5">
+                                <i class="fa-regular fa-clock text-indigo-400"></i>
+                                {{ live_class.duration_minutes }} minutes
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if live_class.meeting_id or live_class.meeting_passcode %}
+                    <!-- Meeting Credentials -->
+                    <div class="flex flex-wrap items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3 text-xs">
+                        {% if live_class.meeting_id %}
+                        <div class="flex items-center space-x-2">
+                            <span class="text-slate-400">Meeting ID:</span>
+                            <code class="font-mono font-bold text-white bg-white/10 px-2 py-0.5 rounded">{{ live_class.meeting_id }}</code>
+                            <button onclick="navigator.clipboard.writeText('{{ live_class.meeting_id }}'); alert('Meeting ID copied!')" class="text-indigo-300 hover:text-white" title="Copy ID">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                        {% endif %}
+                        {% if live_class.meeting_passcode %}
+                        <div class="flex items-center space-x-2">
+                            <span class="text-slate-400">Passcode:</span>
+                            <code class="font-mono font-bold text-emerald-300 bg-white/10 px-2 py-0.5 rounded">{{ live_class.meeting_passcode }}</code>
+                            <button onclick="navigator.clipboard.writeText('{{ live_class.meeting_passcode }}'); alert('Passcode copied!')" class="text-indigo-300 hover:text-white" title="Copy Passcode">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Launch CTA -->
+                    <div class="pt-2">
+                        <a href="{{ live_class.meeting_url }}" target="_blank" rel="noopener noreferrer"
+                           class="inline-flex items-center space-x-3 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold text-sm shadow-xl shadow-indigo-600/30 transition transform hover:-translate-y-0.5">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            <span>Launch {{ live_class.platform|title }} Session</span>
+                        </a>
+                        <span class="block text-[11px] text-slate-400 mt-2">Opens in a new browser tab. Return to this page to ask live doubts!</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Description / Overview Card -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">Class Overview & Agenda</h3>
+                <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    {{ live_class.description or "No agenda details provided for this live class." }}
+                </p>
+                {% if live_class.recording_url %}
+                <div class="mt-4 pt-4 border-t border-slate-100">
+                    <span class="text-xs font-semibold text-slate-700 block mb-1">Class Recording Available:</span>
+                    <a href="{{ live_class.recording_url }}" target="_blank" class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 font-bold">
+                        <i class="fa-solid fa-circle-play"></i> Watch Class Recording
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Column: Live Doubts / Real-time Q&A -->
+        <div class="lg:col-span-4 flex flex-col h-[650px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <!-- Doubt Room Header -->
+            <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-comments text-indigo-600"></i>
+                        <span>Live Doubt Box</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-500">Ask questions directly to faculty during class</p>
+                </div>
+                <span id="questionCountBadge" class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold text-[11px]">
+                    {{ questions|length }}
+                </span>
+            </div>
+
+            <!-- Doubt Feed Container (scrollable) -->
+            <div id="questionsContainer" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/50">
+                {% if questions %}
+                    {% for q in questions %}
+                    <div class="bg-white rounded-xl p-3 border border-slate-200 shadow-xs space-y-1.5" id="q-item-{{ q.id }}">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="font-bold text-slate-800">{{ q.user_name }}</span>
+                            <span class="text-slate-400">{{ q.created_at[:16] }}</span>
+                        </div>
+                        <p class="text-xs text-slate-700 leading-relaxed font-medium">{{ q.question_text }}</p>
+                        
+                        {% if q.is_answered %}
+                        <div class="mt-2 p-2 bg-emerald-50 rounded-lg border border-emerald-200 text-xs">
+                            <span class="font-bold text-emerald-800 text-[11px] flex items-center gap-1">
+                                <i class="fa-solid fa-check-double"></i> Faculty Answer:
+                            </span>
+                            <p class="text-emerald-950 mt-0.5 text-xs">{{ q.answer_text or "Answered verbally during the live session." }}</p>
+                        </div>
+                        {% else %}
+                        <div class="flex items-center justify-between pt-1">
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                                <i class="fa-regular fa-clock"></i> Pending Answer
+                            </span>
+                            {% if user.role in ['teacher', 'department_admin'] %}
+                            <button onclick="toggleAnswerForm({{ q.id }})" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">
+                                Answer <i class="fa-solid fa-reply text-[10px]"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% if user.role in ['teacher', 'department_admin'] %}
+                        <div id="answer-form-{{ q.id }}" class="hidden pt-2 space-y-1.5">
+                            <textarea id="answer-input-{{ q.id }}" placeholder="Type instructor response..." rows="2" class="w-full text-xs p-2 rounded-lg border border-slate-200 focus:ring-1 focus:ring-indigo-500"></textarea>
+                            <button onclick="submitAnswer({{ q.id }})" class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-[11px] font-bold hover:bg-indigo-700">Submit Reply</button>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div id="noQuestionsNotice" class="text-center py-12 text-slate-400">
+                        <i class="fa-regular fa-circle-question text-3xl mb-2"></i>
+                        <p class="text-xs">No questions yet. Be the first to ask!</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Doubt Submission Form (Students & Teachers) -->
+            <div class="p-3 bg-white border-t border-slate-200">
+                <form id="askQuestionForm" onsubmit="handleQuestionSubmit(event)" class="space-y-2">
+                    <div class="relative">
+                        <textarea id="questionInput" required placeholder="Type your question or doubt here..." rows="2" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] text-slate-400">Faculty will see and address this</span>
+                        <button type="submit" id="submitQBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition">
+                            <i class="fa-regular fa-paper-plane text-[10px]"></i>
+                            <span>Send Doubt</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const liveClassId = {{ live_class.id }};
+const isTeacher = {{ 'true' if user.role in ['teacher', 'department_admin'] else 'false' }};
+
+async function handleQuestionSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById('questionInput');
+    const btn = document.getElementById('submitQBtn');
+    const text = input.value.trim();
+    if (!text) return;
+
+    btn.disabled = true;
+    try {
+        const res = await fetch(`/api/live-classes/${liveClassId}/questions`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ question_text: text })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            input.value = '';
+            pollQuestions();
+        } else {
+            alert(data.detail || 'Could not post question.');
+        }
+    } catch (err) {
+        alert('Error posting question');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function pollQuestions() {
+    try {
+        const res = await fetch(`/api/live-classes/${liveClassId}/questions`);
+        const data = await res.json();
+        if (data.status === 'success') {
+            renderQuestions(data.questions);
+        }
+    } catch (err) {}
+}
+
+function renderQuestions(questions) {
+    const container = document.getElementById('questionsContainer');
+    document.getElementById('questionCountBadge').innerText = questions.length;
+    if (questions.length === 0) {
+        container.innerHTML = `
+            <div id="noQuestionsNotice" class="text-center py-12 text-slate-400">
+                <i class="fa-regular fa-circle-question text-3xl mb-2"></i>
+                <p class="text-xs">No questions yet. Be the first to ask!</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    questions.forEach(q => {
+        let answerBlock = '';
+        if (q.is_answered) {
+            answerBlock = `
+                <div class="mt-2 p-2 bg-emerald-50 rounded-lg border border-emerald-200 text-xs">
+                    <span class="font-bold text-emerald-800 text-[11px] flex items-center gap-1">
+                        <i class="fa-solid fa-check-double"></i> Faculty Answer:
+                    </span>
+                    <p class="text-emerald-950 mt-0.5 text-xs">${q.answer_text || 'Answered verbally during the live session.'}</p>
+                </div>
+            `;
+        } else {
+            answerBlock = `
+                <div class="flex items-center justify-between pt-1">
+                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                        <i class="fa-regular fa-clock"></i> Pending Answer
+                    </span>
+                    ${isTeacher ? `
+                    <button onclick="toggleAnswerForm(${q.id})" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">
+                        Answer <i class="fa-solid fa-reply text-[10px]"></i>
+                    </button>
+                    ` : ''}
+                </div>
+                ${isTeacher ? `
+                <div id="answer-form-${q.id}" class="hidden pt-2 space-y-1.5">
+                    <textarea id="answer-input-${q.id}" placeholder="Type instructor response..." rows="2" class="w-full text-xs p-2 rounded-lg border border-slate-200 focus:ring-1 focus:ring-indigo-500"></textarea>
+                    <button onclick="submitAnswer(${q.id})" class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-[11px] font-bold hover:bg-indigo-700">Submit Reply</button>
+                </div>
+                ` : ''}
+            `;
+        }
+
+        html += `
+            <div class="bg-white rounded-xl p-3 border border-slate-200 shadow-xs space-y-1.5" id="q-item-${q.id}">
+                <div class="flex items-center justify-between text-[11px]">
+                    <span class="font-bold text-slate-800">${q.user_name}</span>
+                    <span class="text-slate-400">${(q.created_at || '').substring(0, 16)}</span>
+                </div>
+                <p class="text-xs text-slate-700 leading-relaxed font-medium">${q.question_text}</p>
+                ${answerBlock}
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function toggleAnswerForm(id) {
+    const f = document.getElementById(`answer-form-${id}`);
+    if (f) f.classList.toggle('hidden');
+}
+
+async function submitAnswer(id) {
+    const input = document.getElementById(`answer-input-${id}`);
+    const text = input ? input.value.trim() : '';
+    if (!text) return;
+    try {
+        const res = await fetch(`/api/live-classes/questions/${id}/answer`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ answer_text: text })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            pollQuestions();
+        } else {
+            alert('Could not record answer');
+        }
+    } catch (err) {
+        alert('Error recording answer');
+    }
+}
+
+async function updateStatus(newStatus) {
+    try {
+        const res = await fetch(`/api/live-classes/${liveClassId}/status`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            location.reload();
+        }
+    } catch (e) {
+        alert('Failed to update status');
+    }
+}
+
+// Poll every 5 seconds for new questions
+setInterval(pollQuestions, 5000);
+</script>
+{% endblock %}
