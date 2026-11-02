@@ -21,17 +21,16 @@
 
     <!-- Profile Header Card -->
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
-        {% if user.avatar_url %}
-        <img src="{{ user.avatar_url }}" alt="Profile Avatar" class="w-20 h-20 rounded-2xl object-cover shadow-lg shadow-indigo-100 shrink-0 border border-slate-200">
-        {% else %}
-        <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-2xl shadow-lg shadow-indigo-100 shrink-0">
+        <img id="mainProfileAvatarImg" src="{{ user.avatar_url or '' }}" alt="Profile Avatar" class="w-20 h-20 rounded-2xl object-cover shadow-lg shadow-indigo-100 shrink-0 border border-slate-200 {% if not user.avatar_url %}hidden{% endif %}">
+        <div id="mainProfileAvatarFallback" class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-2xl shadow-lg shadow-indigo-100 shrink-0 {% if user.avatar_url %}hidden{% endif %}">
             {{ user.full_name[:2].upper() }}
         </div>
-        {% endif %}
         
         <div class="flex-1 text-center sm:text-left space-y-1">
             <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <h1 class="text-2xl font-bold text-slate-900">{{ user.full_name }}</h1>
+                <h1 class="text-2xl font-bold text-slate-900">
+                    Welcome {% if user.role == 'teacher' %}Teacher{% elif user.role == 'student' %}Student{% elif user.role in ['department_admin', 'dashboard_viewer'] %}Admin{% else %}User{% endif %} {{ user.full_name }}!
+                </h1>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider
                     {% if user.role == 'department_admin' %}bg-purple-100 text-purple-800
                     {% elif user.role == 'teacher' %}bg-indigo-100 text-indigo-800
@@ -435,14 +434,24 @@ function previewAvatar(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
+            const dataUrl = e.target.result;
             const preview = document.getElementById('avatarPreviewImg');
             const fallback = document.getElementById('avatarFallbackDiv');
             if (preview) {
-                preview.src = e.target.result;
+                preview.src = dataUrl;
                 preview.classList.remove('hidden');
             }
             if (fallback) {
                 fallback.classList.add('hidden');
+            }
+            const mainImg = document.getElementById('mainProfileAvatarImg');
+            const mainFallback = document.getElementById('mainProfileAvatarFallback');
+            if (mainImg) {
+                mainImg.src = dataUrl;
+                mainImg.classList.remove('hidden');
+            }
+            if (mainFallback) {
+                mainFallback.classList.add('hidden');
             }
         };
         reader.readAsDataURL(input.files[0]);

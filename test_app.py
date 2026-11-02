@@ -970,12 +970,15 @@ def test_lms():
     # 1. Verification of Teacher Studio vs Teacher Dashboard access & strict data isolation
     with get_db() as conn:
         c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE role = 'teacher' LIMIT 1")
+        c.execute("SELECT * FROM users WHERE role = 'teacher' AND id IN (SELECT DISTINCT teacher_id FROM courses WHERE status != 'deleted') ORDER BY id ASC LIMIT 1")
         teacher_user = dict(c.fetchone())
         c.execute("SELECT * FROM users WHERE role = 'department_admin' LIMIT 1")
         admin_user = dict(c.fetchone())
         c.execute("SELECT * FROM courses WHERE teacher_id = ? AND status != 'deleted'", (teacher_user["id"],))
         teacher_courses = [dict(r) for r in c.fetchall()]
+
+    teacher_token = create_access_token({"sub": teacher_user["user_id"], "role": "teacher"})
+    teacher_headers = [(b"cookie", f"lms_token={teacher_token}".encode("utf-8"))]
 
     # Teacher analytics computation
     t_analytics = compute_teacher_analytics(teacher_user)

@@ -17,7 +17,7 @@
                     <span>•</span>
                     <span class="italic text-indigo-300">{{ department_info.branding_tagline if department_info else 'transforming education' }}</span>
                 </div>
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Course Management Studio</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Welcome Teacher {{ user.full_name }}!</h1>
                 <p class="mt-1 text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
                     {{ department_info.welcome_message if department_info and department_info.welcome_message else "Design curricula, edit structure, upload video lectures, conduct live classes, and manage student learning." }}
                 </p>

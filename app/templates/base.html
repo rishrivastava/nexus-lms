@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {% set brand = get_branding() %}
-    <title>{% block title %}{{ brand.department_name or brand.platform_name }}{% endblock %}</title>
+    <title>{% block title %}LEAD Group - transforming education{% endblock %}</title>
     <!-- Google Fonts: Outfit, Poppins, Inter, Noto Sans Devanagari, Merriweather -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -146,17 +146,11 @@
             <div class="flex justify-between h-16 items-center">
                 <!-- Logo & Brand Header -->
                 <div class="flex items-center space-x-3">
-                    <a href="/" class="flex items-center space-x-2.5">
-                        {% if brand.logo_image_url %}
-                            <img src="{{ brand.logo_image_url }}" alt="Logo" class="h-10 max-w-[160px] object-contain">
-                        {% else %}
-                            <div class="w-10 h-10 rounded-xl theme-bg flex items-center justify-center text-white shadow-md shadow-indigo-100">
-                                <i class="fa-solid {{ brand.logo_icon or 'fa-graduation-cap' }} text-lg"></i>
-                            </div>
-                        {% endif %}
-                        <div>
-                            <span class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-none block">{{ brand.platform_name }}</span>
-                            <span class="text-[11px] block text-slate-400 font-medium mt-0.5">{{ brand.institution_name }}</span>
+                    <a href="/" class="flex items-center space-x-3 group">
+                        <img src="/static/images/lead_group_logo.png" alt="LEAD Group" class="h-10 sm:h-11 max-w-[160px] object-contain drop-shadow-2xs">
+                        <div class="border-l border-slate-200 pl-3">
+                            <span class="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-tight block">Leadership Boulevard</span>
+                            <span class="text-[10px] sm:text-[11px] block text-indigo-600 font-bold tracking-wide uppercase">transforming education</span>
                         </div>
                     </a>
                 </div>
@@ -319,9 +313,9 @@
     <!-- Footer -->
     <footer class="bg-white border-t border-slate-200 py-6 mt-12">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-            <p>&copy; 2026 {{ brand.department_name }} &bull; {{ brand.institution_name }}</p>
+            <p>&copy; 2026 Leadership Boulevard Pvt Ltd &bull; transforming education</p>
             <div class="flex items-center gap-2">
-                <p class="text-[11px] text-slate-400">Powered by {{ brand.platform_name }} Enterprise Engine</p>
+                <p class="text-[11px] text-slate-400">LEAD Group Learning Platform</p>
                 <span class="text-slate-300">&bull;</span>
                 <span class="text-[11px] font-semibold text-amber-600 flex items-center gap-1 tracking-wide">
                     <i class="fa-solid fa-paw text-[10px]"></i> powered by mylo

@@ -960,24 +960,28 @@ async def update_branding_settings(
     final_banner_url = banner_image_url.strip() if isinstance(banner_image_url, str) else ""
 
     # Logo file upload
-    if isinstance(logo_file, UploadFile) and logo_file.filename:
+    if hasattr(logo_file, "filename") and logo_file.filename:
         ext = os.path.splitext(logo_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".svg", ".webp", ".ico"]:
             safe_logo_name = f"logo_{uuid.uuid4().hex[:8]}{ext}"
             file_path = os.path.join(UPLOAD_DIR, safe_logo_name)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(logo_file.file, buffer)
-            final_logo_url = f"/static/uploads/{safe_logo_name}"
+            contents = await logo_file.read()
+            if contents:
+                with open(file_path, "wb") as buffer:
+                    buffer.write(contents)
+                final_logo_url = f"/static/uploads/{safe_logo_name}"
 
     # Banner / cover file upload
-    if isinstance(banner_file, UploadFile) and banner_file.filename:
+    if hasattr(banner_file, "filename") and banner_file.filename:
         ext = os.path.splitext(banner_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".svg", ".webp"]:
             safe_banner_name = f"banner_{uuid.uuid4().hex[:8]}{ext}"
             file_path = os.path.join(UPLOAD_DIR, safe_banner_name)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(banner_file.file, buffer)
-            final_banner_url = f"/static/uploads/{safe_banner_name}"
+            contents = await banner_file.read()
+            if contents:
+                with open(file_path, "wb") as buffer:
+                    buffer.write(contents)
+                final_banner_url = f"/static/uploads/{safe_banner_name}"
 
     settings = {
         "platform_name": platform_name.strip(),
@@ -1046,14 +1050,18 @@ async def update_admin_personal_profile(
     clean_email = email.strip() if email.strip() else None
     final_avatar = avatar_url.strip() if avatar_url else ""
 
-    if isinstance(avatar_file, UploadFile) and avatar_file.filename:
+    if hasattr(avatar_file, "filename") and avatar_file.filename:
         ext = os.path.splitext(avatar_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".svg", ".webp"]:
+            avatars_dir = os.path.join(UPLOAD_DIR, "avatars")
+            os.makedirs(avatars_dir, exist_ok=True)
             safe_avatar_name = f"avatar_{uuid.uuid4().hex[:8]}{ext}"
-            file_path = os.path.join(UPLOAD_DIR, safe_avatar_name)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(avatar_file.file, buffer)
-            final_avatar = f"/static/uploads/{safe_avatar_name}"
+            file_path = os.path.join(avatars_dir, safe_avatar_name)
+            contents = await avatar_file.read()
+            if contents:
+                with open(file_path, "wb") as buffer:
+                    buffer.write(contents)
+                final_avatar = f"/static/uploads/avatars/{safe_avatar_name}"
 
     with get_db() as conn:
         cursor = conn.cursor()

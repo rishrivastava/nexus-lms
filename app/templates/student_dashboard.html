@@ -28,7 +28,7 @@
                         <span>•</span>
                         <span class="italic text-indigo-300">{{ department_info.branding_tagline if department_info else 'transforming education' }}</span>
                     </div>
-                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Welcome back, {{ user.full_name }}!</h1>
+                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Welcome Student {{ user.full_name }}!</h1>
                     <p class="mt-1 text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
                         {{ department_info.welcome_message if department_info and department_info.welcome_message else "Welcome to your student learning portal. Master your curriculum with curated modules, video lessons, and interactive doubt clearing." }}
                     </p>

@@ -3,6 +3,7 @@ import json
 import ssl
 import urllib.request
 import urllib.error
+from typing import Optional, List, Dict, Any
 from app.database import get_system_settings
 
 def get_gemini_config() -> dict:
@@ -190,23 +191,34 @@ def generate_ai_quiz(
     topic: str,
     num_questions: int = 5,
     difficulty: str = "Beginner",
-    course_title: str = None
+    course_title: Optional[str] = None,
+    course_subject: Optional[str] = None,
+    module_title: Optional[str] = None,
+    module_description: Optional[str] = None,
+    department: Optional[str] = None
 ) -> dict:
-    """Generates an academic quiz using Gemini AI or structured language generator."""
+    """Generates a module-dependent academic assessment quiz using Gemini AI or domain-specific curriculum engine."""
     conf = get_gemini_config()
     
     if conf["api_key"] and conf["enabled"]:
         system_prompt = (
-            "You are an expert Foreign Language Curriculum Designer for Nexus LMS. "
-            "Generate a high-quality educational quiz in valid JSON without any markdown code fences. "
+            "You are an expert academic curriculum designer and assessment specialist for LEAD Group LMS. "
+            "Your task is to generate a high-quality educational quiz in valid JSON without markdown code fences. "
+            "IMPORTANT: Base the questions strictly on the specified module, course, subject, and topic! "
+            "Do NOT generate foreign language or French questions unless the module or subject explicitly specifies a foreign language. "
+            "If the subject is Test Prep, Science, Coding, Mathematics, History, or Business, all questions MUST test that specific subject and module. "
             "Format: {\"title\": \"...\", \"description\": \"...\", \"questions\": [{\"question_text\": \"...\", \"option_a\": \"...\", \"option_b\": \"...\", \"option_c\": \"...\", \"option_d\": \"...\", \"correct_option\": \"A\", \"explanation\": \"...\"}]}"
         )
         user_prompt = (
-            f"Course: {course_title or 'Foreign Language'}\n"
-            f"Topic: {topic}\n"
+            f"Course: {course_title or 'Academic Course'}\n"
+            f"Subject / Department: {course_subject or department or 'General Academic'}\n"
+            f"Module Title: {module_title or 'Curriculum Module'}\n"
+            f"Module Overview / Objectives: {module_description or topic}\n"
+            f"Target Quiz Topic / Concept: {topic}\n"
             f"Difficulty Level: {difficulty}\n"
             f"Number of Questions: {num_questions}\n\n"
-            "Ensure every question has 4 distinct options (A, B, C, D), a valid correct_option, and an instructive explanation."
+            "Generate questions testing concepts from this specific module and topic. "
+            "Ensure each question has 4 distinct options (A, B, C, D), 1 valid correct_option (A, B, C, or D), and an instructive pedagogical explanation."
         )
         raw_resp = call_gemini_api(user_prompt, system_instruction=system_prompt, model=conf["model"], api_key=conf["api_key"], max_tokens=2000)
         if raw_resp:
@@ -224,53 +236,124 @@ def generate_ai_quiz(
             except Exception as e:
                 print(f"[Gemini Quiz JSON Parse Error]: {e}")
 
-    # Fallback generator tailored to requested topic
-    return generate_fallback_quiz(topic, num_questions, difficulty)
+    # Module-dependent fallback generator tailored to requested subject, module, and topic
+    return generate_fallback_quiz(
+        topic=topic,
+        num_questions=num_questions,
+        difficulty=difficulty,
+        course_title=course_title,
+        course_subject=course_subject,
+        module_title=module_title,
+        module_description=module_description,
+        department=department
+    )
 
-def generate_fallback_quiz(topic: str, num_questions: int = 5, difficulty: str = "Beginner") -> dict:
-    """Contextual question generator for language learning topics."""
-    t_lower = topic.lower()
+def generate_fallback_quiz(
+    topic: str,
+    num_questions: int = 5,
+    difficulty: str = "Beginner",
+    course_title: Optional[str] = None,
+    course_subject: Optional[str] = None,
+    module_title: Optional[str] = None,
+    module_description: Optional[str] = None,
+    department: Optional[str] = None
+) -> dict:
+    """Contextual, domain-specific question generator dynamically tailored to the module, course, and topic."""
+    context_text = f"{topic} {module_title or ''} {module_description or ''} {course_subject or ''} {course_title or ''} {department or ''}".lower()
     
-    if "spanish" in t_lower or "es" in t_lower:
-        base_pool = [
-            ("What is the Spanish translation for 'Good morning'?", "Buenas noches", "Buenos días", "Buenas tardes", "Hola", "B", "'Buenos días' is used in the morning until noon."),
-            ("How do you say 'Please' in Spanish?", "Gracias", "De nada", "Por favor", "Perdón", "C", "'Por favor' translates to 'Please'."),
-            ("Which pronoun corresponds to 'We' in Spanish?", "Ellos", "Tú", "Nosotros", "Ustedes", "C", "'Nosotros' is the first person plural pronoun (we)."),
-            ("What does the verb 'Comer' mean?", "To drink", "To eat", "To sleep", "To speak", "B", "'Comer' means 'to eat' in Spanish."),
-            ("Which word means 'Water' in Spanish?", "Agua", "Fuego", "Tierra", "Aire", "A", "'Agua' translates to 'water' in Spanish."),
-            ("How do you ask 'Where is the bathroom?' in Spanish?", "¿Cómo estás?", "¿Dónde está el baño?", "¿Cuánto cuesta?", "¿Qué hora es?", "B", "'¿Dónde está el baño?' is the standard way to ask for the restroom."),
-            ("What is the plural of 'el libro' (the book)?", "los libros", "las libros", "el libros", "los librose", "A", "Masculine nouns ending in a vowel take '-s' and article 'los'."),
-            ("Which verb is used for permanent characteristics in Spanish?", "Estar", "Ser", "Tener", "Hacer", "B", "'Ser' is used for essential qualities, origin, and identity.")
-        ]
-    elif "german" in t_lower or "de" in t_lower:
-        base_pool = [
-            ("What is the German word for 'Thank you'?", "Bitte", "Danke", "Guten Tag", "Hallo", "B", "'Danke' means 'Thank you' in German."),
-            ("How do you say 'Good evening' in German?", "Guten Morgen", "Gute Nacht", "Guten Abend", "Auf Wiedersehen", "C", "'Guten Abend' is used in the evening."),
-            ("What is the definite article for masculine nouns in nominative case?", "Die", "Das", "Der", "Den", "C", "'Der' is the masculine nominative article in German."),
-            ("What does the verb 'Sprechen' mean?", "To write", "To speak", "To read", "To listen", "B", "'Sprechen' means 'to speak'."),
-            ("Which number is 'Zehn' in English?", "Five", "Ten", "Twelve", "Twenty", "B", "'Zehn' is the number 10 in German.")
-        ]
-    elif "verb" in t_lower or "grammar" in t_lower:
-        base_pool = [
-            ("Which tense is typically used to express habitual actions in the present?", "Present Simple", "Past Perfect", "Future Continuous", "Subjunctive", "A", "Present Simple describes routines, regular habits, and general facts."),
-            ("What is an infinitive verb?", "A verb ending in -ed", "The base form of a verb preceded by 'to'", "A conjugated verb", "A past participle", "B", "The infinitive is the unconjugated base form of a verb."),
-            ("What is an irregular verb?", "A verb that always takes -ed", "A verb whose conjugation does not follow regular rules", "A verb with no past tense", "An auxiliary verb", "B", "Irregular verbs have unique conjugation patterns."),
-            ("Which form indicates a command or instruction?", "Indicative", "Conditional", "Imperative", "Interrogative", "C", "The imperative mood expresses direct commands and requests."),
-            ("What is an auxiliary verb?", "A verb used with a main verb to express tense or mood", "A noun acting like a verb", "An adjective", "A preposition", "A", "Auxiliary verbs like 'be', 'have', and 'do' help form complex tenses.")
-        ]
-    else: # French / General Language
+    # 1. French Language (strictly when specified)
+    if "french" in context_text or "français" in context_text:
         base_pool = [
             ("Which French greeting means 'Good morning' or 'Hello'?", "Au revoir", "Bonjour", "Merci", "Bonne nuit", "B", "'Bonjour' is the daytime greeting in French."),
             ("How do you say 'Thank you very much' in French?", "De rien", "S'il vous plaît", "Merci beaucoup", "Enchanté", "C", "'Merci beaucoup' translates to 'Thank you very much'."),
             ("What does 'Comment vous appelez-vous ?' ask in English?", "Where do you live?", "What is your name?", "How old are you?", "How are you?", "B", "It is the formal phrase for 'What is your name?'."),
             ("Which verb means 'to be' in French?", "Avoir", "Faire", "Être", "Aller", "C", "'Être' is the fundamental French verb for 'to be'."),
             ("What is the feminine definite article in French?", "Le", "Les", "La", "Un", "C", "'La' is the singular feminine definite article in French."),
-            ("How do you say 'Goodbye' in French?", "S'il vous plaît", "Au revoir", "Bonsoir", "Oui", "B", "'Au revoir' means 'Goodbye'."),
-            ("What does 'Je voudrais' express?", "I was", "I would like", "I am going", "I have", "B", "'Je voudrais' is the polite conditional for 'I would like'.")
+            ("How do you say 'Goodbye' in French?", "S'il vous plaît", "Au revoir", "Bonsoir", "Oui", "B", "'Au revoir' means 'Goodbye'.")
         ]
-        
+
+    # 2. Spanish Language (strictly when specified)
+    elif "spanish" in context_text or "español" in context_text:
+        base_pool = [
+            ("What is the Spanish translation for 'Good morning'?", "Buenas noches", "Buenos días", "Buenas tardes", "Hola", "B", "'Buenos días' is used in the morning until noon."),
+            ("How do you say 'Please' in Spanish?", "Gracias", "De nada", "Por favor", "Perdón", "C", "'Por favor' translates to 'Please'."),
+            ("Which pronoun corresponds to 'We' in Spanish?", "Ellos", "Tú", "Nosotros", "Ustedes", "C", "'Nosotros' is the first person plural pronoun (we)."),
+            ("What does the verb 'Comer' mean?", "To drink", "To eat", "To sleep", "To speak", "B", "'Comer' means 'to eat' in Spanish."),
+            ("Which word means 'Water' in Spanish?", "Agua", "Fuego", "Tierra", "Aire", "A", "'Agua' translates to 'water' in Spanish.")
+        ]
+
+    # 3. German Language (strictly when specified)
+    elif "german" in context_text or "deutsch" in context_text:
+        base_pool = [
+            ("What is the German word for 'Thank you'?", "Bitte", "Danke", "Guten Tag", "Hallo", "B", "'Danke' means 'Thank you' in German."),
+            ("How do you say 'Good evening' in German?", "Guten Morgen", "Gute Nacht", "Guten Abend", "Auf Wiedersehen", "C", "'Guten Abend' is used in the evening."),
+            ("What is the definite article for masculine nouns in nominative case?", "Die", "Das", "Der", "Den", "C", "'Der' is the masculine nominative article in German."),
+            ("What does the verb 'Sprechen' mean?", "To write", "To speak", "To read", "To listen", "B", "'Sprechen' means 'to speak'.")
+        ]
+
+    # 4. Test Prep / Aptitude / Reasoning
+    elif any(k in context_text for k in ["test prep", "aptitude", "reasoning", "verbal ability", "quantitative", "gre", "sat prep", "cat prep", "gmat", "logic", "general intelligence"]):
+        base_pool = [
+            ("If a train travels 360 km in 4 hours, what is its average speed in meters per second?", "25 m/s", "20 m/s", "30 m/s", "15 m/s", "A", "Speed = 360 km / 4 hr = 90 km/h. To convert to m/s, multiply by 5/18: 90 * (5/18) = 25 m/s."),
+            ("Complete the logical series: 2, 6, 12, 20, 30, ?", "40", "42", "44", "48", "B", "The differences between successive terms are 4, 6, 8, 10, so next difference is 12: 30 + 12 = 42."),
+            ("Identify the synonym of 'CANDID':", "Deceptive", "Frank", "Reserved", "Complex", "B", "'Candid' means truthful, straightforward, and frank."),
+            ("A product was sold for $240 at a 20% profit on cost. What was the cost price?", "$180", "$200", "$210", "$220", "B", "Selling Price = Cost * 1.20 => Cost = 240 / 1.20 = $200."),
+            ("Which word is an antonym of 'EPHEMERAL'?", "Transient", "Eternal", "Fleeting", "Fragile", "B", "'Ephemeral' means lasting for a short time; its antonym is 'eternal'."),
+            ("In a group of 60 students, 35 play football and 30 play cricket. If 15 play both, how many play neither?", "5", "10", "15", "8", "B", "Total playing at least one = 35 + 30 - 15 = 50. Neither = 60 - 50 = 10.")
+        ]
+
+    # 5. Computer Science / Programming / Python / Tech
+    elif any(k in context_text for k in ["python", "code", "programming", "database", "sql", "software", "algorithm", "data structure", "tech"]):
+        base_pool = [
+            ("What is the time complexity of searching an element in a balanced Binary Search Tree (BST)?", "O(1)", "O(log n)", "O(n)", "O(n log n)", "B", "A balanced BST has height log n, allowing binary search in O(log n) time."),
+            ("In Python, which built-in data type is immutable?", "List", "Dictionary", "Tuple", "Set", "C", "Tuples cannot be altered after creation, making them immutable."),
+            ("Which SQL clause is used to filter records based on group aggregate values?", "WHERE", "HAVING", "GROUP BY", "ORDER BY", "B", "'HAVING' filters aggregated result sets, whereas 'WHERE' filters rows before grouping."),
+            ("What does the 'self' keyword represent in Python class methods?", "A reference to the class itself", "A reference to the current object instance", "A global execution scope", "A private variable", "B", "'self' points directly to the instance on which the method is called."),
+            ("Which HTTP status code signifies that a requested resource was not found?", "400", "401", "403", "404", "D", "HTTP 404 indicates Not Found."),
+            ("Which data structure operates on a Last-In, First-Out (LIFO) principle?", "Queue", "Stack", "Linked List", "Tree", "B", "A Stack pushes and pops items according to the LIFO discipline.")
+        ]
+
+    # 6. Mathematics / Algebra / Calculus
+    elif any(k in context_text for k in ["math", "algebra", "calculus", "geometry", "trigonometry", "statistics"]):
+        base_pool = [
+            ("What is the derivative of f(x) = 3x^2 + 5x - 7 with respect to x?", "6x", "6x + 5", "3x + 5", "6x^2 + 5", "B", "Using the power rule: d/dx(3x^2) = 6x, d/dx(5x) = 5, and d/dx(-7) = 0, giving 6x + 5."),
+            ("What is the solution to the equation 2x + 8 = 20?", "x = 4", "x = 6", "x = 8", "x = 12", "B", "2x = 20 - 8 = 12, so x = 6."),
+            ("In a right-angled triangle, if legs are of length 6 and 8, what is the length of the hypotenuse?", "9", "10", "12", "14", "B", "By Pythagorean theorem: sqrt(6^2 + 8^2) = sqrt(36 + 64) = sqrt(100) = 10."),
+            ("What is the probability of rolling an even number on a fair standard six-sided die?", "1/3", "1/2", "2/3", "1/6", "B", "The even outcomes are {2, 4, 6}, which is 3 out of 6 outcomes, simplifying to 1/2."),
+            ("What is the value of log10(1000)?", "1", "2", "3", "10", "C", "10^3 = 1000, so log10(1000) = 3.")
+        ]
+
+    # 7. Science / Physics / Chemistry / Biology
+    elif any(k in context_text for k in ["science", "physic", "chem", "biology", "force", "cell", "energy", "matter"]):
+        base_pool = [
+            ("According to Newton's Second Law of Motion, Force equals:", "Mass * Acceleration", "Mass / Velocity", "Work * Distance", "Power / Time", "A", "Newton's second law states that Force = mass * acceleration (F = ma)."),
+            ("Which cellular organelle is recognized as the 'powerhouse of the cell'?", "Nucleus", "Ribosome", "Mitochondria", "Endoplasmic Reticulum", "C", "Mitochondria produce ATP, generating chemical energy for cellular functions."),
+            ("What is the chemical formula for water?", "CO2", "H2O", "NaCl", "O2", "B", "Water is composed of two hydrogen atoms bonded to one oxygen atom (H2O)."),
+            ("What is the pH level of pure neutral water at 25°C?", "5", "7", "9", "14", "B", "A pH of 7 represents a completely neutral solution."),
+            ("What process do plants use to convert sunlight into chemical energy?", "Respiration", "Photosynthesis", "Fermentation", "Transpiration", "B", "Photosynthesis uses sunlight, water, and CO2 to create glucose and oxygen.")
+        ]
+
+    # 8. History / Social Studies / Civics
+    elif any(k in context_text for k in ["history", "social", "civic", "geograph", "polity", "economics"]):
+        base_pool = [
+            ("In which year did the United Nations officially form?", "1919", "1945", "1950", "1939", "B", "The United Nations was chartered on October 24, 1945 following World War II."),
+            ("Which document serves as the supreme law of a constitutional democracy?", "The Civil Code", "The Constitution", "Executive Orders", "Treaty of Versailles", "B", "The Constitution establishes the legal framework and supreme law of the state."),
+            ("What is the primary economic indicator used to measure total economic output?", "Inflation Rate", "Gross Domestic Product (GDP)", "Consumer Price Index", "Interest Rate", "B", "GDP measures the monetary value of all finished goods and services produced within a country."),
+            ("Which imaginary line divides the Earth into the Northern and Southern Hemispheres?", "Prime Meridian", "Equator", "Tropic of Cancer", "International Date Line", "B", "The Equator is at 0 degrees latitude and divides the Earth into North and South hemispheres.")
+        ]
+
+    # 9. General Academic Module / Subject (Default)
+    else:
+        m_name = module_title.strip() if module_title else topic.strip()
+        base_pool = [
+            (f"Which foundational concept is central to mastering '{m_name}'?", f"Core principles and analytical frameworks of {topic}", "Random memorization without context", "Unverified empirical assumptions", "Superficial skimming of terms", "A", f"Deep mastery of {m_name} requires understanding foundational principles and their structured application."),
+            (f"In the context of '{topic}', what is the primary role of systematic evaluation?", "To identify knowledge gaps and reinforce understanding", "To assign arbitrary numerical grades", "To bypass prerequisite chapters", "To avoid critical problem solving", "A", "Systematic evaluation pinpoints comprehension gaps and consolidates core learning objectives."),
+            (f"When applying principles from '{m_name}', what is the recommended methodology?", "Structured problem decomposition and practical synthesis", "Skipping fundamental definitions", "Ignoring error analysis", "Sole reliance on passive reading", "A", "Structured decomposition allows complex problems within the curriculum to be solved methodically."),
+            (f"Which outcome represents the highest level of proficiency in '{topic}'?", "Synthesis and practical application in new scenarios", "Recall of isolated definitions only", "Passive lecture attendance", "Copying solved examples", "A", "Applying concepts effectively in real-world or novel contexts demonstrates true subject mastery."),
+            (f"What is an essential prerequisite for advancing beyond '{m_name}'?", f"Consistent verification of fundamental {topic} concepts", "Rushing through advanced modules", "Eliminating revision cycles", "Avoiding practice questions", "A", f"Solidifying prerequisites in {m_name} ensures continuous academic progression.")
+        ]
+
     selected = base_pool[:min(num_questions, len(base_pool))]
-    # If more requested than in pool, duplicate with variant suffixes
     while len(selected) < num_questions:
         orig = base_pool[len(selected) % len(base_pool)]
         selected.append((f"{orig[0]} (Review)", orig[1], orig[2], orig[3], orig[4], orig[5], orig[6]))
@@ -288,8 +371,11 @@ def generate_fallback_quiz(topic: str, num_questions: int = 5, difficulty: str =
         })
 
     title = f"{topic.strip().title()} Assessment"
+    if module_title:
+        title = f"{module_title}: {topic.strip().title()}"
+
     return {
         "title": title,
-        "description": f"Curriculum quiz covering {topic.strip()} ({difficulty} level).",
+        "description": f"Curriculum quiz covering {topic.strip()} under {module_title or 'Curriculum Module'} ({difficulty} level).",
         "questions": questions
     }

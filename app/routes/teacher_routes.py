@@ -591,22 +591,24 @@ async def create_course(
 ):
     user = require_teacher_or_admin(request)
     
-    thumb = thumbnail_url.strip() if thumbnail_url and thumbnail_url.strip() else ""
-    if isinstance(thumbnail_file, UploadFile) and thumbnail_file.filename:
+    thumb = thumbnail_url.strip() if isinstance(thumbnail_url, str) and thumbnail_url.strip() else ""
+    if hasattr(thumbnail_file, "filename") and thumbnail_file.filename:
         ext = os.path.splitext(thumbnail_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
             courses_dir = os.path.join(UPLOAD_DIR, "courses")
             os.makedirs(courses_dir, exist_ok=True)
             safe_name = f"course_{uuid.uuid4().hex[:8]}{ext}"
             file_path = os.path.join(courses_dir, safe_name)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(thumbnail_file.file, buffer)
-            thumb = f"/static/uploads/courses/{safe_name}"
+            contents = await thumbnail_file.read()
+            if contents:
+                with open(file_path, "wb") as buffer:
+                    buffer.write(contents)
+                thumb = f"/static/uploads/courses/{safe_name}"
 
     if not thumb:
         thumb = "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60"
 
-    subj = subject.strip() if subject and subject.strip() else department.strip()
+    subj = subject.strip() if isinstance(subject, str) and subject.strip() else (department.strip() if isinstance(department, str) else "")
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -673,16 +675,18 @@ async def edit_course(
             raise HTTPException(status_code=400, detail=f"A course with code '{code.strip().upper()}' already exists. Please choose a unique code.")
 
         thumb = course["thumbnail_url"]
-        if isinstance(thumbnail_file, UploadFile) and thumbnail_file.filename:
+        if hasattr(thumbnail_file, "filename") and thumbnail_file.filename:
             ext = os.path.splitext(thumbnail_file.filename)[1].lower()
             if ext in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
                 courses_dir = os.path.join(UPLOAD_DIR, "courses")
                 os.makedirs(courses_dir, exist_ok=True)
                 safe_name = f"course_{uuid.uuid4().hex[:8]}{ext}"
                 file_path = os.path.join(courses_dir, safe_name)
-                with open(file_path, "wb") as buffer:
-                    shutil.copyfileobj(thumbnail_file.file, buffer)
-                thumb = f"/static/uploads/courses/{safe_name}"
+                contents = await thumbnail_file.read()
+                if contents:
+                    with open(file_path, "wb") as buffer:
+                        buffer.write(contents)
+                    thumb = f"/static/uploads/courses/{safe_name}"
         elif thumbnail_url and thumbnail_url.strip():
             thumb = thumbnail_url.strip()
         dept = department.strip() if department and department.strip() else (course["department"] or "Foreign Language")
@@ -1718,24 +1722,39 @@ async def ai_generate_quiz(
         if not course_id:
             raise HTTPException(status_code=400, detail="Invalid course identifier.")
 
-        cursor.execute("SELECT title FROM courses WHERE id = ?", (course_id,))
+        cursor.execute("SELECT title, subject, department FROM courses WHERE id = ?", (course_id,))
         c_row = cursor.fetchone()
-        course_title = c_row[0] if c_row else "Foreign Language Learning"
+        course_title = c_row[0] if c_row and c_row[0] else "Curriculum Course"
+        course_subject = c_row[1] if c_row and c_row[1] else ""
+        course_dept = c_row[2] if c_row and c_row[2] else ""
 
         if not module_id:
-            cursor.execute("SELECT id FROM modules WHERE course_id = ? ORDER BY position ASC LIMIT 1", (course_id,))
+            cursor.execute("SELECT id, title, description FROM modules WHERE course_id = ? ORDER BY position ASC LIMIT 1", (course_id,))
             m_row = cursor.fetchone()
             if m_row:
                 module_id = m_row[0]
+                module_title = m_row[1] or ""
+                module_desc = m_row[2] or ""
             else:
                 cursor.execute("INSERT INTO modules (course_id, title, position) VALUES (?, 'Module 1: Assessments', 1)", (course_id,))
                 module_id = cursor.lastrowid
+                module_title = "Module 1: Assessments"
+                module_desc = ""
+        else:
+            cursor.execute("SELECT title, description FROM modules WHERE id = ?", (module_id,))
+            m_row = cursor.fetchone()
+            module_title = m_row[0] if m_row and m_row[0] else ""
+            module_desc = m_row[1] if m_row and m_row[1] else ""
 
     generated_quiz = generate_ai_quiz(
         topic=topic.strip(),
         num_questions=max(1, min(int(num_questions), 20)),
         difficulty=difficulty.strip(),
-        course_title=course_title
+        course_title=course_title,
+        course_subject=course_subject,
+        module_title=module_title,
+        module_description=module_desc,
+        department=course_dept
     )
     
     quiz_title = generated_quiz.get("title") or f"{topic.strip().title()} Assessment"

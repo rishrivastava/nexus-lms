@@ -484,14 +484,14 @@ def init_db():
 
         # Default system branding and settings
         default_settings = {
-            "platform_name": "Nexus LMS",
+            "platform_name": "LEAD Group",
             "platform_tagline": "transforming education",
             "institution_name": "Leadership Boulevard Pvt Ltd",
             "department_name": "Foreign Language",
             "department_tagline": "transforming education",
             "brand_color": "#1e3a8a",
             "secondary_brand_color": "#0284c7",
-            "welcome_message": "Welcome to the Foreign Language Learning Portal. Master world languages with curated modules, interactive videos, and speaking practice.",
+            "welcome_message": "Welcome to the Learning Portal. Master your curriculum with curated modules, interactive videos, and live doubts.",
             "login_help_text": "Enter your User ID / Serial Number and password to access your portal.",
             "login_user_id_placeholder": "e.g. Serial Number or ID",
             "login_button_text": "Sign In",
@@ -502,7 +502,7 @@ def init_db():
             "contact_email": "info@fl4schools.com",
             "contact_phone": "+91 9540594033",
             "contact_office": "Mumbai",
-            "branding_text": "Accredited Academic Portal for Foreign Language Learning.",
+            "branding_text": "Leadership Boulevard Pvt Ltd • transforming education",
             "font_family": "outfit",
             "powerbi_api_key": "pbi_live_9a7f82b3d1e4c5a6b7c8d9e0f1a2b3c4",
             "powerbi_last_sync_at": "",
@@ -526,11 +526,12 @@ def init_db():
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (k, v))
 
-        # Always cleanse any legacy IIT, Science or Computer Science from system settings
+        # Always cleanse any legacy titles, learning made easy, or engineering references
+        cursor.execute("UPDATE system_settings SET value = 'LEAD Group' WHERE key = 'platform_name'")
+        cursor.execute("UPDATE system_settings SET value = '/static/images/lead_group_logo.png' WHERE key = 'logo_image_url'")
+        cursor.execute("UPDATE system_settings SET value = 'transforming education' WHERE key IN ('platform_tagline', 'department_tagline')")
+        cursor.execute("UPDATE system_settings SET value = 'Foreign Language' WHERE key = 'department_name' AND (value = 'transforming education' OR value LIKE '%learning made easy%' OR value LIKE '%Computer Science%')")
         cursor.execute("UPDATE system_settings SET value = 'Leadership Boulevard Pvt Ltd' WHERE value LIKE '%Indian Institute%'")
-        cursor.execute("UPDATE system_settings SET value = 'Foreign Language' WHERE value LIKE '%Computer Science%'")
-        cursor.execute("UPDATE system_settings SET value = 'Language learning made easy' WHERE key = 'platform_tagline' OR value LIKE '%Departmental Learning%'")
-        cursor.execute("UPDATE system_settings SET value = 'Pioneering in Language Teaching' WHERE value LIKE '%Pioneering Innovation%'")
         cursor.execute("UPDATE system_settings SET value = 'info@fl4schools.com' WHERE value LIKE '%cse@institution.edu%'")
         cursor.execute("UPDATE system_settings SET value = 'Mumbai' WHERE value LIKE '%Computing Annex%'")
 

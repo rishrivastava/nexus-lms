@@ -263,28 +263,32 @@ async def update_profile(
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    clean_email = email.strip() if email and email.strip() else None
-    clean_name = full_name.strip() if full_name and full_name.strip() else user["full_name"]
-    clean_desig = designation.strip() if designation and designation.strip() else (user.get("designation") or "")
-    clean_dept = department.strip() if department and department.strip() else user.get("department", "")
-    clean_school = school_name.strip() if school_name and school_name.strip() else user.get("school_name", "")
-    clean_phone = phone.strip() if phone and phone.strip() else (user.get("phone") or "")
-    clean_guardian = guardian_name.strip() if guardian_name and guardian_name.strip() else (user.get("guardian_name") or "")
-    clean_block = block.strip() if block and block.strip() else (user.get("block") or "")
-    clean_district = district.strip() if district and district.strip() else (user.get("district") or "")
-    clean_state = state.strip() if state and state.strip() else (user.get("state") or "")
-    clean_pincode = pincode.strip() if pincode and pincode.strip() else (user.get("pincode") or "")
-    clean_bio = bio.strip() if bio and bio.strip() else (user.get("bio") or "")
+    clean_email = email.strip() if isinstance(email, str) and email.strip() else None
+    clean_name = full_name.strip() if isinstance(full_name, str) and full_name.strip() else user["full_name"]
+    clean_desig = designation.strip() if isinstance(designation, str) and designation.strip() else (user.get("designation") or "")
+    clean_dept = department.strip() if isinstance(department, str) and department.strip() else user.get("department", "")
+    clean_school = school_name.strip() if isinstance(school_name, str) and school_name.strip() else user.get("school_name", "")
+    clean_phone = phone.strip() if isinstance(phone, str) and phone.strip() else (user.get("phone") or "")
+    clean_guardian = guardian_name.strip() if isinstance(guardian_name, str) and guardian_name.strip() else (user.get("guardian_name") or "")
+    clean_block = block.strip() if isinstance(block, str) and block.strip() else (user.get("block") or "")
+    clean_district = district.strip() if isinstance(district, str) and district.strip() else (user.get("district") or "")
+    clean_state = state.strip() if isinstance(state, str) and state.strip() else (user.get("state") or "")
+    clean_pincode = pincode.strip() if isinstance(pincode, str) and pincode.strip() else (user.get("pincode") or "")
+    clean_bio = bio.strip() if isinstance(bio, str) and bio.strip() else (user.get("bio") or "")
 
     final_avatar = user.get("avatar_url") or ""
-    if isinstance(avatar_file, UploadFile) and avatar_file.filename:
+    if hasattr(avatar_file, "filename") and avatar_file.filename:
         ext = os.path.splitext(avatar_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".svg", ".webp"]:
+            avatars_dir = os.path.join(UPLOAD_DIR, "avatars")
+            os.makedirs(avatars_dir, exist_ok=True)
             safe_avatar_name = f"avatar_{uuid.uuid4().hex[:8]}{ext}"
-            file_path = os.path.join(UPLOAD_DIR, safe_avatar_name)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(avatar_file.file, buffer)
-            final_avatar = f"/static/uploads/{safe_avatar_name}"
+            file_path = os.path.join(avatars_dir, safe_avatar_name)
+            contents = await avatar_file.read()
+            if contents:
+                with open(file_path, "wb") as buffer:
+                    buffer.write(contents)
+                final_avatar = f"/static/uploads/avatars/{safe_avatar_name}"
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -310,9 +314,9 @@ async def update_profile(
             update_system_settings({"department_name": clean_dept})
 
         # Password update if requested
-        if new_password and new_password.strip():
-            # If must_change_password was set, current_password can be optional or checked
-            if not user.get("password_hash") or not verify_password(current_password.strip() if current_password else "", user.get("password_hash", "")):
+        if isinstance(new_password, str) and new_password.strip():
+            curr_pass = current_password.strip() if isinstance(current_password, str) else ""
+            if not user.get("password_hash") or not verify_password(curr_pass, user.get("password_hash", "")):
                 # If they didn't provide correct current password
                 return RedirectResponse(url="/profile?error=Incorrect+current+password", status_code=303)
             if len(new_password.strip()) < 6:
