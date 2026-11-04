@@ -1028,7 +1028,9 @@ def issue_certificate(student_id: int, course_id: int, admin_user_id: int = None
             log_audit(admin_user_id, "CERTIFICATE_ISSUE", "certificates", str(new_row_id), f"Issued certificate {cert_id} for student {student['full_name']} in course {course['title']}", conn=conn)
 
         cursor.execute("SELECT * FROM certificates WHERE id = ?", (new_row_id,))
-        return dict(cursor.fetchone())
+        cert_dict = dict(cursor.fetchone())
+        cert_dict["course_title"] = cert_dict.get("course_name", "")
+        return cert_dict
     finally:
         if should_close:
             conn.close()
@@ -1127,7 +1129,9 @@ def reissue_certificate(old_certificate_id: str, admin_user_id: int = None) -> d
             log_audit(admin_user_id, "CERTIFICATE_REISSUE", "certificates", str(new_row_id), f"Reissued certificate {old_certificate_id} -> {new_cert_id} for {old_cert['student_name']}", conn=conn)
 
         cursor.execute("SELECT * FROM certificates WHERE id = ?", (new_row_id,))
-        return dict(cursor.fetchone())
+        cert_dict = dict(cursor.fetchone())
+        cert_dict["course_title"] = cert_dict.get("course_name", "")
+        return cert_dict
 
 def list_certificates(status: str = None, search: str = None) -> list:
     """Returns a list of all certificate records with optional status and search filtering."""
