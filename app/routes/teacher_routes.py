@@ -7,7 +7,8 @@ from app.database import (
     get_course_answer_sheet_submissions, evaluate_answer_sheet_submission,
     get_teacher_pending_answer_sheets, complete_answer_sheet_evaluation,
     create_teacher_mentoring_request, get_teacher_mentoring_sessions,
-    complete_mentoring_session
+    complete_mentoring_session, is_ans_writing_enabled_for_course,
+    is_ans_writing_enabled_for_department
 )
 from app.auth import get_current_user
 from app.gemini_service import generate_ai_quiz
@@ -104,7 +105,8 @@ async def teacher_dashboard(request: Request):
         teacher_live_classes = [dict(r) for r in cursor.fetchall()]
 
         # Pending UPSC answer copy submissions for teacher's review
-        pending_answer_sheets = get_teacher_pending_answer_sheets(user["id"])
+        ans_writing_enabled = is_ans_writing_enabled_for_department(dept_info.get("name") if dept_info else user.get("department")) if user["role"] != "department_admin" else True
+        pending_answer_sheets = get_teacher_pending_answer_sheets(user["id"]) if ans_writing_enabled else []
 
         # 1-on-1 mentoring sessions assigned to or initiated by this teacher
         mentoring_sessions = get_teacher_mentoring_sessions(user["id"])
@@ -130,6 +132,7 @@ async def teacher_dashboard(request: Request):
         "all_departments": all_departments,
         "live_classes": teacher_live_classes,
         "pending_answer_sheets": pending_answer_sheets,
+        "ans_writing_enabled": ans_writing_enabled,
         "mentoring_sessions": mentoring_sessions,
         "enrolled_students": enrolled_students,
         "active_tab": "studio"
@@ -901,8 +904,9 @@ async def course_editor(request: Request, course_id: int):
         ai_quiz_row = cursor.fetchone()
         allow_teacher_ai_quiz = ai_quiz_row[0] if ai_quiz_row else "1"
 
+        ans_writing_enabled = is_ans_writing_enabled_for_course(course_id)
         live_classes = get_live_classes_for_course(course_id)
-        answer_sheets = get_course_answer_sheet_submissions(course_id)
+        answer_sheets = get_course_answer_sheet_submissions(course_id) if ans_writing_enabled else []
 
     return templates.TemplateResponse("course_editor.html", {
         "request": request,
@@ -912,7 +916,8 @@ async def course_editor(request: Request, course_id: int):
         "teachers_list": teachers_list,
         "allow_teacher_ai_quiz": allow_teacher_ai_quiz,
         "live_classes": live_classes,
-        "answer_sheets": answer_sheets
+        "answer_sheets": answer_sheets,
+        "ans_writing_enabled": ans_writing_enabled
     })
 
 @router.post("/teacher/course/{course_id}/module")

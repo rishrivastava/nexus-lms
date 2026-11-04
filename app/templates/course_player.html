@@ -217,6 +217,7 @@
                     {% endif %}
                 </div>
 
+                {% if ans_writing_enabled %}
                 <!-- UPSC Mains PDF Answer Sheet Upload Section -->
                 <div id="mainsAnswerSheetSection" class="p-6 border-t border-slate-200 bg-slate-50/40">
                     <div class="bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-transparent p-5 rounded-2xl border border-amber-200/60 mb-6">
@@ -325,6 +326,7 @@
                         {% endif %}
                     </div>
                 </div>
+                {% endif %}
 
             {% else %}
                 <div class="p-12 text-center text-slate-500 text-sm">
@@ -852,6 +854,7 @@ async function submitAnswerSheet(e) {
 }
 </script>
 
+{% if ans_writing_enabled %}
 <!-- Upload Answer Sheet Modal -->
 <div id="uploadAnswerModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
@@ -896,4 +899,5 @@ async function submitAnswerSheet(e) {
         </form>
     </div>
 </div>
+{% endif %}
 {% endblock %}

@@ -38,6 +38,7 @@
         </div>
     </div>
 
+    {% if ans_writing_enabled %}
     <!-- Pending UPSC Mains Answer Copies (Awaiting Teacher Evaluation) -->
     <div id="pendingAnswerCopies" class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-3xl border border-amber-200 p-6 shadow-sm space-y-4">
         <div class="flex items-center justify-between">
@@ -114,6 +115,7 @@
         </div>
         {% endif %}
     </div>
+    {% endif %}
 
     <!-- 1-on-1 Mentoring Sessions (Assigned by Admin or Initiated by Teacher) -->
     <div id="mentoringSessions" class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">

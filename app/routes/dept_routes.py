@@ -7,7 +7,7 @@ from app.database import (
     get_notification_settings, update_notification_settings, get_ai_usage_metrics,
     list_certificates, get_all_departments, create_department, assign_user_to_department,
     get_completed_students_without_certificates, get_admin_pending_mentoring_sessions,
-    admin_assign_mentoring_teacher, notify_users
+    admin_assign_mentoring_teacher, notify_users, toggle_department_ans_writing
 )
 from app.auth import get_current_user, hash_password
 from app.utils import normalize_name, generate_unique_student_id
@@ -1753,7 +1753,8 @@ async def handle_create_department(
     description: str = Form(""),
     banner_url: str = Form(""),
     branding_tagline: str = Form("transforming education"),
-    welcome_message: str = Form("")
+    welcome_message: str = Form(""),
+    ans_writing_enabled: str = Form("0")
 ):
     """Admin-only: Creates an isolated department bucket."""
     user = require_dept_admin(request)
@@ -1762,16 +1763,37 @@ async def handle_create_department(
     if not clean_name:
         raise HTTPException(status_code=400, detail="Department name cannot be empty")
 
+    ans_flag = 1 if ans_writing_enabled in ["1", "true", "on", True] else 0
+
     new_dept = create_department(
         name=clean_name,
         code=code,
         description=description,
         banner_url=banner_url,
         tagline=branding_tagline or "transforming education",
-        welcome_message=welcome_message or f"Welcome to the {clean_name} Learning Portal."
+        welcome_message=welcome_message or f"Welcome to the {clean_name} Learning Portal.",
+        ans_writing_enabled=ans_flag
     )
-    log_audit(user["id"], "CREATE_DEPARTMENT", "departments", str(new_dept.get("id")), f"Created new department bucket '{clean_name}'")
+    log_audit(user["id"], "CREATE_DEPARTMENT", "departments", str(new_dept.get("id")), f"Created new department bucket '{clean_name}' (ANS Writing: {'Enabled' if ans_flag else 'Disabled'})")
     return RedirectResponse(url="/department?tab=departments&dept_created=1", status_code=303)
+
+@router.post("/department/departments/{dept_id}/toggle-ans-writing")
+async def handle_toggle_ans_writing(request: Request, dept_id: int):
+    """Admin-only: Toggles the Answer Writing feature requirement for a department."""
+    user = require_dept_admin(request)
+    dept = toggle_department_ans_writing(dept_id, admin_user_id=user["id"])
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+        
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        return JSONResponse({
+            "status": "success",
+            "department_id": dept_id,
+            "department_name": dept["name"],
+            "ans_writing_enabled": dept["ans_writing_enabled"]
+        })
+    return RedirectResponse(url=f"/department?tab=departments&ans_toggled={dept_id}", status_code=303)
 
 @router.post("/department/users/assign-department")
 async def handle_assign_user_department(request: Request):

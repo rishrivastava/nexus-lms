@@ -433,16 +433,25 @@ def init_db():
             banner_url TEXT,
             branding_tagline TEXT DEFAULT 'transforming education',
             welcome_message TEXT,
+            ans_writing_enabled INTEGER DEFAULT 1,      -- 1 = Answer Writing Enabled, 0 = Disabled
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
 
+        # Migration check: ensure ans_writing_enabled column exists in departments
+        cursor.execute("PRAGMA table_info(departments)")
+        dept_existing_cols = {row["name"] for row in cursor.fetchall()}
+        if "ans_writing_enabled" not in dept_existing_cols:
+            cursor.execute("ALTER TABLE departments ADD COLUMN ans_writing_enabled INTEGER DEFAULT 1")
+            cursor.execute("UPDATE departments SET ans_writing_enabled = 0 WHERE name = 'Foreign Language'")
+            cursor.execute("UPDATE departments SET ans_writing_enabled = 1 WHERE name IN ('Test Prep', 'UPSC Coaching')")
+
         # Seed initial core departments (Foreign Language and Test Prep)
         cursor.execute("""
-        INSERT OR IGNORE INTO departments (name, code, description, banner_url, branding_tagline, welcome_message)
+        INSERT OR IGNORE INTO departments (name, code, description, banner_url, branding_tagline, welcome_message, ans_writing_enabled)
         VALUES 
-        ('Foreign Language', 'FOREIGN_LANG', 'World Languages, Linguistic Proficiency & Conversational Fluency', 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&auto=format&fit=crop&q=80', 'transforming education', 'Welcome to the Foreign Language Learning Portal. Master world languages with curated modules, interactive videos, and speaking practice.'),
-        ('Test Prep', 'TEST_PREP', 'Standardized Exam Preparation, Mock Drills & Competitive Testing', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&auto=format&fit=crop&q=80', 'transforming education', 'Welcome to the Test Prep Portal. Accelerate your performance with targeted practice tests, analytics, and instructor-led strategies.')
+        ('Foreign Language', 'FOREIGN_LANG', 'World Languages, Linguistic Proficiency & Conversational Fluency', 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&auto=format&fit=crop&q=80', 'transforming education', 'Welcome to the Foreign Language Learning Portal. Master world languages with curated modules, interactive videos, and speaking practice.', 0),
+        ('Test Prep', 'TEST_PREP', 'Standardized Exam Preparation, Mock Drills & Competitive Testing', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&auto=format&fit=crop&q=80', 'transforming education', 'Welcome to the Test Prep Portal. Accelerate your performance with targeted practice tests, analytics, and instructor-led strategies.', 1)
         """)
 
         # 19. Live Classes & Sessions Table
@@ -684,7 +693,9 @@ def create_notification(user_id: int, title: str, message: str, link_url: str = 
     except Exception as e:
         print(f"Error creating notification: {e}")
 
-def notify_users(user_ids: list, title: str, message: str, link_url: str = None, category: str = "general", event_type: str = None, conn=None):
+def notify_users(user_ids: list, title: str, message: str, link_url: str = None, category: str = "general", event_type: str = None, conn=None, link: str = None):
+    if link is not None and link_url is None:
+        link_url = link
     if not user_ids:
         return
     try:
@@ -1259,13 +1270,14 @@ def get_department_by_name(name: str, conn=None) -> dict:
             "description": f"{name} Academic Department",
             "banner_url": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&auto=format&fit=crop&q=80",
             "branding_tagline": "transforming education",
-            "welcome_message": f"Welcome to the {name} Portal."
+            "welcome_message": f"Welcome to the {name} Portal.",
+            "ans_writing_enabled": 0 if name == "Foreign Language" else 1
         }
     finally:
         if should_close:
             conn.close()
 
-def create_department(name: str, code: str = None, description: str = "", banner_url: str = "", tagline: str = "transforming education", welcome_message: str = "") -> dict:
+def create_department(name: str, code: str = None, description: str = "", banner_url: str = "", tagline: str = "transforming education", welcome_message: str = "", ans_writing_enabled: int = 1) -> dict:
     """Creates a new isolated department bucket or updates existing."""
     clean_name = name.strip()
     clean_code = code.strip().upper().replace(" ", "_") if code and code.strip() else clean_name.upper().replace(" ", "_")[:12]
@@ -1280,19 +1292,70 @@ def create_department(name: str, code: str = None, description: str = "", banner
         if existing:
             cursor.execute("""
                 UPDATE departments 
-                SET description = ?, banner_url = ?, branding_tagline = ?, welcome_message = ?
+                SET description = ?, banner_url = ?, branding_tagline = ?, welcome_message = ?, ans_writing_enabled = ?
                 WHERE id = ?
-            """, (description.strip() or existing["description"], clean_banner or existing["banner_url"], clean_tagline, clean_welcome, existing["id"]))
+            """, (description.strip() or existing["description"], clean_banner or existing["banner_url"], clean_tagline, clean_welcome, ans_writing_enabled, existing["id"]))
             cursor.execute("SELECT * FROM departments WHERE id = ?", (existing["id"],))
             return dict(cursor.fetchone())
 
         cursor.execute("""
-            INSERT INTO departments (name, code, description, banner_url, branding_tagline, welcome_message)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (clean_name, clean_code, description.strip(), clean_banner, clean_tagline, clean_welcome))
+            INSERT INTO departments (name, code, description, banner_url, branding_tagline, welcome_message, ans_writing_enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (clean_name, clean_code, description.strip(), clean_banner, clean_tagline, clean_welcome, ans_writing_enabled))
         dept_id = cursor.lastrowid
         cursor.execute("SELECT * FROM departments WHERE id = ?", (dept_id,))
         return dict(cursor.fetchone())
+
+def toggle_department_ans_writing(department_id: int, admin_user_id: int = None) -> dict:
+    """Toggles the Answer Writing feature (Mains PDF answer sheets & evaluation) on/off for a department."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, ans_writing_enabled FROM departments WHERE id = ?", (department_id,))
+        dept = cursor.fetchone()
+        if not dept:
+            return None
+        current_state = dept["ans_writing_enabled"] if dept["ans_writing_enabled"] is not None else 1
+        new_state = 0 if current_state == 1 else 1
+        cursor.execute("UPDATE departments SET ans_writing_enabled = ? WHERE id = ?", (new_state, department_id))
+        if admin_user_id:
+            status_label = "ENABLED" if new_state == 1 else "DISABLED"
+            log_audit(admin_user_id, "TOGGLE_ANS_WRITING", "departments", str(department_id), f"Toggled Answer Writing feature for '{dept['name']}' to {status_label}", conn=conn)
+        cursor.execute("SELECT * FROM departments WHERE id = ?", (department_id,))
+        return dict(cursor.fetchone())
+
+def is_ans_writing_enabled_for_course(course_id: int) -> bool:
+    """Checks whether Answer Writing is enabled for the department of the given course."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT d.ans_writing_enabled
+            FROM courses c
+            JOIN departments d ON LOWER(c.department) = LOWER(d.name)
+            WHERE c.id = ?
+        """, (course_id,))
+        row = cursor.fetchone()
+        if row is not None and row[0] is not None:
+            return bool(row[0])
+        cursor.execute("SELECT department FROM courses WHERE id = ?", (course_id,))
+        c_row = cursor.fetchone()
+        if c_row and c_row["department"]:
+            cursor.execute("SELECT ans_writing_enabled FROM departments WHERE name = ? COLLATE NOCASE", (c_row["department"].strip(),))
+            d_row = cursor.fetchone()
+            if d_row and d_row[0] is not None:
+                return bool(d_row[0])
+        return True
+
+def is_ans_writing_enabled_for_department(dept_name: str) -> bool:
+    """Checks whether Answer Writing is enabled for a given department name."""
+    if not dept_name:
+        return True
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT ans_writing_enabled FROM departments WHERE name = ? COLLATE NOCASE", (dept_name.strip(),))
+        row = cursor.fetchone()
+        if row is not None and row[0] is not None:
+            return bool(row[0])
+        return True
 
 def assign_user_to_department(user_id: int, department_name: str, admin_user_id: int = None) -> bool:
     """Moves a student or teacher into a specific department bucket."""
