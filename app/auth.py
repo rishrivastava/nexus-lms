@@ -64,7 +64,10 @@ def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
                     SELECT c.id, c.code, c.title
                     FROM enrollments e
                     JOIN courses c ON e.course_id = c.id
-                    WHERE e.user_id = ? AND c.status != 'deleted'
+                    WHERE e.user_id = ? 
+                      AND c.is_published = 1 
+                      AND c.status = 'published' 
+                      AND c.deleted_at IS NULL
                     ORDER BY e.enrolled_at DESC
                 """, (user_dict["id"],))
                 courses = [dict(c) for c in cursor.fetchall()]

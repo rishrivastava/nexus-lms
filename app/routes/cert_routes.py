@@ -95,7 +95,7 @@ async def student_course_certificate(request: Request, course_id: int):
         cursor.execute("""
             SELECT * FROM certificates 
             WHERE student_id = ? AND course_id = ? AND status != 'revoked'
-            ORDER BY created_at DESC LIMIT 1
+            ORDER BY issued_at DESC, id DESC LIMIT 1
         """, (user["id"], course_id))
         cert = cursor.fetchone()
         if cert:

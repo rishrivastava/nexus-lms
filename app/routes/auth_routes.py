@@ -188,6 +188,9 @@ async def view_profile(request: Request):
                 FROM enrollments e
                 JOIN courses c ON e.course_id = c.id
                 WHERE e.user_id = ?
+                  AND c.is_published = 1
+                  AND c.status = 'published'
+                  AND c.deleted_at IS NULL
                 ORDER BY e.enrolled_at DESC
             """, (user["id"], user["id"]))
             for r in cursor.fetchall():
@@ -205,6 +208,9 @@ async def view_profile(request: Request):
                 JOIN modules m ON l.module_id = m.id
                 JOIN courses c ON m.course_id = c.id
                 WHERE qa.user_id = ?
+                  AND c.is_published = 1
+                  AND c.status = 'published'
+                  AND c.deleted_at IS NULL
                 ORDER BY qa.attempted_at DESC
                 LIMIT 20
             """, (user["id"],))

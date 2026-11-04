@@ -72,8 +72,8 @@ async def student_dashboard(request: Request):
               AND c.is_published = 1 
               AND c.status = 'published' 
               AND c.deleted_at IS NULL
-              AND (c.department = ? OR ? = '')
-        """, (user["id"], user["id"], user["id"], dept_name, dept_name))
+            ORDER BY e.enrolled_at DESC
+        """, (user["id"], user["id"], user["id"]))
         
         courses_raw = cursor.fetchall()
         courses = []
@@ -134,16 +134,10 @@ async def course_player(request: Request, course_id: int, lesson_id: int = None)
         # Update user's last_active_at timestamp
         cursor.execute("UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?", (user["id"],))
 
-        # Enforce strict assignment & department isolation: Students can only access courses assigned to them
+        # Enforce strict assignment: Students can only access courses explicitly assigned to them
         if user["role"] == "student":
             cursor.execute("SELECT id FROM enrollments WHERE user_id = ? AND course_id = ?", (user["id"], course_id))
             if not cursor.fetchone():
-                return templates.TemplateResponse("unauthorized_course.html", {
-                    "request": request,
-                    "user": user,
-                    "course": dict(course)
-                }, status_code=403)
-            if user.get("department") and course["department"] != user["department"]:
                 return templates.TemplateResponse("unauthorized_course.html", {
                     "request": request,
                     "user": user,
@@ -222,7 +216,7 @@ async def course_player(request: Request, course_id: int, lesson_id: int = None)
         cursor.execute("""
             SELECT certificate_id FROM certificates 
             WHERE student_id = ? AND course_id = ? AND status != 'revoked'
-            ORDER BY created_at DESC LIMIT 1
+            ORDER BY issued_at DESC, id DESC LIMIT 1
         """, (user["id"], course_id))
         cert_row = cursor.fetchone()
         issued_certificate_id = cert_row[0] if cert_row else None

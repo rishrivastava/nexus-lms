@@ -816,16 +816,17 @@ async def delete_course(
 
         if deletion_mode == "archive":
             cursor.execute("UPDATE courses SET is_published = 2, status = 'archived', archived_at = CURRENT_TIMESTAMP WHERE id = ?", (course_id,))
-            notify_users(enrolled_ids, f"Course Archived: {course['title']}", f"The course '{course['title']}' has been archived by the department.", None, "course", "course_status_changed")
+            notify_users(enrolled_ids, f"Course Archived: {course['title']}", f"The course '{course['title']}' has been archived by the department.", None, "course", "course_status_changed", conn=conn)
             log_audit(user["id"], "COURSE_ARCHIVE", "courses", str(course_id), f"Archived course {course['title']} ({len(enrolled_ids)} students)", conn=conn)
         elif deletion_mode == "unpublish":
             cursor.execute("UPDATE courses SET is_published = 0, status = 'draft' WHERE id = ?", (course_id,))
-            notify_users(enrolled_ids, f"Course Unpublished: {course['title']}", f"The course '{course['title']}' has been temporarily unpublished.", None, "course", "course_status_changed")
+            notify_users(enrolled_ids, f"Course Unpublished: {course['title']}", f"The course '{course['title']}' has been temporarily unpublished.", None, "course", "course_status_changed", conn=conn)
             log_audit(user["id"], "COURSE_UNPUBLISH", "courses", str(course_id), f"Unpublished course {course['title']} to draft", conn=conn)
         else:
             # Soft delete to preserve audit & analytics history without breaking foreign keys
             cursor.execute("UPDATE courses SET is_published = 0, status = 'deleted', deleted_at = CURRENT_TIMESTAMP WHERE id = ?", (course_id,))
-            notify_users(enrolled_ids, f"Course Removed: {course['title']}", f"The course '{course['title']}' has been removed from your active curriculum.", None, "course", "course_status_changed")
+            cursor.execute("DELETE FROM enrollments WHERE course_id = ?", (course_id,))
+            notify_users(enrolled_ids, f"Course Removed: {course['title']}", f"The course '{course['title']}' has been removed from your active curriculum.", None, "course", "course_status_changed", conn=conn)
             log_audit(user["id"], "COURSE_DELETE", "courses", str(course_id), f"Deleted course {course['title']} ({len(enrolled_ids)} enrolled students affected)", conn=conn)
 
     return RedirectResponse(url="/department?tab=courses&course_deleted=1", status_code=303)

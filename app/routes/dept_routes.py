@@ -647,13 +647,14 @@ async def department_dashboard(
                 COALESCE(u.district, '') as district,
                 COALESCE(u.state, '') as state,
                 COALESCE(u.pincode, '') as pincode,
-                COUNT(DISTINCT e.course_id) as enrolled_courses_count,
-                COUNT(DISTINCT CASE WHEN e.completed_at IS NOT NULL THEN e.course_id END) as completed_courses_count,
-                (SELECT GROUP_CONCAT(c.code, ', ') FROM enrollments e2 JOIN courses c ON e2.course_id = c.id WHERE e2.user_id = u.id AND c.status != 'deleted') as assigned_course_codes,
+                COUNT(DISTINCT CASE WHEN c_sub.is_published = 1 AND c_sub.status = 'published' AND c_sub.deleted_at IS NULL THEN e.course_id END) as enrolled_courses_count,
+                COUNT(DISTINCT CASE WHEN e.completed_at IS NOT NULL AND c_sub.is_published = 1 AND c_sub.status = 'published' AND c_sub.deleted_at IS NULL THEN e.course_id END) as completed_courses_count,
+                (SELECT GROUP_CONCAT(c.code, ', ') FROM enrollments e2 JOIN courses c ON e2.course_id = c.id WHERE e2.user_id = u.id AND c.is_published = 1 AND c.status = 'published' AND c.deleted_at IS NULL) as assigned_course_codes,
                 (SELECT COUNT(*) FROM lesson_progress lp WHERE lp.user_id = u.id AND lp.is_completed = 1) as completed_lessons_count,
                 (SELECT COALESCE(AVG(qa.score_percent), 0) FROM quiz_attempts qa WHERE qa.user_id = u.id) as avg_quiz_score
             FROM users u
             LEFT JOIN enrollments e ON u.id = e.user_id
+            LEFT JOIN courses c_sub ON e.course_id = c_sub.id
             WHERE u.role = 'student'{dept_filter_sql}
             GROUP BY u.id
             ORDER BY u.user_id ASC
@@ -791,36 +792,58 @@ async def assign_course_to_students(
     user = require_dept_admin_or_teacher(request)
     
     assigned_count = 0
+    assigned_user_ids = []
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Verify course exists
-        cursor.execute("SELECT id, title FROM courses WHERE id = ?", (course_id,))
+        # Verify course exists and is published
+        cursor.execute("SELECT id, title, department FROM courses WHERE id = ? AND is_published = 1 AND status = 'published' AND deleted_at IS NULL", (course_id,))
         course = cursor.fetchone()
         if not course:
-            raise HTTPException(status_code=404, detail="Course not found")
+            raise HTTPException(status_code=404, detail="Course not found or inactive")
 
         # 1. Assign by comma-separated student IDs or user_ids
         if student_ids and student_ids.strip():
             raw_ids = [i.strip() for i in student_ids.replace("\n", ",").replace(";", ",").split(",") if i.strip()]
             for uid in raw_ids:
-                cursor.execute("SELECT id FROM users WHERE (user_id = ? OR id = ?) AND role = 'student'", (uid, uid))
+                cursor.execute("""
+                    SELECT id, department FROM users 
+                    WHERE (LOWER(user_id) = LOWER(?) OR CAST(id AS TEXT) = ?) AND role = 'student'
+                """, (uid, uid))
                 st = cursor.fetchone()
                 if st:
                     cursor.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, ?)", (st["id"], course_id))
                     assigned_count += 1
+                    assigned_user_ids.append(st["id"])
+                    if not st["department"] and course["department"]:
+                        cursor.execute("UPDATE users SET department = ? WHERE id = ?", (course["department"], st["id"]))
 
         # 2. Assign by entire School / District batch
         if school_filter and school_filter.strip() and school_filter != "all":
             clean_school = school_filter.strip()
             cursor.execute("""
-                SELECT id FROM users 
+                SELECT id, department FROM users 
                 WHERE (school_name = ? OR district = ? OR department = ?) AND role = 'student'
             """, (clean_school, clean_school, clean_school))
             batch_students = cursor.fetchall()
             for st in batch_students:
                 cursor.execute("INSERT OR IGNORE INTO enrollments (user_id, course_id) VALUES (?, ?)", (st["id"], course_id))
                 assigned_count += 1
+                assigned_user_ids.append(st["id"])
+                if not st["department"] and course["department"]:
+                    cursor.execute("UPDATE users SET department = ? WHERE id = ?", (course["department"], st["id"]))
+
+        if assigned_user_ids:
+            notify_users(
+                assigned_user_ids,
+                f"Course Assigned: {course['title']}",
+                f"You have been enrolled in '{course['title']}'. Start learning now!",
+                link_url=f"/course/{course_id}",
+                category="course",
+                event_type="course_assigned",
+                conn=conn
+            )
+        log_audit(user["id"], "ASSIGN_COURSE", "courses", str(course_id), f"Assigned course {course['title']} to {assigned_count} students", conn=conn)
 
     return RedirectResponse(url=f"/department?tab=courses&assigned={assigned_count}", status_code=303)
 
@@ -828,12 +851,24 @@ async def assign_course_to_students(
 async def unassign_course_from_student(
     request: Request,
     course_id: int = Form(...),
-    user_id: int = Form(...)
+    user_id: str = Form(...)
 ):
-    require_dept_admin_or_teacher(request)
+    admin = require_dept_admin_or_teacher(request)
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM enrollments WHERE user_id = ? AND course_id = ?", (user_id, course_id))
+        target_id = None
+        clean_uid = str(user_id).strip()
+        if clean_uid.isdigit():
+            target_id = int(clean_uid)
+        else:
+            cursor.execute("SELECT id FROM users WHERE user_id = ? OR id = ?", (clean_uid, clean_uid))
+            row = cursor.fetchone()
+            if row:
+                target_id = row["id"]
+        
+        if target_id is not None:
+            cursor.execute("DELETE FROM enrollments WHERE user_id = ? AND course_id = ?", (target_id, course_id))
+            log_audit(admin["id"], "UNENROLL_STUDENT", "enrollments", f"{target_id}:{course_id}", f"Unassigned student #{target_id} ({clean_uid}) from course #{course_id}", conn=conn)
     return RedirectResponse(url="/department?tab=courses&unassigned=1", status_code=303)
 
 @router.post("/department/teachers/add")
@@ -1199,7 +1234,7 @@ async def export_department_csv(request: Request, department: str = None):
                 COALESCE(u.district, '') as "DISTRICT",
                 COALESCE(u.state, '') as "STATE",
                 COALESCE(u.pincode, '') as "PINCODE",
-                COALESCE((SELECT GROUP_CONCAT(c.code, '; ') FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE e.user_id = u.id), 'None') as "ASSIGNED COURSES",
+                COALESCE((SELECT GROUP_CONCAT(c.code, '; ') FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE e.user_id = u.id AND c.is_published = 1 AND c.status = 'published' AND c.deleted_at IS NULL), 'None') as "ASSIGNED COURSES",
                 COALESCE(u.email, 'Not Linked') as "EMAIL",
                 CASE WHEN u.must_change_password = 1 THEN 'Temporary Password' ELSE 'Active' END as "ACCOUNT STATUS",
                 COUNT(DISTINCT e.course_id) as "COURSES ENROLLED",
@@ -1753,16 +1788,14 @@ async def handle_assign_user_department(request: Request):
     if not user_id or not department_name:
         raise HTTPException(status_code=400, detail="Missing user_id or department_name")
 
-    try:
-        uid_int = int(user_id)
-    except Exception:
-        with get_db() as conn:
-            c = conn.cursor()
-            c.execute("SELECT id FROM users WHERE user_id = ? OR id = ?", (str(user_id), str(user_id)))
-            r = c.fetchone()
-            if not r:
-                raise HTTPException(status_code=400, detail=f"User {user_id} not found")
-            uid_int = r["id"]
+    with get_db() as conn:
+        c = conn.cursor()
+        clean_uid = str(user_id).strip()
+        c.execute("SELECT id, user_id, full_name FROM users WHERE id = ? OR LOWER(user_id) = LOWER(?)", (clean_uid, clean_uid))
+        r = c.fetchone()
+        if not r:
+            raise HTTPException(status_code=400, detail=f"User '{user_id}' not found")
+        uid_int = r["id"]
 
     success = assign_user_to_department(user_id=uid_int, department_name=str(department_name).strip(), admin_user_id=user["id"])
     if not success:
