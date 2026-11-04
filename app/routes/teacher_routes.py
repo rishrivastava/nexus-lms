@@ -748,7 +748,7 @@ async def edit_course(
         if notify_students:
             cursor.execute("SELECT user_id FROM enrollments WHERE course_id = ?", (course_id,))
             enrolled_ids = [r[0] for r in cursor.fetchall()]
-            notify_users(enrolled_ids, f"Course Update: {title}", f"The course details and learning materials for '{title}' have been updated.", f"/course/{course_id}", "course", "content_published")
+            notify_users(enrolled_ids, f"Course Update: {title}", f"The course details and learning materials for '{title}' have been updated.", f"/course/{course_id}", "course", "content_published", conn=conn)
 
     return RedirectResponse(url=f"/teacher/course/{course_id}?saved=1", status_code=303)
 
@@ -770,7 +770,7 @@ async def archive_course(request: Request, course_id: int):
         # Notify enrolled students
         cursor.execute("SELECT user_id FROM enrollments WHERE course_id = ?", (course_id,))
         enrolled_ids = [r[0] for r in cursor.fetchall()]
-        notify_users(enrolled_ids, f"Course Archived: {course['title']}", f"The course '{course['title']}' has been archived by the department.", None, "course", "course_status_changed")
+        notify_users(enrolled_ids, f"Course Archived: {course['title']}", f"The course '{course['title']}' has been archived by the department.", None, "course", "course_status_changed", conn=conn)
         
         log_audit(user["id"], "COURSE_ARCHIVE", "courses", str(course_id), f"Archived course {course['title']} ({len(enrolled_ids)} enrolled students affected)", conn=conn)
 

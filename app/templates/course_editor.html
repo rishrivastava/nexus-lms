@@ -257,7 +257,14 @@
                             {% endif %}
                         </td>
                         <td class="p-3.5 text-right">
-                            <button onclick="openEvaluationModal({{ ans.id }}, '{{ ans.student_name|replace(\"'\", \"\\\\'\") }}', '{{ ans.marks_awarded or '' }}', '{{ ans.feedback|replace(\"'\", \"\\\\'\") if ans.feedback else '' }}', '{{ ans.original_filename|replace(\"'\", \"\\\\'\") }}', '/static/uploads/{{ ans.file_path }}')"
+                            <button type="button"
+                                data-sub-id="{{ ans.id }}"
+                                data-student="{{ ans.student_name }}"
+                                data-marks="{{ ans.marks_awarded or '' }}"
+                                data-feedback="{{ ans.feedback or '' }}"
+                                data-filename="{{ ans.original_filename }}"
+                                data-filepath="{{ ans.file_path if ans.file_path.startswith('/') else ('/static/uploads/' + ans.file_path) }}"
+                                onclick="triggerOpenEvaluationModal(this)"
                                 class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 transition">
                                 <i class="fa-solid fa-pen-ruler"></i>
                                 <span>{% if ans.status == 'evaluated' %}Re-Evaluate{% else %}Evaluate & Grade{% endif %}</span>
@@ -1430,6 +1437,16 @@ async function deleteLiveClassSession(id) {
 }
 
 // Evaluate Candidate Answer Sheet
+function triggerOpenEvaluationModal(btn) {
+    const subId = btn.getAttribute('data-sub-id');
+    const student = btn.getAttribute('data-student') || '';
+    const marks = btn.getAttribute('data-marks') || '';
+    const feedback = btn.getAttribute('data-feedback') || '';
+    const filename = btn.getAttribute('data-filename') || '';
+    const filepath = btn.getAttribute('data-filepath') || '#';
+    openEvaluationModal(subId, student, marks, feedback, filename, filepath);
+}
+
 function openEvaluationModal(submissionId, studentName, marks, feedback, fileName, fileUrl) {
     document.getElementById('evalSubmissionId').value = submissionId;
     document.getElementById('evalStudentName').innerText = studentName;
