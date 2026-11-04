@@ -454,6 +454,32 @@ def init_db():
         ('Test Prep', 'TEST_PREP', 'Standardized Exam Preparation, Mock Drills & Competitive Testing', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&auto=format&fit=crop&q=80', 'transforming education', 'Welcome to the Test Prep Portal. Accelerate your performance with targeted practice tests, analytics, and instructor-led strategies.', 1)
         """)
 
+        # 18b. Teacher Departments Mapping Table (One teacher can be in multiple departments)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS teacher_departments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            teacher_id INTEGER NOT NULL,
+            department_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(teacher_id, department_id),
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
+        );
+        """)
+
+        # Migration: populate teacher_departments for any existing teachers based on users.department
+        cursor.execute("""
+            INSERT OR IGNORE INTO teacher_departments (teacher_id, department_id)
+            SELECT u.id, d.id
+            FROM users u
+            JOIN departments d ON (
+                ',' || u.department || ',' LIKE '%,' || d.name || ',%'
+                OR u.department = d.name
+                OR (d.name = 'Foreign Language' AND (u.department IS NULL OR u.department = ''))
+            )
+            WHERE u.role = 'teacher';
+        """)
+
         # 19. Live Classes & Sessions Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS live_classes (
@@ -1365,9 +1391,122 @@ def assign_user_to_department(user_id: int, department_name: str, admin_user_id:
     """Moves a student or teacher into a specific department bucket."""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("UPDATE users SET department = ? WHERE id = ?", (department_name.strip(), user_id))
+        clean_dept = department_name.strip()
+        cursor.execute("UPDATE users SET department = ? WHERE id = ?", (clean_dept, user_id))
+        
+        # If user is a teacher, also update/ensure teacher_departments mapping
+        cursor.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+        u_role = cursor.fetchone()
+        if u_role and u_role["role"] == "teacher":
+            cursor.execute("SELECT id FROM departments WHERE name = ? COLLATE NOCASE", (clean_dept,))
+            d_row = cursor.fetchone()
+            if d_row:
+                cursor.execute("INSERT OR IGNORE INTO teacher_departments (teacher_id, department_id) VALUES (?, ?)", (user_id, d_row["id"]))
+        
         if admin_user_id:
             log_audit(admin_user_id, "ASSIGN_DEPARTMENT", "users", str(user_id), f"Moved user #{user_id} into department '{department_name}'", conn=conn)
+        return True
+
+def get_teacher_departments(teacher_id: int, conn=None) -> list:
+    """Returns all department records assigned to a specific teacher."""
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT d.* 
+            FROM departments d
+            JOIN teacher_departments td ON d.id = td.department_id
+            WHERE td.teacher_id = ?
+            ORDER BY d.name ASC
+        """, (teacher_id,))
+        return [dict(r) for r in cursor.fetchall()]
+    else:
+        with get_db() as c:
+            cursor = c.cursor()
+            cursor.execute("""
+                SELECT d.* 
+                FROM departments d
+                JOIN teacher_departments td ON d.id = td.department_id
+                WHERE td.teacher_id = ?
+                ORDER BY d.name ASC
+            """, (teacher_id,))
+            return [dict(r) for r in cursor.fetchall()]
+
+def set_teacher_departments(teacher_id: int, department_ids: list, admin_user_id: int = None) -> bool:
+    """Assigns a teacher to one or more departments (supports multiple departments)."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Clear existing mappings
+        cursor.execute("DELETE FROM teacher_departments WHERE teacher_id = ?", (teacher_id,))
+        dept_names = []
+        for did in department_ids:
+            try:
+                did_int = int(did)
+                cursor.execute("SELECT name FROM departments WHERE id = ?", (did_int,))
+                d_row = cursor.fetchone()
+                if d_row:
+                    cursor.execute("INSERT OR IGNORE INTO teacher_departments (teacher_id, department_id) VALUES (?, ?)", (teacher_id, did_int))
+                    dept_names.append(d_row["name"])
+            except (ValueError, TypeError):
+                continue
+        # Also sync users.department with primary or comma-separated names
+        dept_str = ", ".join(dept_names) if dept_names else ""
+        if dept_str:
+            cursor.execute("UPDATE users SET department = ? WHERE id = ?", (dept_str, teacher_id))
+        if admin_user_id:
+            log_audit(admin_user_id, "ASSIGN_TEACHER_DEPTS", "users", str(teacher_id), f"Assigned teacher #{teacher_id} to departments: {dept_str}", conn=conn)
+        return True
+
+def get_available_courses_for_teacher(teacher_id: int) -> list:
+    """Returns all published courses belonging to the departments that the teacher is assigned to."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT c.*, (SELECT full_name FROM users WHERE id = c.teacher_id) as current_teacher_name
+            FROM courses c
+            JOIN departments d ON c.department = d.name COLLATE NOCASE
+            JOIN teacher_departments td ON d.id = td.department_id
+            WHERE td.teacher_id = ? AND c.status != 'deleted'
+            ORDER BY c.title ASC
+        """, (teacher_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def assign_teacher_to_course(course_id: int, teacher_id: int, admin_user_id: int = None) -> bool:
+    """
+    Assigns a course to a teacher.
+    Validates the admin flow: Teacher MUST belong to the course's department first!
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM courses WHERE id = ?", (course_id,))
+        course = cursor.fetchone()
+        if not course:
+            raise ValueError(f"Course #{course_id} does not exist.")
+        
+        # Verify teacher belongs to the course's department
+        cursor.execute("""
+            SELECT td.id
+            FROM teacher_departments td
+            JOIN departments d ON td.department_id = d.id
+            WHERE td.teacher_id = ? AND d.name = ? COLLATE NOCASE
+        """, (teacher_id, course["department"]))
+        
+        has_dept = cursor.fetchone()
+        if not has_dept:
+            # Check fallback to users.department
+            cursor.execute("SELECT department FROM users WHERE id = ? AND role = 'teacher'", (teacher_id,))
+            u_row = cursor.fetchone()
+            if not u_row or (course["department"] not in (u_row["department"] or "")):
+                raise ValueError(f"Cannot assign course '{course['title']}': Teacher is not assigned to the '{course['department']}' department. First assign the teacher to the department.")
+            else:
+                # Sync into teacher_departments
+                cursor.execute("SELECT id FROM departments WHERE name = ? COLLATE NOCASE", (course["department"],))
+                d_row = cursor.fetchone()
+                if d_row:
+                    cursor.execute("INSERT OR IGNORE INTO teacher_departments (teacher_id, department_id) VALUES (?, ?)", (teacher_id, d_row["id"]))
+
+        cursor.execute("UPDATE courses SET teacher_id = ? WHERE id = ?", (teacher_id, course_id))
+        if admin_user_id:
+            log_audit(admin_user_id, "ASSIGN_COURSE_TEACHER", "courses", str(course_id), f"Assigned course '{course['title']}' to teacher #{teacher_id}", conn=conn)
         return True
 
 # ===================================================================
@@ -1575,6 +1714,70 @@ def complete_answer_sheet_evaluation(submission_id: int, marks_awarded: float, m
             WHERE a.id = ?
         """, (submission_id,))
         return dict(cursor.fetchone())
+
+def get_teacher_all_answer_sheets(teacher_id: int) -> list:
+    """Returns all answer sheet submissions (both pending and evaluated) for courses assigned to this teacher."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.*, u.full_name as student_name, u.user_id as student_user_id, u.email as student_email,
+                   u.guardian_name, u.school_name,
+                   c.title as course_title, c.code as course_code, c.department as course_dept,
+                   m.title as module_title, l.title as lesson_title,
+                   evaluator.full_name as evaluator_name
+            FROM answer_sheet_submissions a
+            JOIN courses c ON a.course_id = c.id
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN modules m ON a.module_id = m.id
+            LEFT JOIN lessons l ON a.lesson_id = l.id
+            LEFT JOIN users evaluator ON a.evaluated_by = evaluator.id
+            WHERE c.teacher_id = ?
+            ORDER BY a.created_at DESC
+        """, (teacher_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_all_answer_sheets_summary(department: str = None, status: str = None) -> dict:
+    """Returns all answer sheet submissions across the platform with aggregated statistics for admin monitoring."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT a.*, u.full_name as student_name, u.user_id as student_user_id, u.email as student_email,
+                   u.department as student_department, u.school_name,
+                   c.title as course_title, c.code as course_code, c.department as course_dept,
+                   teacher.full_name as teacher_name, teacher.user_id as teacher_user_id,
+                   evaluator.full_name as evaluator_name
+            FROM answer_sheet_submissions a
+            JOIN courses c ON a.course_id = c.id
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN users teacher ON c.teacher_id = teacher.id
+            LEFT JOIN users evaluator ON a.evaluated_by = evaluator.id
+            WHERE 1=1
+        """
+        params = []
+        if department and department != "all":
+            query += " AND (c.department = ? OR u.department = ?)"
+            params.extend([department, department])
+        if status and status != "all":
+            query += " AND a.status = ?"
+            params.append(status)
+            
+        query += " ORDER BY a.created_at DESC"
+        cursor.execute(query, params)
+        submissions = [dict(r) for r in cursor.fetchall()]
+        
+        total_count = len(submissions)
+        evaluated_count = sum(1 for s in submissions if s.get("status") == "evaluated")
+        pending_count = total_count - evaluated_count
+        eval_rate = round((evaluated_count / total_count * 100), 1) if total_count > 0 else 0.0
+        
+        return {
+            "submissions": submissions,
+            "total_count": total_count,
+            "evaluated_count": evaluated_count,
+            "pending_count": pending_count,
+            "evaluation_rate": eval_rate
+        }
 
 def get_completed_students_without_certificates() -> list:
     """

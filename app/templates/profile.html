@@ -29,7 +29,7 @@
         <div class="flex-1 text-center sm:text-left space-y-1">
             <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                 <h1 class="text-2xl font-bold text-slate-900">
-                    Welcome {% if user.role == 'teacher' %}Teacher{% elif user.role == 'student' %}Student{% elif user.role in ['department_admin', 'dashboard_viewer'] %}Admin{% else %}User{% endif %} {{ user.full_name }}!
+                    Welcome {{ user.full_name }}!
                 </h1>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider
                     {% if user.role == 'department_admin' %}bg-purple-100 text-purple-800
@@ -200,37 +200,173 @@
 
     <!-- Teacher Profile View -->
     {% elif user.role == 'teacher' %}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Faculty Statistics</h3>
-            <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-center">
-                <span class="block text-2xl font-black text-indigo-700">{{ teacher_stats.unique_students }}</span>
-                <span class="text-xs text-indigo-900 font-semibold">Total Unique Students Taught</span>
+    <div class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+                <div>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Faculty Statistics</h3>
+                    <div class="space-y-2">
+                        <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-center">
+                            <span class="block text-2xl font-black text-indigo-700">{{ teacher_stats.unique_students }}</span>
+                            <span class="text-xs text-indigo-900 font-semibold">Total Unique Students Taught</span>
+                        </div>
+                        <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                            <span class="block text-2xl font-black text-slate-800">{{ teacher_stats.total_courses }}</span>
+                            <span class="text-xs text-slate-600 font-semibold">Active Authored Courses</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assigned Departments (Read-Only) -->
+                <div class="pt-2 border-t border-slate-100 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <i class="fa-solid fa-building-columns text-indigo-600"></i>
+                            <span>Assigned Department(s)</span>
+                        </h4>
+                        <span class="text-[10px] text-slate-400 font-bold flex items-center gap-1" title="Managed by Admin">
+                            <i class="fa-solid fa-lock text-[9px]"></i> Read-Only
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for d in teacher_departments_list %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+                            {{ d.name }}
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-slate-400 italic">No department assigned by admin yet</span>
+                        {% endfor %}
+                    </div>
+                    <p class="text-[10px] text-slate-400 leading-tight">Faculty department affiliations are managed strictly by Department Administration.</p>
+                </div>
+
+                <div class="pt-2 flex flex-col sm:flex-row gap-2">
+                    <a href="/teacher" class="flex-1 py-2 px-3 text-center bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
+                        <i class="fa-solid fa-chalkboard-user mr-1"></i> Teacher Studio
+                    </a>
+                    <a href="/teacher/dashboard" class="flex-1 py-2 px-3 text-center bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition">
+                        <i class="fa-solid fa-chart-line mr-1"></i> Dashboard
+                    </a>
+                </div>
             </div>
-            <div class="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center">
-                <span class="block text-2xl font-black text-slate-800">{{ teacher_stats.total_courses }}</span>
-                <span class="text-xs text-slate-600 font-semibold">Active Authored Courses</span>
+
+            <div class="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Assigned Classes & Courses</h3>
+                        <p class="text-[11px] text-slate-500">Only classes explicitly assigned to your profile are accessible.</p>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">{{ teacher_courses|length }} Classes</span>
+                </div>
+
+                <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    {% for tc in teacher_courses %}
+                    <div class="py-3 flex items-center justify-between">
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-700">{{ tc.code }}</span>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-50 text-purple-700">{{ tc.department }}</span>
+                            </div>
+                            <h4 class="font-bold text-xs text-slate-900 mt-1">{{ tc.title }}</h4>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs font-bold text-slate-700">{{ tc.enrolled_count }} students</span>
+                            <a href="/teacher/course/{{ tc.id }}" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition">
+                                Manage Class
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="p-8 text-center text-slate-400 text-xs">
+                        <i class="fa-solid fa-chalkboard text-2xl block mb-2 text-slate-300"></i>
+                        No courses assigned to your profile yet. Department Administration will assign courses belonging to your department.
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
 
-        <div class="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Authored Courses & Enrollment</h3>
-            <div class="divide-y divide-slate-100">
-                {% for tc in teacher_courses %}
-                <div class="py-3 flex items-center justify-between">
-                    <div>
-                        <span class="px-2 py-0.5 rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-700">{{ tc.code }}</span>
-                        <h4 class="font-bold text-xs text-slate-900 mt-1">{{ tc.title }}</h4>
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <span class="text-xs font-bold text-slate-700">{{ tc.enrolled_count }} students</span>
-                        <a href="/teacher/course/{{ tc.id }}" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition">
-                            Edit Course
-                        </a>
-                    </div>
+        <!-- Student Answer Sheets & Evaluations Repository (Visible on Teacher Profile) -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-100 gap-2">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-file-pdf text-rose-600"></i>
+                        <span>Enrolled Student Answer Sheets & Evaluations</span>
+                    </h3>
+                    <p class="text-xs text-slate-500">All student PDF answer copies submitted across your assigned classes with instant grading access.</p>
                 </div>
-                {% endfor %}
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                        {{ teacher_answer_sheets|length }} Submission(s)
+                    </span>
+                </div>
             </div>
+
+            {% if teacher_answer_sheets %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-200">
+                            <th class="py-3 px-3">Student</th>
+                            <th class="py-3 px-3">Course / Class</th>
+                            <th class="py-3 px-3">Submitted At</th>
+                            <th class="py-3 px-3 text-center">Answer PDF</th>
+                            <th class="py-3 px-3 text-center">Status & Marks</th>
+                            <th class="py-3 px-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for sub in teacher_answer_sheets %}
+                        <tr class="hover:bg-slate-50/70 transition">
+                            <td class="py-3 px-3">
+                                <div class="font-bold text-slate-900">{{ sub.student_name }}</div>
+                                <div class="text-[10px] font-mono text-slate-400">{{ sub.student_user_id }}</div>
+                            </td>
+                            <td class="py-3 px-3">
+                                <span class="font-bold text-slate-800">{{ sub.course_title }}</span>
+                                <span class="block text-[10px] font-mono text-indigo-600 font-bold">{{ sub.course_code }} &bull; {{ sub.course_dept }}</span>
+                            </td>
+                            <td class="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">
+                                {{ sub.created_at[:16] if sub.created_at else 'Recent' }}
+                            </td>
+                            <td class="py-3 px-3 text-center">
+                                <a href="/static/uploads/{{ sub.file_path }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition shadow-2xs">
+                                    <i class="fa-solid fa-file-pdf"></i>
+                                    <span>View PDF</span>
+                                </a>
+                            </td>
+                            <td class="py-3 px-3 text-center">
+                                {% if sub.status == 'evaluated' %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <i class="fa-solid fa-check-double mr-1 text-[10px]"></i> {{ sub.marks_awarded }}/{{ sub.max_marks }}
+                                </span>
+                                {% if sub.feedback %}
+                                <div class="text-[10px] text-slate-500 italic max-w-xs truncate mx-auto mt-0.5" title="{{ sub.feedback }}">{{ sub.feedback }}</div>
+                                {% endif %}
+                                {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <i class="fa-solid fa-clock mr-1 text-[10px]"></i> Pending Review
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-3 text-right">
+                                <a href="/teacher/course/{{ sub.course_id }}" class="inline-flex items-center gap-1 px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">
+                                    <span>{% if sub.status == 'evaluated' %}Re-Grade{% else %}Evaluate{% endif %}</span>
+                                    <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-8 text-center bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-400">
+                <i class="fa-regular fa-folder-open text-2xl block mb-2 text-slate-300"></i>
+                No answer sheets submitted by students in your assigned courses yet. As students upload handwritten PDFs, they will appear here automatically.
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -326,6 +462,22 @@
                     <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-400 italic">No courses currently assigned</div>
                     {% endif %}
                     <input type="hidden" name="department" value="{{ user.department or brand.department_name }}">
+                    {% elif user.role == 'teacher' %}
+                    <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs flex flex-wrap gap-1.5 items-center justify-between min-h-[38px]">
+                        <div class="flex flex-wrap gap-1.5 items-center">
+                            {% for d in teacher_departments_list %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                <i class="fa-solid fa-building-columns text-[10px] mr-1 text-indigo-500"></i> {{ d.name }}
+                            </span>
+                            {% else %}
+                            <span class="text-xs text-amber-600 font-semibold italic">No department assigned</span>
+                            {% endfor %}
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-semibold flex items-center gap-1 shrink-0" title="Teachers cannot modify their department">
+                            <i class="fa-solid fa-lock text-[9px]"></i> Read-Only (Admin Managed)
+                        </span>
+                    </div>
+                    <input type="hidden" name="department" value="{{ user.department or '' }}">
                     {% else %}
                     <input type="text" name="department" value="{{ user.department or '' }}" placeholder="e.g. Foreign Language, Mathematics"
                         class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">

@@ -1009,11 +1009,15 @@
                     <span>Assign Faculty / Teacher (Admin Authority)</span>
                 </label>
                 <select name="teacher_id" class="w-full px-3 py-2 border border-purple-200 rounded-xl text-xs bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-purple-500">
-                    {% for t in teachers_list %}
-                    <option value="{{ t.id }}" {% if t.id == course.teacher_id %}selected{% endif %}>{{ t.full_name }} ({{ t.email }})</option>
-                    {% endfor %}
+                    {% if teachers_list %}
+                        {% for t in teachers_list %}
+                        <option value="{{ t.id }}" {% if t.id == course.teacher_id %}selected{% endif %}>{{ t.full_name }} ({{ t.email or t.user_id }})</option>
+                        {% endfor %}
+                    {% else %}
+                        <option value="" disabled selected>No faculty assigned to '{{ course.department }}'. Assign teacher to department first.</option>
+                    {% endif %}
                 </select>
-                <p class="text-[10px] text-purple-700 mt-1">Reassigning changes course ownership immediately.</p>
+                <p class="text-[10px] text-purple-700 mt-1">Flow: Only faculty assigned to department "{{ course.department }}" can be assigned this course.</p>
             </div>
             {% endif %}
 

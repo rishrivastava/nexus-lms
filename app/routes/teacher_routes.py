@@ -56,16 +56,16 @@ async def teacher_dashboard(request: Request):
                 ORDER BY c.created_at DESC
             """)
         else:
-            user_dept = user.get("department") or "Foreign Language"
+            # Teachers can only view their explicitly assigned classes/courses
             cursor.execute("""
                 SELECT c.*, u.full_name as teacher_name,
                        (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) as enrolled_count,
                        (SELECT COUNT(*) FROM lessons l JOIN modules m ON l.module_id = m.id WHERE m.course_id = c.id) as lesson_count
                 FROM courses c
                 JOIN users u ON c.teacher_id = u.id
-                WHERE c.teacher_id = ? AND (c.department = ? OR ? = '') AND c.status != 'deleted'
+                WHERE c.teacher_id = ? AND c.status != 'deleted'
                 ORDER BY c.created_at DESC
-            """, (user["id"], user_dept, user_dept))
+            """, (user["id"],))
             
         courses = [dict(c) for c in cursor.fetchall()]
 
@@ -111,9 +111,11 @@ async def teacher_dashboard(request: Request):
         # 1-on-1 mentoring sessions assigned to or initiated by this teacher
         mentoring_sessions = get_teacher_mentoring_sessions(user["id"])
 
-        # List of students enrolled in this teacher's courses (for initiating 1-on-1 sessions)
+        # List of students enrolled in this teacher's courses (for initiating 1-on-1 sessions & profile inspection)
         cursor.execute("""
-            SELECT DISTINCT u.id, u.user_id, u.full_name, c.id as course_id, c.title as course_title
+            SELECT DISTINCT u.id, u.user_id, u.full_name, u.email, u.phone, u.avatar_url,
+                   u.school_name, u.guardian_name, u.district, u.state,
+                   c.id as course_id, c.title as course_title, c.code as course_code
             FROM enrollments e
             JOIN users u ON e.user_id = u.id
             JOIN courses c ON e.course_id = c.id
@@ -174,7 +176,36 @@ def compute_teacher_analytics(user: dict, course_id: Optional[int] = None, date_
             return {
                 "assigned_courses": [],
                 "selected_course_id": None,
-                "has_courses": False
+                "has_courses": False,
+                "all_students": [],
+                "live_students": [],
+                "course_comparison_matrix": [],
+                "kpis": {
+                    "total_enrolled": 0,
+                    "active_count": 0,
+                    "inactive_count": 0,
+                    "overall_avg_score": 0.0,
+                    "pass_percentage": 0.0,
+                    "highest_score": 0.0,
+                    "lowest_score": 0.0,
+                    "overall_completion_pct": 0.0,
+                    "students_completed": 0,
+                    "students_in_progress": 0,
+                    "live_total": 0,
+                    "live_video_count": 0,
+                    "live_quiz_count": 0,
+                    "live_module_count": 0,
+                    "total_learning_hours": 0.0,
+                    "avg_time_per_student_mins": 0.0,
+                    "avg_daily_engagement_mins": 0.0,
+                    "avg_weekly_engagement_hours": 0.0,
+                    "video_completion_rate": 0.0,
+                    "quiz_participation_rate": 0.0
+                },
+                "top_5_students": [],
+                "bottom_5_students": [],
+                "chapter_engagement": [],
+                "most_accessed_topics": []
             }
 
         selected_course_id = int(course_id) if course_id and int(course_id) in assigned_course_ids else None
@@ -190,7 +221,8 @@ def compute_teacher_analytics(user: dict, course_id: Optional[int] = None, date_
         total_enrolled = cursor.fetchone()[0] or 0
 
         cursor.execute(f"""
-            SELECT DISTINCT u.id, u.user_id, u.full_name, u.email, u.avatar_url, u.last_active_at,
+            SELECT DISTINCT u.id, u.user_id, u.full_name, u.email, u.phone, u.avatar_url, u.last_active_at,
+                   u.guardian_name, u.school_name, u.district, u.state, u.udise_code,
                    e.course_id, c.title as course_title, c.code as course_code
             FROM users u
             JOIN enrollments e ON u.id = e.user_id
@@ -728,8 +760,32 @@ async def edit_course(
         new_teacher_id = course["teacher_id"]
         if user["role"] == "department_admin" and teacher_id:
             try:
-                new_teacher_id = int(teacher_id)
-            except Exception:
+                candidate_id = int(teacher_id)
+                if candidate_id != course["teacher_id"]:
+                    # Verify candidate teacher is assigned to the department
+                    cursor.execute("""
+                        SELECT td.id
+                        FROM teacher_departments td
+                        JOIN departments d ON td.department_id = d.id
+                        WHERE td.teacher_id = ? AND d.name = ? COLLATE NOCASE
+                    """, (candidate_id, dept))
+                    if not cursor.fetchone():
+                        cursor.execute("SELECT department FROM users WHERE id = ? AND role = 'teacher'", (candidate_id,))
+                        u_row = cursor.fetchone()
+                        if not u_row or (dept not in (u_row["department"] or "")):
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Cannot assign course: Teacher is not assigned to the '{dept}' department. First assign the teacher to the department."
+                            )
+                        else:
+                            cursor.execute("SELECT id FROM departments WHERE name = ? COLLATE NOCASE", (dept,))
+                            d_row = cursor.fetchone()
+                            if d_row:
+                                cursor.execute("INSERT OR IGNORE INTO teacher_departments (teacher_id, department_id) VALUES (?, ?)", (candidate_id, d_row["id"]))
+                    new_teacher_id = candidate_id
+            except HTTPException:
+                raise
+            except (ValueError, TypeError):
                 pass
 
         sub = subtitle.strip() if subtitle else ""
@@ -897,8 +953,22 @@ async def course_editor(request: Request, course_id: int):
             mod_dict["lessons"] = lessons_list
             modules.append(mod_dict)
 
-        cursor.execute("SELECT id, user_id, full_name, email FROM users WHERE role = 'teacher' ORDER BY full_name ASC")
+        cursor.execute("""
+            SELECT DISTINCT u.id, u.user_id, u.full_name, u.email 
+            FROM users u
+            JOIN teacher_departments td ON u.id = td.teacher_id
+            JOIN departments d ON td.department_id = d.id
+            WHERE u.role = 'teacher' AND d.name = ? COLLATE NOCASE
+            ORDER BY u.full_name ASC
+        """, (course["department"],))
         teachers_list = [dict(t) for t in cursor.fetchall()]
+
+        # Ensure current assigned teacher is included in dropdown even if edge-case unassigned
+        if course["teacher_id"] and not any(t["id"] == course["teacher_id"] for t in teachers_list):
+            cursor.execute("SELECT id, user_id, full_name, email FROM users WHERE id = ?", (course["teacher_id"],))
+            curr_t = cursor.fetchone()
+            if curr_t:
+                teachers_list.insert(0, dict(curr_t))
 
         cursor.execute("SELECT value FROM system_settings WHERE key = 'allow_teacher_ai_quiz'")
         ai_quiz_row = cursor.fetchone()

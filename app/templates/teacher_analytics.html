@@ -11,7 +11,7 @@
                 <i class="fa-solid fa-chart-line"></i>
                 <span>Teacher Dashboard</span>
             </div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Welcome Teacher {{ user.full_name }}!</h1>
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Welcome {{ user.full_name }}!</h1>
             <p class="text-xs sm:text-sm text-slate-500 mt-1">Academic & Student Analytics &bull; Real-time performance metrics, live student activity, engagement analytics, and assessment diagnostics.</p>
         </div>
 
@@ -641,7 +641,7 @@
 
 <!-- Embedded Student Profiles JSON for Drill-down -->
 <script>
-    const studentData = {{ analytics.all_students|tojson|safe }};
+    const studentData = {{ (analytics.all_students or [])|tojson|safe }};
 
     function openStudentModal(studentId) {
         const student = studentData.find(s => s.id === studentId);

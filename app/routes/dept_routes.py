@@ -7,7 +7,9 @@ from app.database import (
     get_notification_settings, update_notification_settings, get_ai_usage_metrics,
     list_certificates, get_all_departments, create_department, assign_user_to_department,
     get_completed_students_without_certificates, get_admin_pending_mentoring_sessions,
-    admin_assign_mentoring_teacher, notify_users, toggle_department_ans_writing
+    admin_assign_mentoring_teacher, notify_users, toggle_department_ans_writing,
+    get_teacher_departments, set_teacher_departments, get_available_courses_for_teacher,
+    assign_teacher_to_course, get_all_answer_sheets_summary
 )
 from app.auth import get_current_user, hash_password
 from app.utils import normalize_name, generate_unique_student_id
@@ -640,6 +642,27 @@ async def department_dashboard(
         """)
         teachers_list = [dict(t) for t in cursor.fetchall()]
 
+        # Attach assigned departments & assigned courses for each teacher
+        for t in teachers_list:
+            cursor.execute("""
+                SELECT d.id, d.name, d.code
+                FROM departments d
+                JOIN teacher_departments td ON d.id = td.department_id
+                WHERE td.teacher_id = ?
+                ORDER BY d.name ASC
+            """, (t["id"],))
+            t["assigned_departments"] = [dict(d) for d in cursor.fetchall()]
+            t["departments_display"] = ", ".join(d["name"] for d in t["assigned_departments"]) if t["assigned_departments"] else "No Department Assigned"
+            
+            # Fetch courses currently assigned to this teacher
+            cursor.execute("""
+                SELECT id, title, code, department FROM courses WHERE teacher_id = ? AND status != 'deleted' ORDER BY title ASC
+            """, (t["id"],))
+            t["assigned_courses"] = [dict(c) for c in cursor.fetchall()]
+
+        # Dedicated Answer Sheet Submissions Summary for Admin Monitoring
+        answer_sheets_summary = get_all_answer_sheets_summary(department=selected_dept)
+
         # Students Roster Table
         query = f"""
             SELECT 
@@ -788,7 +811,9 @@ async def department_dashboard(
         "certificates": list_certificates(),
         "pending_certificate_completions": get_completed_students_without_certificates(),
         "mentoring_sessions": get_admin_pending_mentoring_sessions(),
-        "department_buckets": get_all_departments()
+        "department_buckets": get_all_departments(),
+        "all_departments": get_all_departments(),
+        "answer_sheets_summary": answer_sheets_summary
     })
 
 @router.post("/department/courses/assign")
@@ -1877,5 +1902,201 @@ async def admin_assign_mentoring(
     )
     
     return JSONResponse({"status": "success", "session": session})
+
+
+@router.post("/department/teachers/assign-departments")
+async def handle_assign_teacher_departments(request: Request):
+    """
+    Admin-only: Assigns a faculty member to one or multiple department buckets.
+    """
+    admin = require_dept_admin(request)
+    
+    teacher_id = None
+    department_ids = []
+    content_type = request.headers.get("content-type", "")
+    
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            teacher_id = body.get("teacher_id")
+            department_ids = body.get("department_ids", [])
+        except Exception:
+            pass
+    else:
+        form = await request.form()
+        teacher_id = form.get("teacher_id")
+        department_ids = form.getlist("department_ids")
+        if not department_ids and form.get("department_id"):
+            department_ids = [form.get("department_id")]
+            
+    if not teacher_id:
+        raise HTTPException(status_code=400, detail="Teacher ID is required")
+        
+    try:
+        tid = int(teacher_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid teacher ID")
+        
+    set_teacher_departments(teacher_id=tid, department_ids=department_ids, admin_user_id=admin["id"])
+    
+    if "application/json" in content_type:
+        return JSONResponse({"status": "success", "message": "Teacher departments updated successfully."})
+    return RedirectResponse(url="/department?tab=teachers&depts_assigned=1", status_code=303)
+
+
+@router.get("/api/teachers/{teacher_id}/assignable-courses")
+async def get_teacher_assignable_courses(request: Request, teacher_id: int):
+    """
+    Retrieves the departments a teacher is assigned to, and only the courses belonging to those departments.
+    Enforces flow: Teacher must be in a department before courses of that department can be assigned!
+    """
+    admin = require_dept_admin(request)
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, user_id, full_name, role FROM users WHERE id = ? AND role = 'teacher'", (teacher_id,))
+        teacher = cursor.fetchone()
+        if not teacher:
+            raise HTTPException(status_code=404, detail="Teacher not found")
+            
+        depts = get_teacher_departments(teacher_id, conn=conn)
+        available_courses = get_available_courses_for_teacher(teacher_id)
+        
+        return JSONResponse({
+            "status": "success",
+            "teacher": dict(teacher),
+            "departments": depts,
+            "has_departments": len(depts) > 0,
+            "courses": available_courses
+        })
+
+
+@router.post("/department/teachers/assign-course")
+async def handle_assign_course_to_teacher(request: Request):
+    """
+    Admin-only: Assigns a course to a teacher.
+    Strictly verifies that the teacher has been assigned to the course's department first!
+    """
+    admin = require_dept_admin(request)
+    
+    teacher_id = None
+    course_id = None
+    content_type = request.headers.get("content-type", "")
+    
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            teacher_id = body.get("teacher_id")
+            course_id = body.get("course_id")
+        except Exception:
+            pass
+    else:
+        form = await request.form()
+        teacher_id = form.get("teacher_id")
+        course_id = form.get("course_id")
+        
+    if not teacher_id or not course_id:
+        raise HTTPException(status_code=400, detail="Teacher and Course IDs are required.")
+        
+    try:
+        tid = int(teacher_id)
+        cid = int(course_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid teacher or course ID format.")
+        
+    try:
+        assign_teacher_to_course(course_id=cid, teacher_id=tid, admin_user_id=admin["id"])
+    except ValueError as ve:
+        if "application/json" in content_type:
+            return JSONResponse({"status": "error", "message": str(ve)}, status_code=400)
+        return RedirectResponse(url=f"/department?tab=teachers&error={str(ve).replace(' ', '+')}", status_code=303)
+        
+    # Notify teacher
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT title, code FROM courses WHERE id = ?", (cid,))
+        c_row = cursor.fetchone()
+        c_title = c_row["title"] if c_row else "Course"
+        c_code = c_row["code"] if c_row else ""
+        
+    notify_users(
+        [tid],
+        f"Assigned to Course: {c_title}",
+        f"Administration assigned you to instruct course: {c_title} ({c_code}). You can now access and manage this class in Teacher Studio.",
+        link=f"/teacher/course/{cid}",
+        category="course",
+        event_type="course_assigned"
+    )
+    
+    if "application/json" in content_type:
+        return JSONResponse({"status": "success", "message": f"Successfully assigned {c_title} to faculty member."})
+    return RedirectResponse(url=f"/department?tab=teachers&course_assigned=1", status_code=303)
+
+
+@router.get("/api/students/{student_id}/profile-modal")
+async def get_student_profile_modal(request: Request, student_id: int):
+    """
+    API for teachers and admins to view the full profile and learning portfolio of a student.
+    """
+    user = require_dept_admin_or_teacher(request)
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE id = ? AND role = 'student'", (student_id,))
+        student = cursor.fetchone()
+        if not student:
+            raise HTTPException(status_code=404, detail="Student record not found")
+        s_dict = dict(student)
+        s_dict.pop("password_hash", None)
+        
+        # Enrolled courses with completion
+        cursor.execute("""
+            SELECT c.id, c.title, c.code, c.department, c.subject, e.enrolled_at, e.completed_at,
+                   (SELECT COUNT(*) FROM lessons l JOIN modules m ON l.module_id = m.id WHERE m.course_id = c.id) as total_lessons,
+                   (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON lp.lesson_id = l.id JOIN modules m ON l.module_id = m.id WHERE m.course_id = c.id AND lp.user_id = ? AND lp.is_completed = 1) as completed_lessons
+            FROM enrollments e
+            JOIN courses c ON e.course_id = c.id
+            WHERE e.user_id = ? AND c.status != 'deleted'
+            ORDER BY c.title ASC
+        """, (student_id, student_id))
+        courses = []
+        for cr in cursor.fetchall():
+            cd = dict(cr)
+            tot = cd["total_lessons"] or 0
+            comp = cd["completed_lessons"] or 0
+            cd["completion_pct"] = round((comp / tot * 100), 1) if tot > 0 else 0.0
+            courses.append(cd)
+            
+        # Recent quiz attempts
+        cursor.execute("""
+            SELECT qa.*, l.title as quiz_title, c.title as course_title, c.code as course_code
+            FROM quiz_attempts qa
+            JOIN quizzes q ON qa.quiz_id = q.id
+            JOIN lessons l ON q.lesson_id = l.id
+            JOIN modules m ON l.module_id = m.id
+            JOIN courses c ON m.course_id = c.id
+            WHERE qa.user_id = ?
+            ORDER BY qa.attempted_at DESC
+            LIMIT 10
+        """, (student_id,))
+        quiz_attempts = [dict(qa) for qa in cursor.fetchall()]
+        
+        # Answer sheets submitted
+        cursor.execute("""
+            SELECT a.*, c.title as course_title, c.code as course_code
+            FROM answer_sheet_submissions a
+            JOIN courses c ON a.course_id = c.id
+            WHERE a.user_id = ?
+            ORDER BY a.created_at DESC
+        """, (student_id,))
+        answer_sheets = [dict(ans) for ans in cursor.fetchall()]
+        
+        return JSONResponse({
+            "status": "success",
+            "student": s_dict,
+            "courses": courses,
+            "quiz_attempts": quiz_attempts,
+            "answer_sheets": answer_sheets
+        })
 
 

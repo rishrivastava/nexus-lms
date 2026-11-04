@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from app.templates_config import templates
-from app.database import get_db, UPLOAD_DIR, update_system_settings, log_audit
+from app.database import get_db, UPLOAD_DIR, update_system_settings, log_audit, get_teacher_departments, get_teacher_all_answer_sheets
 from app.auth import verify_password, hash_password, create_access_token, get_current_user
 from app.utils import normalize_name
 import os
@@ -221,7 +221,7 @@ async def view_profile(request: Request):
                 SELECT c.*,
                        (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) as enrolled_count
                 FROM courses c
-                WHERE c.teacher_id = ?
+                WHERE c.teacher_id = ? AND c.status != 'deleted'
                 ORDER BY c.created_at DESC
             """, (user["id"],))
             teacher_courses = [dict(c) for c in cursor.fetchall()]
@@ -230,10 +230,16 @@ async def view_profile(request: Request):
                 SELECT COUNT(DISTINCT e.user_id) 
                 FROM enrollments e 
                 JOIN courses c ON e.course_id = c.id 
-                WHERE c.teacher_id = ?
+                WHERE c.teacher_id = ? AND c.status != 'deleted'
             """, (user["id"],))
             teacher_stats["unique_students"] = cursor.fetchone()[0]
             teacher_stats["total_courses"] = len(teacher_courses)
+            
+            # Fetch assigned departments for teacher
+            teacher_departments_list = get_teacher_departments(user["id"], conn=conn)
+            
+            # Fetch all student answer sheets submitted for this teacher's courses
+            teacher_answer_sheets = get_teacher_all_answer_sheets(user["id"])
 
     return templates.TemplateResponse("profile.html", {
         "request": request,
@@ -242,6 +248,8 @@ async def view_profile(request: Request):
         "quiz_history": quiz_history,
         "teacher_courses": teacher_courses,
         "teacher_stats": teacher_stats,
+        "teacher_departments_list": teacher_departments_list if user["role"] == "teacher" else [],
+        "teacher_answer_sheets": teacher_answer_sheets if user["role"] == "teacher" else [],
         "saved": request.query_params.get("saved"),
         "error": request.query_params.get("error")
     })
@@ -273,6 +281,9 @@ async def update_profile(
     clean_name = full_name.strip() if isinstance(full_name, str) and full_name.strip() else user["full_name"]
     clean_desig = designation.strip() if isinstance(designation, str) and designation.strip() else (user.get("designation") or "")
     clean_dept = department.strip() if isinstance(department, str) and department.strip() else user.get("department", "")
+    # Non-admins cannot modify their department affiliation in the profile
+    if user["role"] != "department_admin":
+        clean_dept = user.get("department", "")
     clean_school = school_name.strip() if isinstance(school_name, str) and school_name.strip() else user.get("school_name", "")
     clean_phone = phone.strip() if isinstance(phone, str) and phone.strip() else (user.get("phone") or "")
     clean_guardian = guardian_name.strip() if isinstance(guardian_name, str) and guardian_name.strip() else (user.get("guardian_name") or "")

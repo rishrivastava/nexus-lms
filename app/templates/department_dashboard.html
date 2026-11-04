@@ -12,7 +12,7 @@
                 <span>{{ branding.institution_name }} &bull; Department Governance</span>
             </div>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight" style="font-family: var(--font-heading)">
-                Welcome Admin {{ user.full_name }}!
+                Welcome {{ user.full_name }}!
             </h1>
             <p class="text-xs sm:text-sm text-slate-500 mt-1">
                 Centralised Department Administration, 3-Tier Academic Analytics, Curriculum Control & Power BI Integration.
@@ -118,6 +118,13 @@
         <button onclick="switchTab('departments')" id="tabBtn-departments" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-shapes text-indigo-600"></i>
             <span>Departments & Buckets</span>
+        </button>
+        <button onclick="switchTab('answer-sheets')" id="tabBtn-answer-sheets" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-file-pdf text-rose-600"></i>
+            <span>Answer Sheets Monitor</span>
+            {% if answer_sheets_summary and answer_sheets_summary.total_count > 0 %}
+            <span class="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold">{{ answer_sheets_summary.total_count }}</span>
+            {% endif %}
         </button>
         <button onclick="switchTab('conflicts')" id="tabBtn-conflicts" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-user-shield"></i>
@@ -967,32 +974,83 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for t in teachers %}
-                <div class="p-4 bg-slate-50/60 rounded-2xl border border-slate-200/80 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-sm">
-                                {{ t.full_name[:2]|upper }}
+                <div class="p-4 bg-slate-50/60 rounded-2xl border border-slate-200/80 space-y-3 flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-sm">
+                                    {{ t.full_name[:2]|upper }}
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-900 text-xs">{{ t.full_name }}</h4>
+                                    <span class="text-[10px] font-mono text-slate-400 block">{{ t.user_id }} &bull; {{ t.designation or 'Faculty' }}</span>
+                                </div>
                             </div>
-                            <div>
-                                <h4 class="font-bold text-slate-900 text-xs">{{ t.full_name }}</h4>
-                                <span class="text-[10px] font-mono text-slate-400 block">{{ t.user_id }} &bull; {{ t.designation or 'Faculty' }}</span>
+                            {% if user.role == 'department_admin' %}
+                            <form action="/department/teachers/delete/{{ t.user_id }}" method="POST" onsubmit="return confirm('Remove faculty member {{ t.full_name }} ({{ t.user_id }})?');">
+                                <button type="submit" title="Remove Faculty Member" class="text-slate-400 hover:text-red-600 transition p-1">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+
+                        <!-- Department Badges (Supports Multiple Departments) -->
+                        <div class="space-y-1">
+                            <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Assigned Department(s):</span>
+                            <div class="flex flex-wrap gap-1">
+                                {% for d in t.assigned_departments %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <i class="fa-solid fa-building-columns text-[9px] mr-1 text-indigo-500"></i>{{ d.name }}
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <i class="fa-solid fa-triangle-exclamation mr-1 text-[9px]"></i> Not Assigned to Department
+                                </span>
+                                {% endfor %}
                             </div>
                         </div>
+
+                        <!-- Assigned Courses Badges -->
+                        <div class="space-y-1">
+                            <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Assigned Course(s):</span>
+                            <div class="flex flex-wrap gap-1">
+                                {% for ac in t.assigned_courses %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200" title="{{ ac.title }} ({{ ac.department }})">
+                                    {{ ac.code }}
+                                </span>
+                                {% else %}
+                                <span class="text-[10px] text-slate-400 italic">No courses assigned yet</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-slate-500 font-mono">
+                            Email: {{ t.email or 'N/A' }}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between py-2 border-t border-slate-200/60 text-[11px] font-bold text-slate-700">
+                            <span>{{ t.courses_count }} Course(s)</span>
+                            <span class="text-indigo-600">{{ t.total_students_taught }} Students Taught</span>
+                        </div>
+
+                        <!-- Admin Management Flow Buttons -->
                         {% if user.role == 'department_admin' %}
-                        <form action="/department/teachers/delete/{{ t.user_id }}" method="POST" onsubmit="return confirm('Remove faculty member {{ t.full_name }} ({{ t.user_id }})?');">
-                            <button type="submit" title="Remove Faculty Member" class="text-slate-400 hover:text-red-600 transition p-1">
-                                <i class="fa-solid fa-trash-can text-xs"></i>
+                        <div class="pt-2 border-t border-slate-200/60 grid grid-cols-2 gap-2">
+                            <button type="button" onclick="openAssignTeacherDeptModal({{ t.id }}, '{{ t.full_name|replace('\'', '\\\'') }}', {{ (t.assigned_departments|map(attribute='id')|list)|tojson }})" 
+                                class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center gap-1 transition" title="Step 1: Assign teacher to department(s)">
+                                <i class="fa-solid fa-shapes text-[10px] text-indigo-600"></i>
+                                <span>Assign Dept</span>
                             </button>
-                        </form>
+                            <button type="button" onclick="openAssignTeacherCourseModal({{ t.id }}, '{{ t.full_name|replace('\'', '\\\'') }}')" 
+                                class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center gap-1 transition" title="Step 2: Assign course from teacher's departments">
+                                <i class="fa-solid fa-book-bookmark text-[10px]"></i>
+                                <span>Assign Course</span>
+                            </button>
+                        </div>
                         {% endif %}
-                    </div>
-                    <div class="text-[11px] text-slate-600 space-y-1">
-                        <div>Department: <span class="font-semibold text-slate-800">{{ t.department }}</span></div>
-                        <div>Email: <span class="font-mono text-slate-700">{{ t.email or 'N/A' }}</span></div>
-                    </div>
-                    <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] font-bold text-slate-700">
-                        <span>{{ t.courses_count }} Course(s)</span>
-                        <span class="text-indigo-600">{{ t.total_students_taught }} Students Taught</span>
                     </div>
                 </div>
                 {% endfor %}
@@ -2854,7 +2912,7 @@ in
                                         <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-slate-200 text-slate-600">Disabled</span>
                                         {% endif %}
                                     </div>
-                                    <p class="text-[10px] text-slate-500 leading-tight">UPSC Mains PDF answer sheet upload & faculty grading</p>
+                                    <p class="text-[10px] text-slate-500 leading-tight">Ans sheet upload</p>
                                 </div>
                             </div>
 
@@ -2937,6 +2995,152 @@ in
                         Reassign Student Bucket
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TAB: ANSWER SHEET REPOSITORY & EVALUATION MONITOR        -->
+    <!-- ========================================================= -->
+    <div id="tab-answer-sheets" class="tab-content hidden space-y-6">
+        <!-- Header Banner -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold mb-2">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span>Administrative Surveillance &bull; Answer Sheet Repository</span>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Answer Sheet Submissions & Evaluation Control</h2>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl leading-relaxed">
+                    Centralized monitoring window for student uploaded handwritten PDF answer copies across courses. Monitor submission volume, evaluation completion rates, marks distribution, and faculty grading turnaround.
+                </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1.5">
+                    <i class="fa-solid fa-clock-rotate-left text-slate-500"></i>
+                    <span>Live Tracking</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- 4 Metric KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-1">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Received</span>
+                <div class="text-2xl sm:text-3xl font-black text-slate-900">{{ answer_sheets_summary.total_count }}</div>
+                <span class="text-[11px] text-slate-500 font-medium">All uploaded answer sheets</span>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-1">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Evaluated Copies</span>
+                <div class="text-2xl sm:text-3xl font-black text-emerald-600">{{ answer_sheets_summary.evaluated_count }}</div>
+                <span class="text-[11px] text-emerald-600 font-medium">Evaluated & graded by faculty</span>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-1">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Pending Evaluation</span>
+                <div class="text-2xl sm:text-3xl font-black text-amber-500">{{ answer_sheets_summary.pending_count }}</div>
+                <span class="text-[11px] text-amber-600 font-medium">Awaiting faculty review</span>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-1">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Evaluation Rate</span>
+                <div class="text-2xl sm:text-3xl font-black text-indigo-600">{{ answer_sheets_summary.evaluation_rate }}%</div>
+                <span class="text-[11px] text-indigo-600 font-medium">Completion progress rate</span>
+            </div>
+        </div>
+
+        <!-- Submissions Table Card -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm">All Student Answer Sheet Submissions</h3>
+                    <p class="text-xs text-slate-500">Inspect student uploaded PDFs, faculty evaluations, awarded marks, and comments</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="text" id="answerSheetSearchInput" onkeyup="filterAnswerSheets()" placeholder="Search by student or course..." 
+                        class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500 w-52">
+                    <select id="answerSheetStatusFilter" onchange="filterAnswerSheets()" class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700">
+                        <option value="all">All Statuses</option>
+                        <option value="pending">Pending Evaluation</option>
+                        <option value="evaluated">Evaluated</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-left text-xs" id="answerSheetsTable">
+                    <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <tr>
+                            <th class="px-5 py-3.5">Student</th>
+                            <th class="px-5 py-3.5">Course / Department</th>
+                            <th class="px-5 py-3.5">Assigned Faculty</th>
+                            <th class="px-5 py-3.5">Submitted At</th>
+                            <th class="px-5 py-3.5 text-center">PDF Copy</th>
+                            <th class="px-5 py-3.5 text-center">Status & Marks</th>
+                            <th class="px-5 py-3.5">Evaluation Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for sub in answer_sheets_summary.submissions %}
+                        <tr class="hover:bg-slate-50/70 transition answer-sheet-row" data-status="{{ sub.status }}" data-student="{{ (sub.student_name or '')|lower }} {{ (sub.student_user_id or '')|lower }}" data-course="{{ (sub.course_title or '')|lower }} {{ (sub.course_code or '')|lower }}">
+                            <td class="px-5 py-3.5">
+                                <div class="font-bold text-slate-900 flex items-center gap-1.5">
+                                    <button type="button" onclick="openStudentProfileModal({{ sub.user_id }})" class="hover:text-indigo-600 hover:underline text-left">
+                                        {{ sub.student_name }}
+                                    </button>
+                                </div>
+                                <div class="text-[10px] font-mono text-slate-400">{{ sub.student_user_id }}</div>
+                            </td>
+                            <td class="px-5 py-3.5">
+                                <span class="font-bold text-slate-800">{{ sub.course_title }}</span>
+                                <span class="block text-[10px] font-mono text-indigo-600 font-bold">{{ sub.course_code }} &bull; {{ sub.course_dept }}</span>
+                            </td>
+                            <td class="px-5 py-3.5 text-slate-600">
+                                {% if sub.teacher_name %}
+                                <span class="font-semibold text-slate-800">{{ sub.teacher_name }}</span>
+                                {% else %}
+                                <span class="text-slate-400 italic">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-5 py-3.5 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                                {{ sub.created_at[:16] if sub.created_at else 'Recent' }}
+                            </td>
+                            <td class="px-5 py-3.5 text-center">
+                                <a href="/static/uploads/{{ sub.file_path }}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition shadow-2xs">
+                                    <i class="fa-solid fa-file-pdf"></i>
+                                    <span>View PDF</span>
+                                </a>
+                            </td>
+                            <td class="px-5 py-3.5 text-center">
+                                {% if sub.status == 'evaluated' %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <i class="fa-solid fa-circle-check mr-1 text-[10px]"></i> Evaluated: {{ sub.marks_awarded }}/{{ sub.max_marks }}
+                                </span>
+                                {% if sub.evaluator_name %}
+                                <div class="text-[10px] text-slate-400 mt-0.5">by {{ sub.evaluator_name }}</div>
+                                {% endif %}
+                                {% else %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <i class="fa-solid fa-clock mr-1 text-[10px]"></i> Pending Evaluation
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-5 py-3.5 text-slate-600 max-w-xs">
+                                {% if sub.feedback %}
+                                <p class="text-[11px] italic text-slate-700 line-clamp-2" title="{{ sub.feedback }}">{{ sub.feedback }}</p>
+                                {% else %}
+                                <span class="text-[11px] text-slate-400 italic">No feedback entered yet</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="px-5 py-10 text-center text-slate-400 text-xs">
+                                <i class="fa-regular fa-folder-open text-2xl block mb-2 text-slate-300"></i>
+                                No student answer sheets have been submitted yet. When students upload answer copies in courses with answer writing enabled, they will be listed here.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -3699,6 +3903,189 @@ in
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Modal: Assign Faculty Member to Department(s) -->
+<div id="assignTeacherDeptModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-shapes text-indigo-600 mr-2"></i> Assign Faculty to Department(s)
+            </h3>
+            <button onclick="closeAssignTeacherDeptModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs text-indigo-900">
+            <span class="font-bold block text-sm" id="assignTeacherDeptName">Faculty Member</span>
+            <span class="text-[11px] text-indigo-700">A teacher can be assigned to multiple departments. Courses can only be assigned after department affiliation.</span>
+        </div>
+
+        <form action="/department/teachers/assign-departments" method="POST" class="space-y-4">
+            <input type="hidden" name="teacher_id" id="assignTeacherDeptTeacherId">
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Select Department(s) *</label>
+                <div class="space-y-2 max-h-56 overflow-y-auto p-1">
+                    {% for d in all_departments %}
+                    <label class="flex items-center space-x-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                        <input type="checkbox" name="department_ids" value="{{ d.id }}" id="teacherDeptCheckbox_{{ d.id }}" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                        <div class="flex-1">
+                            <span class="font-bold text-xs text-slate-900 block">{{ d.name }}</span>
+                            <span class="text-[10px] text-slate-500 font-mono">{{ d.code }}</span>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeAssignTeacherDeptModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                    Save Departments
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Assign Course to Faculty Member (Flow Enforced) -->
+<div id="assignTeacherCourseModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-book-bookmark text-indigo-600 mr-2"></i> Assign Course to Faculty Member
+            </h3>
+            <button onclick="closeAssignTeacherCourseModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 space-y-1">
+            <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-900 text-sm" id="assignCourseModalTeacherName">Faculty</span>
+                <div id="assignCourseModalDeptBadges" class="flex flex-wrap gap-1"></div>
+            </div>
+            <p class="text-[11px] text-slate-500">Flow: Only courses belonging to the teacher's assigned department(s) can be assigned.</p>
+        </div>
+
+        <!-- No Department Warning -->
+        <div id="assignCourseNoDeptWarning" class="hidden p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-2">
+            <div class="flex items-center space-x-2 font-bold text-amber-800">
+                <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                <span>Department Assignment Required</span>
+            </div>
+            <p class="text-amber-800 text-[11px] leading-relaxed">
+                This teacher is not currently assigned to any department. Under institutional rules, you must first assign the teacher to a department before courses can be assigned.
+            </p>
+            <div class="pt-1">
+                <button type="button" onclick="switchToDeptAssignFromCourseModal()" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition">
+                    <i class="fa-solid fa-shapes mr-1"></i> Assign to Department First
+                </button>
+            </div>
+        </div>
+
+        <!-- Course Assignment Form -->
+        <form id="assignTeacherCourseForm" action="/department/teachers/assign-course" method="POST" class="space-y-4">
+            <input type="hidden" name="teacher_id" id="assignTeacherCourseTeacherId">
+
+            <div id="assignCourseDropdownContainer">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Select Course to Assign *</label>
+                <select name="course_id" id="assignTeacherCourseSelect" required class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500">
+                    <option value="">-- Choose Course from Teacher's Departments --</option>
+                </select>
+                <p class="text-[10px] text-slate-400 mt-1">Courses available are strictly filtered by the teacher's assigned department(s).</p>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100" id="assignCourseModalFooter">
+                <button type="button" onclick="closeAssignTeacherCourseModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" id="assignCourseSubmitBtn" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">
+                    Assign Course
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Comprehensive Student Profile View -->
+<div id="studentProfileModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-3">
+                <div id="stProfileAvatar" class="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base border border-indigo-200">
+                    ST
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900" id="stProfileName">Student Name</h3>
+                    <p class="text-xs text-slate-500 font-mono" id="stProfileId">ID: CS2026-000</p>
+                </div>
+            </div>
+            <button onclick="closeStudentProfileModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Institutional Details Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
+            <div>
+                <span class="text-[10px] text-slate-400 block font-bold uppercase">Father / Guardian</span>
+                <span class="font-bold text-slate-800" id="stProfileGuardian">-</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 block font-bold uppercase">School / Institution</span>
+                <span class="font-bold text-slate-800" id="stProfileSchool">-</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 block font-bold uppercase">District / State</span>
+                <span class="font-bold text-slate-800" id="stProfileLocation">-</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 block font-bold uppercase">Email Address</span>
+                <span class="font-mono text-slate-700" id="stProfileEmail">-</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 block font-bold uppercase">Contact Phone</span>
+                <span class="font-mono text-slate-700" id="stProfilePhone">-</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 block font-bold uppercase">Department</span>
+                <span class="font-bold text-indigo-700" id="stProfileDept">-</span>
+            </div>
+        </div>
+
+        <!-- Enrolled Courses -->
+        <div class="space-y-2">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-graduation-cap text-indigo-600"></i>
+                <span>Enrolled Class Curricula</span>
+            </h4>
+            <div id="stProfileCoursesList" class="space-y-2 text-xs">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- Answer Sheets Submissions by Student -->
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-file-pdf text-rose-600"></i>
+                <span>Answer Sheet PDF Submissions</span>
+            </h4>
+            <div id="stProfileAnswerSheetsList" class="space-y-2 text-xs">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-3 border-t border-slate-100">
+            <button type="button" onclick="closeStudentProfileModal()" class="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">
+                Close Profile
+            </button>
+        </div>
     </div>
 </div>
 
@@ -4474,6 +4861,214 @@ async function generateStudentCertificate(studentId, courseId, studentName, cour
     } catch (err) {
         alert('Server error generating certificate.');
     }
+}
+
+// --- Answer Sheets Filtering ---
+function filterAnswerSheets() {
+    const searchVal = (document.getElementById('answerSheetSearchInput')?.value || '').toLowerCase();
+    const statusVal = document.getElementById('answerSheetStatusFilter')?.value || 'all';
+    
+    document.querySelectorAll('.answer-sheet-row').forEach(row => {
+        const rowStatus = row.getAttribute('data-status') || '';
+        const rowStudent = row.getAttribute('data-student') || '';
+        const rowCourse = row.getAttribute('data-course') || '';
+        
+        const matchesStatus = (statusVal === 'all' || rowStatus === statusVal);
+        const matchesSearch = (!searchVal || rowStudent.includes(searchVal) || rowCourse.includes(searchVal));
+        
+        if (matchesStatus && matchesSearch) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// --- Teacher Departments Assignment Modal ---
+function openAssignTeacherDeptModal(teacherId, teacherName, currentDeptIds) {
+    document.getElementById('assignTeacherDeptTeacherId').value = teacherId;
+    document.getElementById('assignTeacherDeptName').innerText = teacherName;
+    
+    // Check checkboxes
+    document.querySelectorAll('[id^="teacherDeptCheckbox_"]').forEach(cb => {
+        cb.checked = false;
+    });
+    if (Array.isArray(currentDeptIds)) {
+        currentDeptIds.forEach(did => {
+            const el = document.getElementById(`teacherDeptCheckbox_${did}`);
+            if (el) el.checked = true;
+        });
+    }
+    document.getElementById('assignTeacherDeptModal').classList.remove('hidden');
+}
+
+function closeAssignTeacherDeptModal() {
+    document.getElementById('assignTeacherDeptModal').classList.add('hidden');
+}
+
+// --- Teacher Course Assignment Modal (Flow-Enforced) ---
+let currentModalTeacherId = null;
+let currentModalTeacherName = '';
+
+async function openAssignTeacherCourseModal(teacherId, teacherName) {
+    currentModalTeacherId = teacherId;
+    currentModalTeacherName = teacherName;
+    document.getElementById('assignTeacherCourseTeacherId').value = teacherId;
+    document.getElementById('assignCourseModalTeacherName').innerText = teacherName;
+    
+    const badgesDiv = document.getElementById('assignCourseModalDeptBadges');
+    badgesDiv.innerHTML = '<span class="text-xs text-slate-400">Loading departments...</span>';
+    
+    const selectEl = document.getElementById('assignTeacherCourseSelect');
+    selectEl.innerHTML = '<option value="">Loading courses...</option>';
+    
+    const noDeptWarning = document.getElementById('assignCourseNoDeptWarning');
+    const formDropdown = document.getElementById('assignCourseDropdownContainer');
+    const footer = document.getElementById('assignCourseModalFooter');
+    
+    document.getElementById('assignTeacherCourseModal').classList.remove('hidden');
+    
+    try {
+        const res = await fetch(`/api/teachers/${teacherId}/assignable-courses`);
+        const data = await res.json();
+        
+        if (!data.has_departments || data.departments.length === 0) {
+            // Teacher has NO departments assigned!
+            badgesDiv.innerHTML = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">No Department Assigned</span>';
+            noDeptWarning.classList.remove('hidden');
+            formDropdown.classList.add('hidden');
+            footer.classList.add('hidden');
+        } else {
+            noDeptWarning.classList.add('hidden');
+            formDropdown.classList.remove('hidden');
+            footer.classList.remove('hidden');
+            
+            // Render department badges
+            badgesDiv.innerHTML = data.departments.map(d => `
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    <i class="fa-solid fa-building-columns text-[9px] mr-1 text-indigo-500"></i>${d.name}
+                </span>
+            `).join('');
+            
+            // Populate courses belonging to those departments
+            if (data.courses && data.courses.length > 0) {
+                selectEl.innerHTML = '<option value="">-- Select Course to Assign --</option>' + 
+                    data.courses.map(c => `
+                        <option value="${c.id}">
+                            ${c.code} - ${c.title} (${c.department}) ${c.teacher_id === teacherId ? '✓ Currently Assigned' : ''}
+                        </option>
+                    `).join('');
+            } else {
+                selectEl.innerHTML = '<option value="">-- No published courses found in teacher\'s departments --</option>';
+            }
+        }
+    } catch (err) {
+        badgesDiv.innerHTML = '<span class="text-xs text-rose-500">Failed to load department info</span>';
+    }
+}
+
+function closeAssignTeacherCourseModal() {
+    document.getElementById('assignTeacherCourseModal').classList.add('hidden');
+}
+
+function switchToDeptAssignFromCourseModal() {
+    closeAssignTeacherCourseModal();
+    if (currentModalTeacherId) {
+        openAssignTeacherDeptModal(currentModalTeacherId, currentModalTeacherName, []);
+    }
+}
+
+// --- Student Profile Modal ---
+async function openStudentProfileModal(studentId) {
+    const modal = document.getElementById('studentProfileModal');
+    if (!modal) return;
+    
+    document.getElementById('stProfileName').innerText = 'Loading Student Profile...';
+    document.getElementById('stProfileId').innerText = '';
+    document.getElementById('stProfileGuardian').innerText = '...';
+    document.getElementById('stProfileSchool').innerText = '...';
+    document.getElementById('stProfileLocation').innerText = '...';
+    document.getElementById('stProfileEmail').innerText = '...';
+    document.getElementById('stProfilePhone').innerText = '...';
+    document.getElementById('stProfileDept').innerText = '...';
+    document.getElementById('stProfileCoursesList').innerHTML = '<div class="text-slate-400 py-3 text-center">Loading course progress...</div>';
+    document.getElementById('stProfileAnswerSheetsList').innerHTML = '<div class="text-slate-400 py-3 text-center">Loading answer copies...</div>';
+    
+    modal.classList.remove('hidden');
+    
+    try {
+        const res = await fetch(`/api/students/${studentId}/profile-modal`);
+        const data = await res.json();
+        if (!res.ok) {
+            alert(data.detail || 'Could not load student profile.');
+            modal.classList.add('hidden');
+            return;
+        }
+        
+        const s = data.student;
+        document.getElementById('stProfileName').innerText = s.full_name || 'Student';
+        document.getElementById('stProfileId').innerText = `ID: ${s.user_id || 'N/A'}`;
+        document.getElementById('stProfileAvatar').innerText = (s.full_name || 'ST').substring(0, 2).toUpperCase();
+        document.getElementById('stProfileGuardian').innerText = s.guardian_name || 'Not provided';
+        document.getElementById('stProfileSchool').innerText = s.school_name || 'LEAD Academic Portal';
+        document.getElementById('stProfileLocation').innerText = `${s.district || '-'}${s.state ? ', ' + s.state : ''}`;
+        document.getElementById('stProfileEmail').innerText = s.email || 'None';
+        document.getElementById('stProfilePhone').innerText = s.phone || 'None';
+        document.getElementById('stProfileDept').innerText = s.department || 'General';
+        
+        // Enrolled courses
+        const coursesDiv = document.getElementById('stProfileCoursesList');
+        if (data.courses && data.courses.length > 0) {
+            coursesDiv.innerHTML = data.courses.map(c => `
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="font-mono text-[10px] font-bold text-indigo-600">${c.code}</span>
+                        <h5 class="font-bold text-slate-800 text-xs">${c.title}</h5>
+                        <span class="text-[10px] text-slate-400">${c.completed_lessons}/${c.total_lessons} lessons completed</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${c.completion_pct >= 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'}">
+                            ${c.completion_pct}%
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            coursesDiv.innerHTML = '<div class="text-slate-400 py-2 italic">No courses currently enrolled.</div>';
+        }
+        
+        // Answer sheets
+        const answersDiv = document.getElementById('stProfileAnswerSheetsList');
+        if (data.answer_sheets && data.answer_sheets.length > 0) {
+            answersDiv.innerHTML = data.answer_sheets.map(a => `
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="font-mono text-[10px] font-bold text-indigo-600">${a.course_code}</span>
+                        <h5 class="font-bold text-slate-800 text-xs">${a.course_title}</h5>
+                        <span class="text-[10px] text-slate-400 font-mono">${(a.created_at || '').substring(0, 16)}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${a.status === 'evaluated' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                            ${a.status === 'evaluated' ? `${a.marks_awarded}/${a.max_marks}` : 'Pending'}
+                        </span>
+                        <a href="/static/uploads/${a.file_path}" target="_blank" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200">
+                            PDF
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            answersDiv.innerHTML = '<div class="text-slate-400 py-2 italic">No handwritten answer sheets uploaded yet.</div>';
+        }
+        
+    } catch (err) {
+        alert('Server communication error.');
+        modal.classList.add('hidden');
+    }
+}
+
+function closeStudentProfileModal() {
+    document.getElementById('studentProfileModal')?.classList.add('hidden');
 }
 </script>
 {% endblock %}
