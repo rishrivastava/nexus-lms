@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if status == 'not_completed' %}Course Not Completed - Nexus LMS{% else %}Certificate Pending Admin Issuance - Nexus LMS{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-8 sm:p-10 text-center space-y-6">
+        
+        {% if status == 'not_completed' %}
+            <!-- Status 1: Course Not Completed -->
+            <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-2xl border border-amber-200/60 shadow-xs">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+
+            <div class="space-y-2">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
+                    <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Course Incomplete
+                </span>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">Course Not Completed</h1>
+                <p class="text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
+                    You have finished <span class="font-bold text-slate-900">{{ completed_lessons }} of {{ total_lessons }} lessons ({{ progress_percent }}%)</span> in 
+                    <span class="font-bold text-indigo-700">"{{ course.title }}"</span>.
+                </p>
+                <p class="text-xs text-slate-400 max-w-md mx-auto">
+                    Certificates are authentic academic credentials issued by Leadership Boulevard Pvt Ltd. All video lectures, study materials, and assessments must be 100% completed to qualify for certification.
+                </p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="max-w-md mx-auto bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+                <div class="flex justify-between text-xs font-semibold text-slate-700">
+                    <span>Curriculum Completion</span>
+                    <span class="text-amber-600">{{ progress_percent }}%</span>
+                </div>
+                <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-amber-500 rounded-full transition-all duration-500" style="width: {{ progress_percent }}%"></div>
+                </div>
+            </div>
+
+            <div class="pt-4 flex flex-wrap items-center justify-center gap-3">
+                <a href="/course/{{ course.id }}" class="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-100 transition">
+                    <i class="fa-solid fa-play text-xs"></i>
+                    <span>Resume Course & Finish Remaining Lessons</span>
+                </a>
+                <a href="/student" class="inline-flex items-center space-x-1.5 px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Back to Dashboard</span>
+                </a>
+            </div>
+
+        {% else %}
+            <!-- Status 2: Course Completed - Awaiting Admin Issuance -->
+            <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto text-2xl border border-indigo-200/60 shadow-xs">
+                <i class="fa-solid fa-hourglass-half animate-pulse"></i>
+            </div>
+
+            <div class="space-y-2">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <i class="fa-solid fa-circle-check text-[10px]"></i> 100% Course Completed
+                </span>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">Certificate Pending Admin Approval</h1>
+                <p class="text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
+                    Congratulations on completing 100% of <span class="font-bold text-indigo-700">"{{ course.title }}"</span>!
+                </p>
+                <div class="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 text-xs text-indigo-950 max-w-lg mx-auto leading-relaxed text-left space-y-1">
+                    <div class="font-bold flex items-center gap-1.5 text-indigo-900">
+                        <i class="fa-solid fa-shield-halved text-indigo-600"></i> Administrative Verification Workflow:
+                    </div>
+                    <div>1. Your completion record has been forwarded to the <b>Nexus LMS Administrator</b>.</div>
+                    <div>2. The Administrator will review your assessment scores and verify course requirements.</div>
+                    <div>3. Once generated, your unique verified certificate with official QR code will appear here.</div>
+                </div>
+            </div>
+
+            <div class="pt-4 flex flex-wrap items-center justify-center gap-3">
+                <a href="/student" class="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-100 transition">
+                    <i class="fa-solid fa-arrow-left text-xs"></i>
+                    <span>Back to Dashboard</span>
+                </a>
+                <a href="/course/{{ course.id }}" class="inline-flex items-center space-x-1.5 px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>Review Course Materials</span>
+                </a>
+            </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

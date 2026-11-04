@@ -3,7 +3,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.templates_config import templates
 from app.database import (
     get_db, UPLOAD_DIR, log_audit, notify_users,
-    get_live_classes_for_course, get_department_by_name, get_all_departments
+    get_live_classes_for_course, get_department_by_name, get_all_departments,
+    get_course_answer_sheet_submissions, evaluate_answer_sheet_submission,
+    get_teacher_pending_answer_sheets, complete_answer_sheet_evaluation,
+    create_teacher_mentoring_request, get_teacher_mentoring_sessions,
+    complete_mentoring_session
 )
 from app.auth import get_current_user
 from app.gemini_service import generate_ai_quiz
@@ -95,6 +99,23 @@ async def teacher_dashboard(request: Request):
         """, (user["id"], user["role"]))
         teacher_live_classes = [dict(r) for r in cursor.fetchall()]
 
+        # Pending UPSC answer copy submissions for teacher's review
+        pending_answer_sheets = get_teacher_pending_answer_sheets(user["id"])
+
+        # 1-on-1 mentoring sessions assigned to or initiated by this teacher
+        mentoring_sessions = get_teacher_mentoring_sessions(user["id"])
+
+        # List of students enrolled in this teacher's courses (for initiating 1-on-1 sessions)
+        cursor.execute("""
+            SELECT DISTINCT u.id, u.user_id, u.full_name, c.id as course_id, c.title as course_title
+            FROM enrollments e
+            JOIN users u ON e.user_id = u.id
+            JOIN courses c ON e.course_id = c.id
+            WHERE c.teacher_id = ? OR ? = 'department_admin'
+            ORDER BY u.full_name ASC
+        """, (user["id"], user["role"]))
+        enrolled_students = [dict(r) for r in cursor.fetchall()]
+
     return templates.TemplateResponse("teacher_dashboard.html", {
         "request": request,
         "user": user,
@@ -104,6 +125,9 @@ async def teacher_dashboard(request: Request):
         "department_info": dept_info,
         "all_departments": all_departments,
         "live_classes": teacher_live_classes,
+        "pending_answer_sheets": pending_answer_sheets,
+        "mentoring_sessions": mentoring_sessions,
+        "enrolled_students": enrolled_students,
         "active_tab": "studio"
     })
 
@@ -873,6 +897,7 @@ async def course_editor(request: Request, course_id: int):
         allow_teacher_ai_quiz = ai_quiz_row[0] if ai_quiz_row else "1"
 
         live_classes = get_live_classes_for_course(course_id)
+        answer_sheets = get_course_answer_sheet_submissions(course_id)
 
     return templates.TemplateResponse("course_editor.html", {
         "request": request,
@@ -881,7 +906,8 @@ async def course_editor(request: Request, course_id: int):
         "modules": modules,
         "teachers_list": teachers_list,
         "allow_teacher_ai_quiz": allow_teacher_ai_quiz,
-        "live_classes": live_classes
+        "live_classes": live_classes,
+        "answer_sheets": answer_sheets
     })
 
 @router.post("/teacher/course/{course_id}/module")
@@ -1911,4 +1937,108 @@ async def api_answer_live_class_question(
     from app.database import answer_live_class_question
     answer_live_class_question(question_id, answer_text)
     return JSONResponse({"status": "success", "message": "Question answered successfully."})
+
+@router.get("/api/teacher/course/{course_id}/answer-sheets")
+async def teacher_get_answer_sheets(request: Request, course_id: int):
+    user = require_teacher_or_admin(request)
+    submissions = get_course_answer_sheet_submissions(course_id)
+    return JSONResponse(content={"submissions": submissions})
+
+@router.post("/api/answer-sheet/{submission_id}/evaluate")
+async def teacher_evaluate_answer_sheet(
+    request: Request,
+    submission_id: int,
+    marks_awarded: float = Form(...),
+    max_marks: float = Form(20.0),
+    feedback: str = Form(...)
+):
+    """Teacher marks paper, adds critique comments, and completes evaluation."""
+    user = require_teacher_or_admin(request)
+    sub = complete_answer_sheet_evaluation(
+        submission_id=submission_id,
+        marks_awarded=marks_awarded,
+        max_marks=max_marks,
+        feedback=feedback,
+        evaluated_by=user["id"]
+    )
+    
+    # Notify student that their answer copy has been evaluated with comments
+    if sub and sub.get("user_id"):
+        notify_users(
+            [sub["user_id"]],
+            f"Answer Copy Evaluated: {sub.get('course_title', 'Course')}",
+            f"Your UPSC answer copy has been evaluated by {user['full_name']}. Score: {marks_awarded}/{max_marks}. Comments: {feedback[:100]}...",
+            link=f"/course/{sub.get('course_id')}#mainsAnswerSheetSection",
+            category="feedback",
+            event_type="answer_copy_evaluated"
+        )
+
+    return JSONResponse(content={"status": "success", "submission": sub})
+
+# =========================================================================
+# ONE-ON-ONE MENTORING ROUTES FOR TEACHERS
+# =========================================================================
+
+@router.post("/api/mentoring/teacher-request")
+async def api_teacher_mentoring_request(
+    request: Request,
+    student_id: int = Form(...),
+    topic: str = Form(...),
+    description: Optional[str] = Form(""),
+    scheduled_date: str = Form(...),
+    scheduled_time: str = Form(...),
+    course_id: Optional[int] = Form(None)
+):
+    """Teacher initiates a 1-on-1 mentoring session with a specific student."""
+    user = require_teacher_or_admin(request)
+
+    session = create_teacher_mentoring_request(
+        teacher_id=user["id"],
+        student_id=student_id,
+        course_id=course_id,
+        topic=topic,
+        description=description,
+        scheduled_date=scheduled_date,
+        scheduled_time=scheduled_time
+    )
+
+    # Notify student that teacher requested a 1-on-1 session
+    notify_users(
+        [student_id],
+        f"1-on-1 Mentoring Invitation: {user['full_name']}",
+        f"Teacher {user['full_name']} has invited you for a 1-on-1 mentoring session on '{topic}'. Please review and confirm or suggest your date & time.",
+        link="/student#mentoringSessions",
+        category="mentoring",
+        event_type="mentoring_teacher_requested"
+    )
+
+    return JSONResponse({"status": "success", "session": session})
+
+@router.post("/api/mentoring/{session_id}/complete")
+async def api_complete_mentoring_session(
+    request: Request,
+    session_id: int,
+    teacher_notes: Optional[str] = Form("")
+):
+    """Teacher marks the 1-on-1 session as completed with guidance notes."""
+    user = require_teacher_or_admin(request)
+    complete_mentoring_session(session_id=session_id, teacher_notes=teacher_notes)
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT student_id, topic FROM mentoring_sessions WHERE id = ?", (session_id,))
+        sess = cursor.fetchone()
+        if sess:
+            notify_users(
+                [sess["student_id"]],
+                f"1-on-1 Mentoring Completed: {sess['topic']}",
+                f"Your 1-on-1 session on '{sess['topic']}' has been concluded by {user['full_name']}. Guidance notes: {teacher_notes or 'Session completed successfully.'}",
+                link="/student#mentoringSessions",
+                category="mentoring",
+                event_type="mentoring_completed",
+                conn=conn
+            )
+
+    return JSONResponse({"status": "success", "message": "Mentoring session marked as completed."})
+
 

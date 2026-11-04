@@ -1,19 +1,26 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Request, Depends, HTTPException, status, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.templates_config import templates
 from app.database import (
     get_db,
+    notify_users,
     get_live_classes_for_course,
     get_live_class_by_id,
     add_live_class_question,
     get_live_class_questions,
-    get_department_by_name
+    get_department_by_name,
+    get_user_answer_sheet_submissions,
+    create_answer_sheet_submission,
+    create_student_mentoring_request,
+    get_student_mentoring_sessions,
+    student_confirm_mentoring_schedule
 )
 from app.auth import get_current_user
 from app.utils import extract_youtube_id
 from app.gemini_service import explain_quiz_mistake
 from typing import Optional
 import os
+import time
 import json
 
 router = APIRouter()
@@ -48,7 +55,7 @@ async def student_dashboard(request: Request):
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?", (user["id"],))
         
-        # Fetch all courses the student is enrolled in
+        # Fetch all active published courses the student is enrolled in
         cursor.execute("""
             SELECT c.id, c.title, c.code, c.department, c.description, c.thumbnail_url,
                    u.full_name as teacher_name,
@@ -56,12 +63,17 @@ async def student_dashboard(request: Request):
                    (SELECT COUNT(*) FROM lesson_progress lp 
                     JOIN lessons l ON lp.lesson_id = l.id 
                     JOIN modules m ON l.module_id = m.id 
-                    WHERE m.course_id = c.id AND lp.user_id = ? AND lp.is_completed = 1) as completed_lessons
+                    WHERE m.course_id = c.id AND lp.user_id = ? AND lp.is_completed = 1) as completed_lessons,
+                   (SELECT certificate_id FROM certificates cert WHERE cert.student_id = ? AND cert.course_id = c.id AND cert.status != 'revoked' LIMIT 1) as certificate_id
             FROM enrollments e
             JOIN courses c ON e.course_id = c.id
             JOIN users u ON c.teacher_id = u.id
-            WHERE e.user_id = ? AND c.is_published = 1
-        """, (user["id"], user["id"]))
+            WHERE e.user_id = ? 
+              AND c.is_published = 1 
+              AND c.status = 'published' 
+              AND c.deleted_at IS NULL
+              AND (c.department = ? OR ? = '')
+        """, (user["id"], user["id"], user["id"], dept_name, dept_name))
         
         courses_raw = cursor.fetchall()
         courses = []
@@ -81,16 +93,21 @@ async def student_dashboard(request: Request):
             JOIN users u ON lc.teacher_id = u.id
             JOIN enrollments e ON e.course_id = c.id
             WHERE e.user_id = ? AND lc.status IN ('scheduled', 'live')
+              AND c.status = 'published' AND c.deleted_at IS NULL
             ORDER BY lc.scheduled_at ASC
         """, (user["id"],))
         upcoming_live_classes = [dict(r) for r in cursor.fetchall()]
+
+        # Fetch 1-on-1 mentoring sessions for the student
+        mentoring_sessions = get_student_mentoring_sessions(user["id"])
 
     return templates.TemplateResponse("student_dashboard.html", {
         "request": request,
         "user": user,
         "courses": courses,
         "department_info": department_info,
-        "upcoming_live_classes": upcoming_live_classes
+        "upcoming_live_classes": upcoming_live_classes,
+        "mentoring_sessions": mentoring_sessions
     })
 
 @router.get("/course/{course_id}", response_class=HTMLResponse)
@@ -103,24 +120,30 @@ async def course_player(request: Request, course_id: int, lesson_id: int = None)
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?", (user["id"],))
         
-        # Check course and enrollment
+        # Check course and enrollment - ensure active published and not deleted
         cursor.execute("""
             SELECT c.*, u.full_name as teacher_name 
             FROM courses c
             JOIN users u ON c.teacher_id = u.id
-            WHERE c.id = ?
+            WHERE c.id = ? AND c.status = 'published' AND c.deleted_at IS NULL AND c.is_published = 1
         """, (course_id,))
         course = cursor.fetchone()
         if not course:
-            raise HTTPException(status_code=404, detail="Course not found")
+            raise HTTPException(status_code=404, detail="Course not found or has been removed from LMS")
 
         # Update user's last_active_at timestamp
         cursor.execute("UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?", (user["id"],))
 
-        # Enforce strict assignment: Students can only access courses assigned to them
+        # Enforce strict assignment & department isolation: Students can only access courses assigned to them
         if user["role"] == "student":
             cursor.execute("SELECT id FROM enrollments WHERE user_id = ? AND course_id = ?", (user["id"], course_id))
             if not cursor.fetchone():
+                return templates.TemplateResponse("unauthorized_course.html", {
+                    "request": request,
+                    "user": user,
+                    "course": dict(course)
+                }, status_code=403)
+            if user.get("department") and course["department"] != user["department"]:
                 return templates.TemplateResponse("unauthorized_course.html", {
                     "request": request,
                     "user": user,
@@ -192,6 +215,22 @@ async def course_player(request: Request, course_id: int, lesson_id: int = None)
         # Fetch live classes for this course
         live_classes = get_live_classes_for_course(course_id)
 
+        # Fetch student's submitted UPSC answer sheets
+        answer_sheets = get_user_answer_sheet_submissions(user["id"], course_id)
+
+        # Check if an official certificate has been generated by Admin
+        cursor.execute("""
+            SELECT certificate_id FROM certificates 
+            WHERE student_id = ? AND course_id = ? AND status != 'revoked'
+            ORDER BY created_at DESC LIMIT 1
+        """, (user["id"], course_id))
+        cert_row = cursor.fetchone()
+        issued_certificate_id = cert_row[0] if cert_row else None
+
+        total_course_lessons = len(all_lessons)
+        completed_course_lessons = sum(1 for l in all_lessons if l.get("is_completed"))
+        is_course_completed = (total_course_lessons > 0 and completed_course_lessons == total_course_lessons)
+
     return templates.TemplateResponse("course_player.html", {
         "request": request,
         "user": user,
@@ -200,7 +239,10 @@ async def course_player(request: Request, course_id: int, lesson_id: int = None)
         "active_lesson": active_lesson,
         "youtube_id": youtube_id,
         "quiz_data": quiz_data,
-        "live_classes": live_classes
+        "live_classes": live_classes,
+        "answer_sheets": answer_sheets,
+        "issued_certificate_id": issued_certificate_id,
+        "is_course_completed": is_course_completed
     })
 
 @router.post("/api/lesson/{lesson_id}/complete")
@@ -247,12 +289,35 @@ async def mark_lesson_complete(request: Request, lesson_id: int):
                     SET completed_at = CURRENT_TIMESTAMP 
                     WHERE user_id = ? AND course_id = ? AND completed_at IS NULL
                 """, (user["id"], course_id))
-                # Automatically generate authentic certificate for completed student
-                from app.database import issue_certificate
-                try:
-                    issue_certificate(student_id=user["id"], course_id=course_id, conn=conn)
-                except Exception:
-                    pass
+                
+                # Fetch course title for notification
+                cursor.execute("SELECT title FROM courses WHERE id = ?", (course_id,))
+                c_row = cursor.fetchone()
+                c_title = c_row[0] if c_row else "Course"
+
+                # Notify Admins: Student completed 100%, certificate generation is pending approval
+                cursor.execute("SELECT id FROM users WHERE role = 'department_admin'")
+                admin_ids = [r[0] for r in cursor.fetchall()]
+                if admin_ids:
+                    notify_users(
+                        admin_ids,
+                        f"Course Completed: {c_title}",
+                        f"Student {user['full_name']} ({user['user_id']}) has completed 100% of '{c_title}'. Certificate generation is pending administrative issuance.",
+                        link="/department?tab=certificates",
+                        category="certificate",
+                        event_type="course_completed_pending_certificate",
+                        conn=conn
+                    )
+                # Notify Student: Course completed, awaiting admin certificate issuance
+                notify_users(
+                    [user["id"]],
+                    f"Course Completed: {c_title}!",
+                    f"Congratulations! You have completed 100% of '{c_title}'. Your completion record has been forwarded to the Administrator for certificate issuance.",
+                    link=f"/course/{course_id}",
+                    category="course",
+                    event_type="course_completed",
+                    conn=conn
+                )
 
     return JSONResponse({"status": "success", "lesson_id": lesson_id, "is_completed": True})
 
@@ -398,11 +463,32 @@ async def submit_quiz(request: Request, quiz_id: int):
                         SET completed_at = CURRENT_TIMESTAMP 
                         WHERE user_id = ? AND course_id = ? AND completed_at IS NULL
                     """, (user["id"], qc_id))
-                    from app.database import issue_certificate
-                    try:
-                        issue_certificate(student_id=user["id"], course_id=qc_id, conn=conn)
-                    except Exception:
-                        pass
+
+                    cursor.execute("SELECT title FROM courses WHERE id = ?", (qc_id,))
+                    c_row = cursor.fetchone()
+                    c_title = c_row[0] if c_row else "Course"
+
+                    cursor.execute("SELECT id FROM users WHERE role = 'department_admin'")
+                    admin_ids = [r[0] for r in cursor.fetchall()]
+                    if admin_ids:
+                        notify_users(
+                            admin_ids,
+                            f"Course Completed: {c_title}",
+                            f"Student {user['full_name']} ({user['user_id']}) has completed 100% of '{c_title}'. Certificate generation is pending administrative issuance.",
+                            link="/department?tab=certificates",
+                            category="certificate",
+                            event_type="course_completed_pending_certificate",
+                            conn=conn
+                        )
+                    notify_users(
+                        [user["id"]],
+                        f"Course Completed: {c_title}!",
+                        f"Congratulations! You have completed 100% of '{c_title}'. Your academic completion record has been forwarded to the Administrator for certificate issuance.",
+                        link=f"/course/{qc_id}",
+                        category="course",
+                        event_type="course_completed",
+                        conn=conn
+                    )
 
     return JSONResponse({
         "score_percent": score_percent,
@@ -571,4 +657,158 @@ async def fetch_live_class_questions(request: Request, live_class_id: int):
         raise HTTPException(status_code=401, detail="Unauthorized")
     questions = get_live_class_questions(live_class_id)
     return JSONResponse({"status": "success", "questions": questions})
+
+@router.post("/api/course/{course_id}/upload-answer-sheet")
+async def upload_answer_sheet(
+    request: Request,
+    course_id: int,
+    file: UploadFile = File(...),
+    module_id: Optional[int] = Form(None),
+    lesson_id: Optional[int] = Form(None),
+    remarks: Optional[str] = Form("")
+):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    if not file.filename.lower().endswith(".pdf"):
+        return JSONResponse(status_code=400, content={"error": "Only PDF files are allowed for answer sheet submission."})
+
+    upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "answer_sheets")
+    os.makedirs(upload_folder, exist_ok=True)
+
+    timestamp = int(time.time())
+    safe_name = f"ans_{user['id']}_{course_id}_{timestamp}_{os.path.basename(file.filename)}"
+    dest_path = os.path.join(upload_folder, safe_name)
+    
+    contents = await file.read()
+    with open(dest_path, "wb") as f:
+        f.write(contents)
+
+    rel_file_path = f"answer_sheets/{safe_name}"
+    submission = create_answer_sheet_submission(
+        user_id=user["id"],
+        course_id=course_id,
+        file_path=rel_file_path,
+        original_filename=file.filename,
+        module_id=module_id,
+        lesson_id=lesson_id,
+        remarks=remarks
+    )
+
+    # Notify the concerned subject teacher immediately
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT title, teacher_id FROM courses WHERE id = ?", (course_id,))
+        course_row = cursor.fetchone()
+        if course_row and course_row["teacher_id"]:
+            notify_users(
+                [course_row["teacher_id"]],
+                f"New UPSC Answer Copy Submitted: {course_row['title']}",
+                f"Student {user['full_name']} ({user['user_id']}) has uploaded an answer copy for '{course_row['title']}' ({file.filename}). Evaluation pending.",
+                link="/teacher/dashboard#pendingAnswerCopies",
+                category="submission",
+                event_type="answer_copy_uploaded",
+                conn=conn
+            )
+
+    return JSONResponse(content={"status": "success", "submission": submission})
+
+@router.get("/api/course/{course_id}/answer-sheets")
+async def get_answer_sheets(request: Request, course_id: int):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    submissions = get_user_answer_sheet_submissions(user["id"], course_id)
+    return JSONResponse(content={"submissions": submissions})
+
+# =========================================================================
+# ONE-ON-ONE MENTORING ROUTES FOR STUDENTS
+# =========================================================================
+
+@router.post("/api/mentoring/student-request")
+async def api_student_mentoring_request(
+    request: Request,
+    topic: str = Form(...),
+    description: Optional[str] = Form(""),
+    preferred_date: str = Form(...),
+    preferred_time: str = Form(...),
+    course_id: Optional[int] = Form(None)
+):
+    """Student raises a 1-on-1 mentoring request. Sent to Admin for faculty assignment."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    session = create_student_mentoring_request(
+        student_id=user["id"],
+        course_id=course_id,
+        topic=topic,
+        description=description,
+        preferred_date=preferred_date,
+        preferred_time=preferred_time
+    )
+
+    # Notify all Administrators
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE role = 'department_admin'")
+        admin_ids = [r[0] for r in cursor.fetchall()]
+        if admin_ids:
+            notify_users(
+                admin_ids,
+                f"New 1-on-1 Mentoring Request: {user['full_name']}",
+                f"Student {user['full_name']} ({user['user_id']}) requested a 1-on-1 session for topic: '{topic}' on {preferred_date} ({preferred_time}). Please assign a mentor.",
+                link="/department?tab=mentoring",
+                category="mentoring",
+                event_type="mentoring_requested",
+                conn=conn
+            )
+
+    return JSONResponse({"status": "success", "session": session})
+
+@router.get("/api/mentoring/my-sessions")
+async def api_get_student_mentoring(request: Request):
+    """Returns all 1-on-1 mentoring sessions for the logged-in student."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    sessions = get_student_mentoring_sessions(user["id"])
+    return JSONResponse({"status": "success", "sessions": sessions})
+
+@router.post("/api/mentoring/student-confirm-schedule")
+async def api_student_confirm_mentoring(
+    request: Request,
+    session_id: int = Form(...),
+    scheduled_date: str = Form(...),
+    scheduled_time: str = Form(...),
+    student_notes: Optional[str] = Form("")
+):
+    """Student confirms or suggests date/time for a teacher-initiated 1-on-1 session."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    updated = student_confirm_mentoring_schedule(
+        session_id=session_id,
+        scheduled_date=scheduled_date,
+        scheduled_time=scheduled_time,
+        student_notes=student_notes
+    )
+
+    # Notify teacher if assigned
+    if updated.get("teacher_id"):
+        with get_db() as conn:
+            notify_users(
+                [updated["teacher_id"]],
+                f"1-on-1 Mentoring Session Confirmed: {user['full_name']}",
+                f"Student {user['full_name']} confirmed 1-on-1 session on '{updated['topic']}' for {scheduled_date} at {scheduled_time}.",
+                link="/teacher/dashboard#mentoringSessions",
+                category="mentoring",
+                event_type="mentoring_confirmed",
+                conn=conn
+            )
+
+    return JSONResponse({"status": "success", "session": updated})
+
 

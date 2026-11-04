@@ -103,6 +103,17 @@
         <button onclick="switchTab('certificates')" id="tabBtn-certificates" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-award text-emerald-600"></i>
             <span>Certificates & Verification</span>
+            {% if pending_certificate_completions and pending_certificate_completions|length > 0 %}
+            <span class="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-bold">{{ pending_certificate_completions|length }}</span>
+            {% endif %}
+        </button>
+        <button onclick="switchTab('mentoring')" id="tabBtn-mentoring" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
+            <i class="fa-solid fa-comments text-indigo-600"></i>
+            <span>1-on-1 Mentoring Requests</span>
+            {% set pending_ment_count = (mentoring_sessions|selectattr('status', 'equalto', 'pending_admin_assignment')|list|length) if mentoring_sessions else 0 %}
+            {% if pending_ment_count > 0 %}
+            <span class="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10px] font-bold">{{ pending_ment_count }}</span>
+            {% endif %}
         </button>
         <button onclick="switchTab('departments')" id="tabBtn-departments" class="tab-btn pb-3 px-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 whitespace-nowrap">
             <i class="fa-solid fa-shapes text-indigo-600"></i>
@@ -2331,6 +2342,70 @@ in
             </div>
         </div>
 
+        <!-- Pending Course Completions (Awaiting Admin Certificate Generation) -->
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-3xl border border-amber-200 p-4 sm:p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-clock text-amber-600"></i>
+                        <span>Pending Course Completions (Awaiting Admin Certificate Generation)</span>
+                    </h3>
+                    <p class="text-xs text-slate-600 mt-0.5">Students who completed 100% of their course modules. Per institutional policy, an Administrator must review and generate the authentic verifiable certificate.</p>
+                </div>
+                <span class="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold font-mono">
+                    {{ pending_certificate_completions|length if pending_certificate_completions else 0 }} Pending
+                </span>
+            </div>
+
+            {% if pending_certificate_completions %}
+            <div class="overflow-x-auto border border-amber-200/80 rounded-2xl bg-white shadow-xs">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-amber-100/60 text-slate-600 text-[11px] uppercase tracking-wider font-semibold border-b border-amber-200">
+                            <th class="py-2.5 px-4">Student Name & ID</th>
+                            <th class="py-2.5 px-4">Course</th>
+                            <th class="py-2.5 px-3 text-center">Lessons</th>
+                            <th class="py-2.5 px-3">Completed On</th>
+                            <th class="py-2.5 px-4 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-amber-100/80 font-medium">
+                        {% for p in pending_certificate_completions %}
+                        <tr class="hover:bg-amber-50/40 transition">
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-slate-900">{{ p.student_name }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ p.student_uid }} &bull; {{ p.student_email }}</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-slate-800">{{ p.course_title }}</div>
+                                <div class="text-[11px] text-indigo-600 font-mono">{{ p.course_code }}</div>
+                            </td>
+                            <td class="py-3 px-3 text-center">
+                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[11px]">100% Complete</span>
+                            </td>
+                            <td class="py-3 px-3 text-slate-500">
+                                {{ p.completed_at[:10] if p.completed_at else 'Recent' }}
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                                <button type="button" onclick="generateStudentCertificate({{ p.student_id }}, {{ p.course_id }}, '{{ p.student_name }}', '{{ p.course_title }}')"
+                                    class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition inline-flex items-center gap-1.5">
+                                    <i class="fa-solid fa-award"></i>
+                                    <span>Generate Certificate</span>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-4 bg-white rounded-2xl border border-amber-100 text-center text-slate-400 text-xs">
+                <i class="fa-solid fa-circle-check text-emerald-500 text-lg mb-1 inline-block mr-1.5"></i>
+                All eligible course completions have been processed and certified!
+            </div>
+            {% endif %}
+        </div>
+
         <!-- Filter & Search Toolbar -->
         <div class="bg-white rounded-3xl border border-slate-200/80 p-4 sm:p-6 shadow-sm space-y-4">
             <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -2445,6 +2520,231 @@ in
                             <td colspan="7" class="py-8 text-center text-slate-400">
                                 <i class="fa-solid fa-award text-3xl mb-2 text-slate-300"></i>
                                 <p class="text-xs">No certificates issued yet. Click "Issue Certificate" to grant credentials.</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TAB: 1-ON-1 MENTORING SESSIONS & FACULTY ASSIGNMENT       -->
+    <!-- ========================================================= -->
+    <div id="tab-mentoring" class="tab-content hidden space-y-6">
+        <!-- Header Banner -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
+                    <i class="fa-solid fa-comments"></i>
+                    <span>Leadership Boulevard • Academic Guidance & Mentoring</span>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight">1-on-1 Mentoring Session Operations</h2>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl leading-relaxed">
+                    Review personalized 1-on-1 mentoring requests raised by students, match and assign qualified faculty subject mentors, configure meeting links, and monitor teacher-initiated mentoring discussions.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold">
+                    {{ mentoring_sessions|length if mentoring_sessions else 0 }} Total Sessions
+                </span>
+            </div>
+        </div>
+
+        <!-- Section 1: Student-Initiated Requests (Awaiting Admin Assignment & Scheduled) -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-user-graduate text-indigo-600"></i>
+                        <span>Student-Initiated Mentoring Requests</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Students request 1-on-1 mentoring for specific subjects or doubt areas. Assign an active teacher to schedule the session.</p>
+                </div>
+                {% set student_pending = (mentoring_sessions|selectattr('initiator_role', 'equalto', 'student')|selectattr('status', 'equalto', 'pending_admin_assignment')|list|length) if mentoring_sessions else 0 %}
+                <span class="px-3 py-1 rounded-full text-xs font-bold {% if student_pending > 0 %}bg-amber-100 text-amber-800 animate-pulse{% else %}bg-slate-100 text-slate-600{% endif %}">
+                    {{ student_pending }} Pending Assignment
+                </span>
+            </div>
+
+            <div class="overflow-x-auto border border-slate-100 rounded-2xl">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-200">
+                            <th class="py-3 px-4">Student</th>
+                            <th class="py-3 px-4">Course / Topic</th>
+                            <th class="py-3 px-4">Requested Timing</th>
+                            <th class="py-3 px-3 text-center">Status</th>
+                            <th class="py-3 px-4">Assigned Mentor & Meeting</th>
+                            <th class="py-3 px-4 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-medium">
+                        {% set student_requests = (mentoring_sessions|selectattr('initiator_role', 'equalto', 'student')|list) if mentoring_sessions else [] %}
+                        {% if student_requests %}
+                        {% for s in student_requests %}
+                        <tr class="hover:bg-slate-50/50 transition">
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-slate-900">{{ s.student_name }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ s.student_user_id }} &bull; {{ s.student_email }}</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-indigo-900">{{ s.topic }}</div>
+                                <div class="text-[11px] text-slate-500">{{ s.course_title or 'General Academic' }}</div>
+                                {% if s.description %}
+                                <div class="text-[11px] text-slate-400 italic line-clamp-1 mt-0.5">"{{ s.description }}"</div>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 text-slate-700">
+                                <div><i class="fa-regular fa-calendar mr-1 text-slate-400"></i>{{ s.preferred_date or 'Flexible' }}</div>
+                                <div class="text-[11px] text-slate-500"><i class="fa-regular fa-clock mr-1 text-slate-400"></i>{{ s.preferred_time or 'Anytime' }}</div>
+                            </td>
+                            <td class="py-3 px-3 text-center">
+                                {% if s.status == 'pending_admin_assignment' %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    Pending Assignment
+                                </span>
+                                {% elif s.status == 'scheduled' %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    Scheduled
+                                </span>
+                                {% elif s.status == 'completed' %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    Completed
+                                </span>
+                                {% else %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                    {{ s.status|title }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4">
+                                {% if s.teacher_name %}
+                                <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-chalkboard-user text-indigo-500 text-[11px]"></i>
+                                    <span>{{ s.teacher_name }}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-500">{{ s.scheduled_date }} at {{ s.scheduled_time }}</div>
+                                {% if s.meeting_link %}
+                                <a href="{{ s.meeting_link }}" target="_blank" class="text-[11px] text-indigo-600 hover:underline flex items-center gap-1 mt-0.5">
+                                    <i class="fa-solid fa-video text-[10px]"></i>
+                                    <span>Join Session</span>
+                                </a>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-slate-400 text-xs italic">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                                {% if s.status == 'pending_admin_assignment' %}
+                                <button type="button" onclick="openAssignMentorModal({{ s.id }}, '{{ s.student_name }}', '{{ s.topic|replace('\'', '\\\'') }}', '{{ s.preferred_date }}', '{{ s.preferred_time }}')"
+                                    class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition inline-flex items-center gap-1.5">
+                                    <i class="fa-solid fa-user-plus text-[10px]"></i>
+                                    <span>Assign Faculty</span>
+                                </button>
+                                {% else %}
+                                <button type="button" onclick="openAssignMentorModal({{ s.id }}, '{{ s.student_name }}', '{{ s.topic|replace('\'', '\\\'') }}', '{{ s.scheduled_date }}', '{{ s.scheduled_time }}', '{{ s.meeting_link }}', {{ s.teacher_id or 0 }})"
+                                    class="px-2.5 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs font-semibold transition">
+                                    Reassign / Edit
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-slate-400">
+                                <i class="fa-solid fa-comments text-3xl mb-2 text-slate-300"></i>
+                                <p class="text-xs">No student-initiated mentoring requests yet.</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section 2: Teacher-Initiated Mentoring Sessions (Direct Faculty Invites) -->
+        <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-chalkboard-user text-indigo-600"></i>
+                        <span>Teacher-Initiated Mentoring Sessions</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Sessions initiated directly by faculty members for targeted student guidance or weak-topic support.</p>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto border border-slate-100 rounded-2xl">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-200">
+                            <th class="py-3 px-4">Faculty Mentor</th>
+                            <th class="py-3 px-4">Student</th>
+                            <th class="py-3 px-4">Course & Topic</th>
+                            <th class="py-3 px-4">Scheduled Date & Time</th>
+                            <th class="py-3 px-3 text-center">Status</th>
+                            <th class="py-3 px-4 text-right">Meeting Link</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-medium">
+                        {% set teacher_sessions = (mentoring_sessions|selectattr('initiator_role', 'equalto', 'teacher')|list) if mentoring_sessions else [] %}
+                        {% if teacher_sessions %}
+                        {% for ts in teacher_sessions %}
+                        <tr class="hover:bg-slate-50/50 transition">
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-slate-900">{{ ts.teacher_name }}</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-slate-800">{{ ts.student_name }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ ts.student_user_id }}</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-indigo-900">{{ ts.topic }}</div>
+                                <div class="text-[11px] text-slate-500">{{ ts.course_title or 'Mentorship' }}</div>
+                            </td>
+                            <td class="py-3 px-4 text-slate-700">
+                                <div><i class="fa-regular fa-calendar mr-1 text-slate-400"></i>{{ ts.scheduled_date or 'Awaiting Student Confirmation' }}</div>
+                                <div class="text-[11px] text-slate-500"><i class="fa-regular fa-clock mr-1 text-slate-400"></i>{{ ts.scheduled_time or '' }}</div>
+                            </td>
+                            <td class="py-3 px-3 text-center">
+                                {% if ts.status == 'pending_student_schedule' %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    Awaiting Student Timing
+                                </span>
+                                {% elif ts.status == 'scheduled' %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    Confirmed & Scheduled
+                                </span>
+                                {% elif ts.status == 'completed' %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                    Completed
+                                </span>
+                                {% else %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                    {{ ts.status|title }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                                {% if ts.meeting_link %}
+                                <a href="{{ ts.meeting_link }}" target="_blank" class="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition">
+                                    <i class="fa-solid fa-video text-[10px]"></i>
+                                    <span>Join</span>
+                                </a>
+                                {% else %}
+                                <span class="text-slate-400 text-xs">--</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-slate-400">
+                                <i class="fa-solid fa-chalkboard-user text-3xl mb-2 text-slate-300"></i>
+                                <p class="text-xs">No teacher-initiated sessions recorded yet.</p>
                             </td>
                         </tr>
                         {% endif %}
@@ -3292,6 +3592,67 @@ in
     </div>
 </div>
 
+<!-- Modal: Assign Mentor to Student Request -->
+<div id="assignMentorModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-chalkboard-user text-indigo-600 mr-2"></i> Assign Faculty Mentor
+            </h3>
+            <button onclick="closeAssignMentorModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="p-3 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-xs text-indigo-900 space-y-1">
+            <div><strong>Student:</strong> <span id="mentorModalStudentName"></span></div>
+            <div><strong>Topic:</strong> <span id="mentorModalTopic"></span></div>
+            <div><strong>Preferred Timing:</strong> <span id="mentorModalPreferred"></span></div>
+        </div>
+
+        <form id="assignMentorForm" onsubmit="submitAssignMentorForm(event)" class="space-y-4">
+            <input type="hidden" id="mentorSessionId" name="session_id">
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Assign Faculty Teacher *</label>
+                <select id="mentorTeacherSelect" name="teacher_id" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="">-- Choose Faculty Subject Expert --</option>
+                    {% for t in teachers %}
+                    <option value="{{ t.id }}">{{ t.full_name }} ({{ t.department or 'Faculty' }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Scheduled Date *</label>
+                    <input type="date" id="mentorDateInput" name="scheduled_date" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Scheduled Time *</label>
+                    <input type="time" id="mentorTimeInput" name="scheduled_time" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Meeting Link (Google Meet / Zoom)</label>
+                <input type="url" id="mentorMeetingLink" name="meeting_link" placeholder="https://meet.google.com/..." value="https://meet.google.com/new" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                <span class="text-[10px] text-slate-400 mt-1 block">Both the student and assigned teacher will receive automated notifications with this link.</span>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeAssignMentorModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </button>
+                <button type="submit" id="btnSubmitAssignMentor" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Confirm & Notify</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 // Tab Switching
 function switchTab(tabId) {
@@ -3976,6 +4337,93 @@ function filterCertificatesTable() {
     const noRow = document.getElementById('noCertsRow');
     if (noRow) {
         noRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+}
+
+// 1-on-1 Mentoring Faculty Assignment Handlers
+function openAssignMentorModal(sessionId, studentName, topic, prefDate, prefTime, meetingLink, teacherId) {
+    document.getElementById('mentorSessionId').value = sessionId;
+    document.getElementById('mentorModalStudentName').textContent = studentName;
+    document.getElementById('mentorModalTopic').textContent = topic;
+    document.getElementById('mentorModalPreferred').textContent = `${prefDate || 'Any date'} at ${prefTime || 'Any time'}`;
+    if (prefDate && prefDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        document.getElementById('mentorDateInput').value = prefDate;
+    } else {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('mentorDateInput').value = today;
+    }
+    if (prefTime && prefTime.match(/^\d{2}:\d{2}/)) {
+        document.getElementById('mentorTimeInput').value = prefTime.substring(0, 5);
+    } else {
+        document.getElementById('mentorTimeInput').value = '15:00';
+    }
+    if (meetingLink) document.getElementById('mentorMeetingLink').value = meetingLink;
+    if (teacherId) document.getElementById('mentorTeacherSelect').value = teacherId;
+    document.getElementById('assignMentorModal').classList.remove('hidden');
+}
+
+function closeAssignMentorModal() {
+    document.getElementById('assignMentorModal').classList.add('hidden');
+}
+
+async function submitAssignMentorForm(e) {
+    e.preventDefault();
+    const sessionId = document.getElementById('mentorSessionId').value;
+    const teacherId = document.getElementById('mentorTeacherSelect').value;
+    const scheduledDate = document.getElementById('mentorDateInput').value;
+    const scheduledTime = document.getElementById('mentorTimeInput').value;
+    const meetingLink = document.getElementById('mentorMeetingLink').value;
+
+    const btn = document.getElementById('btnSubmitAssignMentor');
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Assigning...`;
+
+    try {
+        const fd = new FormData();
+        fd.append('teacher_id', teacherId);
+        fd.append('scheduled_date', scheduledDate);
+        fd.append('scheduled_time', scheduledTime);
+        fd.append('meeting_link', meetingLink);
+
+        const res = await fetch(`/api/mentoring/${sessionId}/assign-teacher`, {
+            method: 'POST',
+            body: fd
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert('Faculty mentor successfully assigned! Automated notifications dispatched to both teacher and student.');
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Failed to assign mentor.');
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> Confirm & Notify`;
+        }
+    } catch (err) {
+        alert('Server error assigning mentor.');
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Confirm & Notify`;
+    }
+}
+
+async function generateStudentCertificate(studentId, courseId, studentName, courseTitle) {
+    if (!confirm(`Generate authentic verified certificate for ${studentName} (${courseTitle})?`)) return;
+    try {
+        const formData = new FormData();
+        formData.append('student_id', studentId);
+        formData.append('course_id', courseId);
+        const res = await fetch('/api/certificates/generate-for-student', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`Certificate ${data.data.certificate_id} successfully issued to ${studentName}!`);
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Failed to generate certificate.');
+        }
+    } catch (err) {
+        alert('Server error generating certificate.');
     }
 }
 </script>

@@ -5,7 +5,9 @@ from app.database import (
     get_db, get_system_settings, update_system_settings, UPLOAD_DIR,
     log_audit, get_dashboard_permissions, update_dashboard_permissions,
     get_notification_settings, update_notification_settings, get_ai_usage_metrics,
-    list_certificates, get_all_departments, create_department, assign_user_to_department
+    list_certificates, get_all_departments, create_department, assign_user_to_department,
+    get_completed_students_without_certificates, get_admin_pending_mentoring_sessions,
+    admin_assign_mentoring_teacher, notify_users
 )
 from app.auth import get_current_user, hash_password
 from app.utils import normalize_name, generate_unique_student_id
@@ -773,6 +775,8 @@ async def department_dashboard(
         "last_rejected_count": len(LAST_IMPORT_REJECTED),
         "ai_usage_metrics": get_ai_usage_metrics(),
         "certificates": list_certificates(),
+        "pending_certificate_completions": get_completed_students_without_certificates(),
+        "mentoring_sessions": get_admin_pending_mentoring_sessions(),
         "department_buckets": get_all_departments()
     })
 
@@ -1736,4 +1740,46 @@ async def handle_assign_user_department(
     if not success:
         raise HTTPException(status_code=400, detail="Could not assign user to department")
     return RedirectResponse(url="/department?tab=departments&user_assigned=1", status_code=303)
+
+@router.post("/api/mentoring/{session_id}/assign-teacher")
+async def admin_assign_mentoring(
+    request: Request,
+    session_id: int,
+    teacher_id: int = Form(...),
+    scheduled_date: str = Form(None),
+    scheduled_time: str = Form(None),
+    meeting_link: str = Form("https://meet.google.com/new")
+):
+    """Admin assigns an active subject teacher and meeting details to a student's 1-on-1 mentoring request."""
+    admin = require_dept_admin(request)
+    session = admin_assign_mentoring_teacher(
+        session_id=session_id,
+        teacher_id=teacher_id,
+        scheduled_date=scheduled_date,
+        scheduled_time=scheduled_time,
+        meeting_link=meeting_link
+    )
+    
+    # Notify assigned teacher
+    notify_users(
+        [teacher_id],
+        f"Assigned 1-on-1 Mentoring Session: {session['student_name']}",
+        f"Admin assigned you a 1-on-1 mentoring session with {session['student_name']} ({session.get('student_user_id', '')}) on '{session['topic']}' scheduled for {session.get('scheduled_date', 'TBD')} at {session.get('scheduled_time', 'TBD')}. Link: {meeting_link}",
+        link="/teacher/dashboard#mentoringSessions",
+        category="mentoring",
+        event_type="mentoring_assigned"
+    )
+    
+    # Notify student
+    notify_users(
+        [session["student_id"]],
+        f"1-on-1 Mentor Assigned: {session.get('teacher_name', 'Teacher')}",
+        f"Your 1-on-1 mentoring request for '{session['topic']}' has been assigned to {session.get('teacher_name', 'Faculty Mentor')}. Scheduled date: {session.get('scheduled_date', 'TBD')} at {session.get('scheduled_time', 'TBD')}. Link: {meeting_link}",
+        link="/student#mentoringSessions",
+        category="mentoring",
+        event_type="mentoring_assigned"
+    )
+    
+    return JSONResponse({"status": "success", "session": session})
+
 

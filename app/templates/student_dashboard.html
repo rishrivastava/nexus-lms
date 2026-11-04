@@ -36,6 +36,10 @@
             </div>
 
             <div class="flex items-center gap-3 shrink-0">
+                <button type="button" onclick="openRequestMentoringModal()" class="px-4 py-2 rounded-xl bg-white text-indigo-700 hover:bg-slate-50 text-xs font-bold transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-comments text-indigo-600"></i>
+                    <span>Request 1-on-1 Mentoring</span>
+                </button>
                 <a href="/profile" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/15 text-xs font-semibold text-white transition flex items-center gap-2">
                     <i class="fa-solid fa-id-badge"></i>
                     <span>Profile & Photo</span>
@@ -158,12 +162,17 @@
                                 </p>
                             </div>
 
-                            <!-- View Certificate Button if course completed -->
-                            {% if course.progress_percent == 100 %}
-                            <a href="/course/{{ course.id }}/certificate" target="_blank" class="w-full mb-2.5 flex items-center justify-center space-x-2 py-2 px-4 rounded-xl font-bold text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition shadow-xs">
+                            <!-- Authentic Certificate Status Button -->
+                            {% if course.certificate_id %}
+                            <a href="/certificate/{{ course.certificate_id }}" target="_blank" class="w-full mb-2.5 flex items-center justify-center space-x-2 py-2 px-4 rounded-xl font-bold text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition shadow-xs">
                                 <i class="fa-solid fa-award text-amber-500"></i>
                                 <span>View Verified Certificate</span>
                                 <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i>
+                            </a>
+                            {% elif course.progress_percent == 100 %}
+                            <a href="/course/{{ course.id }}/certificate" class="w-full mb-2.5 flex items-center justify-center space-x-2 py-2 px-4 rounded-xl font-bold text-[11px] bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition shadow-xs">
+                                <i class="fa-solid fa-clock text-amber-600"></i>
+                                <span>Certificate Pending Admin Issuance</span>
                             </a>
                             {% endif %}
 
@@ -187,5 +196,330 @@
             </div>
         {% endif %}
     </div>
+
+    <!-- 1-on-1 Mentoring Sessions Section -->
+    <div id="mentoringSessions" class="space-y-4 pt-4 border-t border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-comments text-indigo-600"></i>
+                    <span>1-on-1 Faculty Mentoring & Doubt Clearing</span>
+                </h2>
+                <p class="text-xs text-slate-500">Personalized sessions with expert faculty mentors. Raise a request or confirm faculty invitations.</p>
+            </div>
+            <button type="button" onclick="openRequestMentoringModal()"
+                class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition self-start sm:self-auto">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Request 1-on-1 Session</span>
+            </button>
+        </div>
+
+        {% if mentoring_sessions %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {% for s in mentoring_sessions %}
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between hover:shadow-md transition">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                            {% if s.status == 'scheduled' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+                            {% elif s.status == 'pending_student_schedule' %}bg-amber-50 text-amber-700 border border-amber-200 animate-pulse
+                            {% elif s.status == 'completed' %}bg-slate-100 text-slate-700
+                            {% else %}bg-indigo-50 text-indigo-700 border border-indigo-100{% endif %}">
+                            {% if s.status == 'pending_student_schedule' %}
+                            <i class="fa-solid fa-bell mr-1"></i> Confirm Timing
+                            {% elif s.status == 'scheduled' %}
+                            <i class="fa-solid fa-circle-check mr-1"></i> Scheduled
+                            {% elif s.status == 'completed' %}
+                            <i class="fa-solid fa-check mr-1"></i> Completed
+                            {% else %}
+                            <i class="fa-solid fa-clock mr-1"></i> Pending Mentor
+                            {% endif %}
+                        </span>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase">{{ s.initiator_role }} Initiated</span>
+                    </div>
+
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 leading-snug">{{ s.topic }}</h3>
+                        <p class="text-xs text-indigo-600 font-semibold mt-0.5">{{ s.course_title or 'General Curriculum' }}</p>
+                        {% if s.description %}
+                        <p class="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">"{{ s.description }}"</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5 text-xs">
+                        <div class="flex items-center justify-between text-slate-600">
+                            <span class="text-slate-400 text-[11px]">Mentor</span>
+                            <span class="font-bold text-slate-800">{{ s.teacher_name or 'Awaiting Admin Assignment' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-slate-600">
+                            <span class="text-slate-400 text-[11px]">Timing</span>
+                            <span class="font-medium text-slate-700">
+                                {% if s.scheduled_date %}
+                                {{ s.scheduled_date }} at {{ s.scheduled_time }}
+                                {% else %}
+                                {{ s.preferred_date or 'Flexible' }} ({{ s.preferred_time or 'Anytime' }})
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if s.teacher_notes %}
+                    <div class="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs text-emerald-900 space-y-1">
+                        <div class="font-bold flex items-center gap-1.5 text-emerald-800">
+                            <i class="fa-solid fa-comment-dots text-emerald-600"></i>
+                            <span>Mentor Feedback & Notes</span>
+                        </div>
+                        <p class="text-[11px] text-slate-600 leading-relaxed">{{ s.teacher_notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-100">
+                    {% if s.status == 'pending_student_schedule' %}
+                    <button type="button" onclick="openConfirmScheduleModal({{ s.id }}, '{{ s.teacher_name }}', '{{ s.topic|replace('\'', '\\\'') }}', '{{ s.scheduled_date }}', '{{ s.scheduled_time }}')"
+                        class="w-full py-2 px-4 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 shadow-sm transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        <span>Confirm / Select Date & Time</span>
+                    </button>
+                    {% elif s.status == 'scheduled' and s.meeting_link %}
+                    <a href="{{ s.meeting_link }}" target="_blank"
+                        class="w-full py-2 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-video"></i>
+                        <span>Join 1-on-1 Video Session</span>
+                    </a>
+                    {% elif s.status == 'pending_admin_assignment' %}
+                    <div class="text-center py-1.5 text-xs text-slate-400 italic">
+                        Admin reviewing request to match mentor
+                    </div>
+                    {% else %}
+                    <div class="text-center py-1.5 text-xs text-slate-400">
+                        Session Concluded
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-md mx-auto">
+            <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                <i class="fa-solid fa-comments text-lg"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 text-sm">No Mentoring Sessions Yet</h3>
+            <p class="text-xs text-slate-500 mt-1 mb-3">Have doubts or need UPSC answer writing guidance? Request a 1-on-1 session with a faculty mentor.</p>
+            <button type="button" onclick="openRequestMentoringModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">
+                Request Mentoring Session
+            </button>
+        </div>
+        {% endif %}
+    </div>
 </div>
+
+<!-- Modal: Student Request 1-on-1 Mentoring -->
+<div id="requestMentoringModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-comments text-indigo-600 mr-2"></i> Request 1-on-1 Mentoring Session
+            </h3>
+            <button onclick="closeRequestMentoringModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <p class="text-xs text-slate-500">
+            Submit your doubt or topic. Administration will assign a specialized teacher and confirm your session time.
+        </p>
+
+        <form id="requestMentoringForm" onsubmit="submitStudentMentoringRequest(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Subject / Course (Optional)</label>
+                <select id="reqCourseSelect" name="course_id" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="">-- General Academic Guidance --</option>
+                    {% for c in courses %}
+                    <option value="{{ c.id }}">{{ c.title }} ({{ c.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Topic / Doubt Area *</label>
+                <input type="text" id="reqTopicInput" name="topic" required placeholder="e.g. UPSC Mains Paper II Answer Structure / Article 32 Doubts"
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Preferred Date *</label>
+                    <input type="date" id="reqDateInput" name="preferred_date" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Preferred Time *</label>
+                    <input type="time" id="reqTimeInput" name="preferred_time" required value="17:00" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Details / Questions you want to ask</label>
+                <textarea id="reqDescInput" name="description" rows="3" placeholder="Describe the doubts, questions, or topics you would like your mentor to address..."
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeRequestMentoringModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" id="btnSubmitStudentMentoring" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Submit Request</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Student Confirm / Suggest Date & Time for Teacher Invite -->
+<div id="confirmScheduleModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-calendar-check text-amber-600 mr-2"></i> Confirm Mentoring Session
+            </h3>
+            <button onclick="closeConfirmScheduleModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 space-y-1">
+            <div><strong>Teacher:</strong> <span id="confirmTeacherName"></span></div>
+            <div><strong>Topic:</strong> <span id="confirmTopic"></span></div>
+        </div>
+
+        <form id="confirmScheduleForm" onsubmit="submitConfirmSchedule(event)" class="space-y-3">
+            <input type="hidden" id="confirmSessionId">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Confirm Date *</label>
+                    <input type="date" id="confirmDateInput" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Confirm Time *</label>
+                    <input type="time" id="confirmTimeInput" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Note to Teacher (Optional)</label>
+                <textarea id="confirmNotesInput" rows="2" placeholder="e.g. Confirmed! Looking forward to discussing the answer copies." class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeConfirmScheduleModal()" class="px-3.5 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Confirm & Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openRequestMentoringModal() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('reqDateInput').value = today;
+    document.getElementById('reqTimeInput').value = '17:00';
+    document.getElementById('requestMentoringModal').classList.remove('hidden');
+}
+
+function closeRequestMentoringModal() {
+    document.getElementById('requestMentoringModal').classList.add('hidden');
+}
+
+async function submitStudentMentoringRequest(e) {
+    e.preventDefault();
+    const courseId = document.getElementById('reqCourseSelect').value;
+    const topic = document.getElementById('reqTopicInput').value;
+    const prefDate = document.getElementById('reqDateInput').value;
+    const prefTime = document.getElementById('reqTimeInput').value;
+    const desc = document.getElementById('reqDescInput').value;
+    const btn = document.getElementById('btnSubmitStudentMentoring');
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Submitting...`;
+
+    try {
+        const fd = new FormData();
+        if (courseId) fd.append('course_id', courseId);
+        fd.append('topic', topic);
+        fd.append('preferred_date', prefDate);
+        fd.append('preferred_time', prefTime);
+        fd.append('description', desc);
+
+        const res = await fetch('/api/mentoring/student-request', {
+            method: 'POST',
+            body: fd
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert('Your 1-on-1 mentoring request has been submitted to Administration. You will be notified as soon as a faculty mentor is assigned!');
+            location.reload();
+        } else {
+            alert(data.detail || 'Failed to submit request.');
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Submit Request`;
+        }
+    } catch(err) {
+        alert('Server communication error.');
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Submit Request`;
+    }
+}
+
+function openConfirmScheduleModal(sessionId, teacherName, topic, schedDate, schedTime) {
+    document.getElementById('confirmSessionId').value = sessionId;
+    document.getElementById('confirmTeacherName').innerText = teacherName;
+    document.getElementById('confirmTopic').innerText = topic;
+    if (schedDate && schedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        document.getElementById('confirmDateInput').value = schedDate;
+    } else {
+        document.getElementById('confirmDateInput').value = new Date().toISOString().split('T')[0];
+    }
+    if (schedTime && schedTime.match(/^\d{2}:\d{2}/)) {
+        document.getElementById('confirmTimeInput').value = schedTime.substring(0, 5);
+    } else {
+        document.getElementById('confirmTimeInput').value = '16:00';
+    }
+    document.getElementById('confirmNotesInput').value = '';
+    document.getElementById('confirmScheduleModal').classList.remove('hidden');
+}
+
+function closeConfirmScheduleModal() {
+    document.getElementById('confirmScheduleModal').classList.add('hidden');
+}
+
+async function submitConfirmSchedule(e) {
+    e.preventDefault();
+    const sessionId = document.getElementById('confirmSessionId').value;
+    const schedDate = document.getElementById('confirmDateInput').value;
+    const schedTime = document.getElementById('confirmTimeInput').value;
+    const notes = document.getElementById('confirmNotesInput').value;
+
+    try {
+        const fd = new FormData();
+        fd.append('session_id', sessionId);
+        fd.append('scheduled_date', schedDate);
+        fd.append('scheduled_time', schedTime);
+        fd.append('student_notes', notes);
+
+        const res = await fetch('/api/mentoring/student-confirm-schedule', {
+            method: 'POST',
+            body: fd
+        });
+        if (res.ok) {
+            alert('Mentoring schedule confirmed! Your teacher has been notified.');
+            location.reload();
+        } else {
+            alert('Could not confirm schedule.');
+        }
+    } catch(err) {
+        alert('Connection error.');
+    }
+}
+</script>
 {% endblock %}

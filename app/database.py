@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
 
 DB_PATH = os.environ.get("LMS_DB_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "lms.db"))
@@ -479,6 +480,58 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (live_class_id) REFERENCES live_classes(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        """)
+
+        # 21. UPSC Mains PDF Answer Sheet Submissions Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS answer_sheet_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            course_id INTEGER NOT NULL,
+            module_id INTEGER,
+            lesson_id INTEGER,
+            file_path TEXT NOT NULL,
+            original_filename TEXT NOT NULL,
+            remarks TEXT,
+            status TEXT DEFAULT 'pending',
+            marks_awarded REAL,
+            max_marks REAL DEFAULT 20.0,
+            feedback TEXT,
+            evaluated_by INTEGER,
+            evaluated_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+            FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE SET NULL,
+            FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE SET NULL,
+            FOREIGN KEY (evaluated_by) REFERENCES users(id) ON DELETE SET NULL
+        );
+        """)
+
+        # 22. One-on-One Mentoring Sessions Table (Student-Initiated & Teacher-Initiated)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mentoring_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            initiator_role TEXT NOT NULL,       -- 'student' or 'teacher'
+            student_id INTEGER NOT NULL,
+            teacher_id INTEGER,                 -- Assigned by admin if student-initiated, or teacher who initiated
+            course_id INTEGER,
+            topic TEXT NOT NULL,
+            description TEXT,
+            preferred_date TEXT,
+            preferred_time TEXT,
+            scheduled_date TEXT,
+            scheduled_time TEXT,
+            meeting_link TEXT,
+            status TEXT DEFAULT 'pending_admin_assignment', -- 'pending_admin_assignment', 'pending_student_schedule', 'scheduled', 'completed', 'cancelled'
+            student_notes TEXT,
+            teacher_notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL
         );
         """)
 
@@ -1358,6 +1411,275 @@ def answer_live_class_question(question_id: int, answer_text: str) -> bool:
             WHERE id = ?
         """, (answer_text.strip(), question_id))
         return True
+
+def create_answer_sheet_submission(user_id: int, course_id: int, file_path: str, original_filename: str, module_id: Optional[int] = None, lesson_id: Optional[int] = None, remarks: Optional[str] = None) -> dict:
+    """Records a student's uploaded PDF answer sheet for UPSC Mains evaluation."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO answer_sheet_submissions (user_id, course_id, module_id, lesson_id, file_path, original_filename, remarks)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, course_id, module_id, lesson_id, file_path, original_filename, (remarks or "").strip()))
+        sid = cursor.lastrowid
+        cursor.execute("""
+            SELECT a.*, u.full_name as student_name, u.user_id as student_user_id, c.title as course_title
+            FROM answer_sheet_submissions a
+            JOIN users u ON a.user_id = u.id
+            JOIN courses c ON a.course_id = c.id
+            WHERE a.id = ?
+        """, (sid,))
+        return dict(cursor.fetchone())
+
+def get_user_answer_sheet_submissions(user_id: int, course_id: int) -> list:
+    """Returns all answer sheet submissions for a specific student in a course."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.*, c.title as course_title, m.title as module_title, l.title as lesson_title
+            FROM answer_sheet_submissions a
+            JOIN courses c ON a.course_id = c.id
+            LEFT JOIN modules m ON a.module_id = m.id
+            LEFT JOIN lessons l ON a.lesson_id = l.id
+            WHERE a.user_id = ? AND a.course_id = ?
+            ORDER BY a.created_at DESC
+        """, (user_id, course_id))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_course_answer_sheet_submissions(course_id: int) -> list:
+    """Returns all answer sheets submitted by students for a course (for faculty review)."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.*, u.full_name as student_name, u.user_id as student_user_id, u.email as student_email,
+                   c.title as course_title, m.title as module_title, l.title as lesson_title,
+                   evaluator.full_name as evaluator_name
+            FROM answer_sheet_submissions a
+            JOIN users u ON a.user_id = u.id
+            JOIN courses c ON a.course_id = c.id
+            LEFT JOIN modules m ON a.module_id = m.id
+            LEFT JOIN lessons l ON a.lesson_id = l.id
+            LEFT JOIN users evaluator ON a.evaluated_by = evaluator.id
+            WHERE a.course_id = ?
+            ORDER BY a.created_at DESC
+        """, (course_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def evaluate_answer_sheet_submission(submission_id: int, marks_awarded: float, max_marks: float, feedback: str, evaluated_by: int) -> bool:
+    """Updates an answer sheet submission with evaluation marks and faculty feedback."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE answer_sheet_submissions
+            SET marks_awarded = ?, max_marks = ?, feedback = ?, status = 'evaluated', evaluated_by = ?, evaluated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (marks_awarded, max_marks, feedback.strip(), evaluated_by, submission_id))
+        return True
+
+def get_teacher_pending_answer_sheets(teacher_id: int) -> list:
+    """Returns all pending answer copy submissions for courses taught by a specific teacher."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.*, u.full_name as student_name, u.user_id as student_user_id, u.email as student_email,
+                   c.title as course_title, c.code as course_code, m.title as module_title
+            FROM answer_sheet_submissions a
+            JOIN courses c ON a.course_id = c.id
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN modules m ON a.module_id = m.id
+            WHERE c.teacher_id = ? AND a.status IN ('pending', 'submitted', 'under_review')
+            ORDER BY a.created_at ASC
+        """, (teacher_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def complete_answer_sheet_evaluation(submission_id: int, marks_awarded: float, max_marks: float, feedback: str, evaluated_by: int) -> dict:
+    """Evaluates and marks an answer sheet submission as completed with marks and feedback."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE answer_sheet_submissions
+            SET marks_awarded = ?, max_marks = ?, feedback = ?, status = 'evaluated', evaluated_by = ?, evaluated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (marks_awarded, max_marks, feedback.strip(), evaluated_by, submission_id))
+        cursor.execute("""
+            SELECT a.*, u.full_name as student_name, u.user_id as student_user_id, c.title as course_title, c.teacher_id
+            FROM answer_sheet_submissions a
+            JOIN users u ON a.user_id = u.id
+            JOIN courses c ON a.course_id = c.id
+            WHERE a.id = ?
+        """, (submission_id,))
+        return dict(cursor.fetchone())
+
+def get_completed_students_without_certificates() -> list:
+    """
+    Finds enrolled students who have completed 100% of a course, but do not yet have an authentic certificate issued by Admin.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT e.user_id, e.course_id, e.completed_at,
+                   u.full_name as student_name, u.user_id as student_user_id, u.email as student_email,
+                   c.title as course_title, c.code as course_code
+            FROM enrollments e
+            JOIN users u ON e.user_id = u.id
+            JOIN courses c ON e.course_id = c.id
+            WHERE c.status = 'published' AND c.deleted_at IS NULL
+              AND (e.completed_at IS NOT NULL OR 
+                  ((SELECT COUNT(*) FROM lessons l JOIN modules m ON l.module_id = m.id WHERE m.course_id = c.id) > 0 AND
+                   (SELECT COUNT(*) FROM lessons l JOIN modules m ON l.module_id = m.id WHERE m.course_id = c.id) = 
+                   (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON lp.lesson_id = l.id JOIN modules m ON l.module_id = m.id WHERE m.course_id = c.id AND lp.user_id = u.id AND lp.is_completed = 1)))
+              AND NOT EXISTS (
+                  SELECT 1 FROM certificates cert 
+                  WHERE cert.student_id = e.user_id AND cert.course_id = e.course_id AND cert.status != 'revoked'
+              )
+            ORDER BY e.completed_at DESC, u.full_name ASC
+        """)
+        return [dict(r) for r in cursor.fetchall()]
+
+# =========================================================================
+# ONE-ON-ONE MENTORING SESSIONS HELPERS
+# =========================================================================
+
+def create_student_mentoring_request(student_id: int, course_id: Optional[int], topic: str, description: str, preferred_date: str, preferred_time: str) -> dict:
+    """Student requests a 1-on-1 mentoring session; awaits Admin assignment of a faculty mentor."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO mentoring_sessions (initiator_role, student_id, course_id, topic, description, preferred_date, preferred_time, status)
+            VALUES ('student', ?, ?, ?, ?, ?, ?, 'pending_admin_assignment')
+        """, (student_id, course_id, topic.strip(), (description or "").strip(), preferred_date.strip(), preferred_time.strip()))
+        sid = cursor.lastrowid
+        cursor.execute("""
+            SELECT ms.*, u.full_name as student_name, u.user_id as student_user_id, c.title as course_title
+            FROM mentoring_sessions ms
+            JOIN users u ON ms.student_id = u.id
+            LEFT JOIN courses c ON ms.course_id = c.id
+            WHERE ms.id = ?
+        """, (sid,))
+        return dict(cursor.fetchone())
+
+def create_teacher_mentoring_request(teacher_id: int, student_id: int, course_id: Optional[int], topic: str, description: str, scheduled_date: str, scheduled_time: str) -> dict:
+    """Teacher initiates a 1-on-1 mentoring session with a specific student; student confirms or suggests date/time."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO mentoring_sessions (initiator_role, student_id, teacher_id, course_id, topic, description, scheduled_date, scheduled_time, status)
+            VALUES ('teacher', ?, ?, ?, ?, ?, ?, ?, 'pending_student_schedule')
+        """, (student_id, teacher_id, course_id, topic.strip(), (description or "").strip(), scheduled_date.strip(), scheduled_time.strip()))
+        sid = cursor.lastrowid
+        cursor.execute("""
+            SELECT ms.*, u.full_name as student_name, u.user_id as student_user_id, t.full_name as teacher_name, c.title as course_title
+            FROM mentoring_sessions ms
+            JOIN users u ON ms.student_id = u.id
+            JOIN users t ON ms.teacher_id = t.id
+            LEFT JOIN courses c ON ms.course_id = c.id
+            WHERE ms.id = ?
+        """, (sid,))
+        return dict(cursor.fetchone())
+
+def admin_assign_mentoring_teacher(session_id: int, teacher_id: int, scheduled_date: Optional[str] = None, scheduled_time: Optional[str] = None, meeting_link: Optional[str] = None) -> dict:
+    """Admin assigns an expert faculty mentor to a student-initiated 1-on-1 session."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE mentoring_sessions
+            SET teacher_id = ?,
+                scheduled_date = COALESCE(?, preferred_date),
+                scheduled_time = COALESCE(?, preferred_time),
+                meeting_link = ?,
+                status = 'scheduled',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (teacher_id, scheduled_date, scheduled_time, (meeting_link or "https://meet.google.com/new"), session_id))
+        cursor.execute("""
+            SELECT ms.*, u.full_name as student_name, u.user_id as student_user_id, t.full_name as teacher_name, c.title as course_title
+            FROM mentoring_sessions ms
+            JOIN users u ON ms.student_id = u.id
+            JOIN users t ON ms.teacher_id = t.id
+            LEFT JOIN courses c ON ms.course_id = c.id
+            WHERE ms.id = ?
+        """, (session_id,))
+        return dict(cursor.fetchone())
+
+def student_confirm_mentoring_schedule(session_id: int, scheduled_date: str, scheduled_time: str, student_notes: Optional[str] = None) -> dict:
+    """Student confirms or suggests date/time for a teacher-initiated 1-on-1 session."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE mentoring_sessions
+            SET scheduled_date = ?,
+                scheduled_time = ?,
+                student_notes = ?,
+                status = 'scheduled',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (scheduled_date.strip(), scheduled_time.strip(), (student_notes or "").strip(), session_id))
+        cursor.execute("""
+            SELECT ms.*, u.full_name as student_name, u.user_id as student_user_id, t.full_name as teacher_name, c.title as course_title
+            FROM mentoring_sessions ms
+            JOIN users u ON ms.student_id = u.id
+            LEFT JOIN users t ON ms.teacher_id = t.id
+            LEFT JOIN courses c ON ms.course_id = c.id
+            WHERE ms.id = ?
+        """, (session_id,))
+        return dict(cursor.fetchone())
+
+def complete_mentoring_session(session_id: int, teacher_notes: Optional[str] = None) -> bool:
+    """Marks a mentoring session as successfully completed with notes."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE mentoring_sessions
+            SET status = 'completed',
+                teacher_notes = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, ((teacher_notes or "").strip(), session_id))
+        return True
+
+def get_student_mentoring_sessions(student_id: int) -> list:
+    """Returns all mentoring sessions for a student."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT ms.*, t.full_name as teacher_name, t.email as teacher_email, c.title as course_title
+            FROM mentoring_sessions ms
+            LEFT JOIN users t ON ms.teacher_id = t.id
+            LEFT JOIN courses c ON ms.course_id = c.id
+            WHERE ms.student_id = ?
+            ORDER BY ms.created_at DESC
+        """, (student_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_teacher_mentoring_sessions(teacher_id: int) -> list:
+    """Returns all mentoring sessions assigned to or initiated by a teacher."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT ms.*, u.full_name as student_name, u.user_id as student_user_id, u.email as student_email, c.title as course_title
+            FROM mentoring_sessions ms
+            JOIN users u ON ms.student_id = u.id
+            LEFT JOIN courses c ON ms.course_id = c.id
+            WHERE ms.teacher_id = ?
+            ORDER BY ms.created_at DESC
+        """, (teacher_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_admin_pending_mentoring_sessions() -> list:
+    """Returns all student requests awaiting teacher assignment by admin, plus all scheduled sessions."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT ms.*, u.full_name as student_name, u.user_id as student_user_id, u.email as student_email,
+                   t.full_name as teacher_name, c.title as course_title
+            FROM mentoring_sessions ms
+            JOIN users u ON ms.student_id = u.id
+            LEFT JOIN users t ON ms.teacher_id = t.id
+            LEFT JOIN courses c ON ms.course_id = c.id
+            ORDER BY CASE WHEN ms.status = 'pending_admin_assignment' THEN 0 ELSE 1 END, ms.created_at DESC
+        """)
+        return [dict(r) for r in cursor.fetchall()]
+
+
 
 
 

@@ -185,6 +185,98 @@
         {% endif %}
     </div>
 
+    <!-- UPSC Mains Answer Sheets & Candidate Evaluations Panel -->
+    <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm mb-8 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+                <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pen text-amber-600"></i>
+                    <span>UPSC Mains Answer Sheets & Candidate Evaluations</span>
+                    <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">{{ (answer_sheets or [])|length }}</span>
+                </h2>
+                <p class="text-xs text-slate-500">Review student-uploaded handwritten answer sheet PDFs, assign scores, and provide structured mentor feedback.</p>
+            </div>
+        </div>
+
+        {% if answer_sheets and answer_sheets|length > 0 %}
+        <div class="overflow-x-auto rounded-2xl border border-slate-200">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                    <tr>
+                        <th class="p-3.5">Candidate / Student</th>
+                        <th class="p-3.5">Topic / Question Reference</th>
+                        <th class="p-3.5">Submitted PDF</th>
+                        <th class="p-3.5">Submitted On</th>
+                        <th class="p-3.5">Status</th>
+                        <th class="p-3.5">Score</th>
+                        <th class="p-3.5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                    {% for ans in answer_sheets %}
+                    <tr class="hover:bg-slate-50/70 transition">
+                        <td class="p-3.5">
+                            <div class="font-bold text-slate-900">{{ ans.student_name }}</div>
+                            <div class="text-[11px] text-slate-400 font-mono">{{ ans.student_user_id }}</div>
+                        </td>
+                        <td class="p-3.5">
+                            <div class="font-medium text-slate-800 max-w-xs">{{ ans.remarks or 'General Mains Submission' }}</div>
+                            {% if ans.module_title %}
+                            <div class="text-[10px] text-slate-400">{{ ans.module_title }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="p-3.5">
+                            <a href="/static/uploads/{{ ans.file_path }}" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-bold text-xs border border-red-200 transition">
+                                <i class="fa-solid fa-file-pdf"></i>
+                                <span class="truncate max-w-[140px]">{{ ans.original_filename }}</span>
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                            </a>
+                        </td>
+                        <td class="p-3.5 text-slate-500 whitespace-nowrap text-[11px]">{{ ans.created_at }}</td>
+                        <td class="p-3.5">
+                            {% if ans.status == 'evaluated' %}
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                <i class="fa-solid fa-circle-check text-[9px]"></i> Evaluated
+                            </span>
+                            {% elif ans.status == 'under_review' %}
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+                                <i class="fa-solid fa-spinner fa-spin text-[9px]"></i> Under Review
+                            </span>
+                            {% else %}
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
+                                <i class="fa-regular fa-clock text-[9px]"></i> Pending Review
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="p-3.5">
+                            {% if ans.marks_awarded is not none %}
+                            <span class="text-sm font-bold text-emerald-700">{{ ans.marks_awarded }}</span>
+                            <span class="text-slate-400 text-[11px]">/ {{ ans.max_marks or 20.0 }}</span>
+                            {% else %}
+                            <span class="text-slate-400 text-xs italic">Not Graded</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-3.5 text-right">
+                            <button onclick="openEvaluationModal({{ ans.id }}, '{{ ans.student_name|replace(\"'\", \"\\\\'\") }}', '{{ ans.marks_awarded or '' }}', '{{ ans.feedback|replace(\"'\", \"\\\\'\") if ans.feedback else '' }}', '{{ ans.original_filename|replace(\"'\", \"\\\\'\") }}', '/static/uploads/{{ ans.file_path }}')"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 transition">
+                                <i class="fa-solid fa-pen-ruler"></i>
+                                <span>{% if ans.status == 'evaluated' %}Re-Evaluate{% else %}Evaluate & Grade{% endif %}</span>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8 px-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
+            <i class="fa-solid fa-file-pen text-slate-300 text-2xl mb-2"></i>
+            <p class="text-xs text-slate-600 font-medium">No candidate answer sheets uploaded yet for this course.</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Enrolled UPSC candidates can submit their subjective handwritten PDFs through the course player.</p>
+        </div>
+        {% endif %}
+    </div>
+
     <!-- Curriculum Modules & Lessons -->
     <div class="space-y-6">
         <div class="flex flex-wrap justify-between items-center gap-3">
@@ -1337,6 +1429,51 @@ async function deleteLiveClassSession(id) {
     }
 }
 
+// Evaluate Candidate Answer Sheet
+function openEvaluationModal(submissionId, studentName, marks, feedback, fileName, fileUrl) {
+    document.getElementById('evalSubmissionId').value = submissionId;
+    document.getElementById('evalStudentName').innerText = studentName;
+    document.getElementById('evalFileName').innerText = fileName;
+    document.getElementById('evalFileLink').href = fileUrl;
+    document.getElementById('evalMarks').value = marks || '';
+    document.getElementById('evalFeedback').value = feedback || '';
+    document.getElementById('evaluateAnswerModal').classList.remove('hidden');
+}
+
+async function submitEvaluation(e) {
+    e.preventDefault();
+    const submissionId = document.getElementById('evalSubmissionId').value;
+    const marks = document.getElementById('evalMarks').value;
+    const feedback = document.getElementById('evalFeedback').value;
+    const btn = document.getElementById('evalSubmitBtn');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving Grade...';
+
+    const formData = new FormData();
+    formData.append('marks_awarded', marks);
+    formData.append('feedback', feedback);
+
+    try {
+        const res = await fetch(`/api/answer-sheet/${submissionId}/evaluate`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to submit evaluation.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Save Evaluation & Marks';
+        }
+    } catch (err) {
+        alert('Network error while saving evaluation.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Save Evaluation & Marks';
+    }
+}
+
 // Attach Mylo Loader to Course Editor forms
 document.addEventListener('DOMContentLoaded', () => {
     const editCourseForm = document.querySelector('#editCourseModal form');
@@ -1358,4 +1495,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
+
+<!-- Answer Sheet Evaluation Modal -->
+<div id="evaluateAnswerModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <i class="fa-solid fa-pen-ruler"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm">Evaluate UPSC Mains Answer Sheet</h3>
+                    <p class="text-[11px] text-slate-500">Candidate: <span id="evalStudentName" class="font-bold text-indigo-600"></span></p>
+                </div>
+            </div>
+            <button type="button" onclick="document.getElementById('evaluateAnswerModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form id="evalForm" onsubmit="submitEvaluation(event)" class="space-y-4">
+            <input type="hidden" id="evalSubmissionId" name="submission_id">
+            
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div class="flex items-center space-x-2 text-xs">
+                    <i class="fa-solid fa-file-pdf text-red-500 text-base"></i>
+                    <span id="evalFileName" class="font-bold text-slate-800 truncate max-w-[240px]"></span>
+                </div>
+                <a id="evalFileLink" href="#" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition">
+                    <span>Inspect PDF</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                </a>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Marks Awarded (Max 20.0)</label>
+                <input type="number" step="0.5" min="0" max="20" id="evalMarks" name="marks_awarded" required placeholder="e.g. 14.5" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Mentor Evaluation Feedback & Critique</label>
+                <textarea id="evalFeedback" name="feedback" rows="4" required placeholder="Structure: Good introduction with constitutional article. Content: Well articulated arguments on basic structure doctrine. Scope for Improvement: Add 2-3 recent Supreme Court judgments in the conclusion." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+            </div>
+
+            <div class="pt-2 flex items-center justify-end space-x-2">
+                <button type="button" onclick="document.getElementById('evaluateAnswerModal').classList.add('hidden')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition">
+                    Cancel
+                </button>
+                <button type="submit" id="evalSubmitBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Save Evaluation & Marks</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

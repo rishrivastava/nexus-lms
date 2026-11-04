@@ -24,6 +24,11 @@
             </div>
 
             <div class="flex items-center gap-3 shrink-0">
+                <button type="button" onclick="openInitiateMentoringModal()"
+                    class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-indigo-700 bg-white hover:bg-slate-50 shadow-md transition">
+                    <i class="fa-solid fa-comments text-indigo-600 text-xs"></i>
+                    <span>Initiate 1-on-1 Mentoring</span>
+                </button>
                 <button onclick="document.getElementById('createCourseModal').classList.remove('hidden')"
                     class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition">
                     <i class="fa-solid fa-plus text-xs"></i>
@@ -31,6 +36,185 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- Pending UPSC Mains Answer Copies (Awaiting Teacher Evaluation) -->
+    <div id="pendingAnswerCopies" class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-3xl border border-amber-200 p-6 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold mb-1 border border-amber-200">
+                    <i class="fa-solid fa-file-pen text-amber-700"></i>
+                    <span>UPSC Mains Answer Copy Evaluation Queue</span>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900 tracking-tight">Pending Answer Sheet Evaluations</h3>
+                <p class="text-xs text-slate-600 mt-0.5">Students submit handwritten answer copies for UPSC Mains evaluation. Inspect papers, assign scores, write critique comments, and finalize reviews.</p>
+            </div>
+            <span class="px-3.5 py-1.5 bg-amber-200/70 text-amber-900 rounded-full text-xs font-bold font-mono">
+                {{ pending_answer_sheets|length if pending_answer_sheets else 0 }} Pending Review
+            </span>
+        </div>
+
+        {% if pending_answer_sheets %}
+        <div class="overflow-x-auto border border-amber-200 rounded-2xl bg-white shadow-xs">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="bg-amber-100/60 text-slate-600 text-[11px] uppercase tracking-wider font-semibold border-b border-amber-200">
+                        <th class="py-3 px-4">Student</th>
+                        <th class="py-3 px-4">Course & Lesson</th>
+                        <th class="py-3 px-4">Answer Copy File</th>
+                        <th class="py-3 px-3">Submitted On</th>
+                        <th class="py-3 px-3 text-center">Status</th>
+                        <th class="py-3 px-4 text-right">Evaluation Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-amber-100/80 font-medium">
+                    {% for sub in pending_answer_sheets %}
+                    <tr class="hover:bg-amber-50/40 transition">
+                        <td class="py-3 px-4">
+                            <div class="font-bold text-slate-900">{{ sub.student_name }}</div>
+                            <div class="text-[11px] text-slate-500 font-mono">{{ sub.student_user_id }} &bull; {{ sub.student_email }}</div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="font-bold text-slate-800">{{ sub.course_title }}</div>
+                            <div class="text-[11px] text-indigo-600">{{ sub.module_title or 'UPSC Mains Question' }}</div>
+                            {% if sub.remarks %}
+                            <div class="text-[11px] text-slate-400 italic line-clamp-1 mt-0.5">Student Note: "{{ sub.remarks }}"</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4">
+                            <a href="{{ sub.file_path if sub.file_path.startswith('/') else ('/static/uploads/' + sub.file_path) }}" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold transition">
+                                <i class="fa-solid fa-file-pdf text-red-600"></i>
+                                <span class="max-w-[140px] truncate">{{ sub.original_filename }}</span>
+                            </a>
+                        </td>
+                        <td class="py-3 px-3 text-slate-500">
+                            {{ sub.created_at[:10] if sub.created_at else 'Recent' }}
+                        </td>
+                        <td class="py-3 px-3 text-center">
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                Pending Evaluation
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-right">
+                            <button type="button" onclick="openEvaluateModal({{ sub.id }}, '{{ sub.student_name }}', '{{ sub.course_title|replace('\'', '\\\'') }}', '{{ sub.file_path if sub.file_path.startswith('/') else ('/static/uploads/' + sub.file_path) }}', '{{ sub.original_filename|replace('\'', '\\\'') }}')"
+                                class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition inline-flex items-center gap-1.5">
+                                <i class="fa-solid fa-feather-pointed"></i>
+                                <span>Evaluate & Grade</span>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-6 bg-white rounded-2xl border border-amber-100 text-center text-slate-400 text-xs">
+            <i class="fa-solid fa-circle-check text-emerald-500 text-xl mb-1 block"></i>
+            No pending UPSC answer sheets awaiting your evaluation right now!
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 1-on-1 Mentoring Sessions (Assigned by Admin or Initiated by Teacher) -->
+    <div id="mentoringSessions" class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-1">
+                    <i class="fa-solid fa-comments"></i>
+                    <span>Personalized Student Guidance</span>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900 tracking-tight">1-on-1 Mentoring Sessions</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Sessions assigned to you by Administration or initiated directly with enrolled learners.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="openInitiateMentoringModal()"
+                    class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition inline-flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus text-[10px]"></i>
+                    <span>Initiate Session with Student</span>
+                </button>
+            </div>
+        </div>
+
+        {% if mentoring_sessions %}
+        <div class="overflow-x-auto border border-slate-100 rounded-2xl">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-200">
+                        <th class="py-3 px-4">Student</th>
+                        <th class="py-3 px-4">Topic & Subject</th>
+                        <th class="py-3 px-4">Scheduled Date & Time</th>
+                        <th class="py-3 px-3 text-center">Type</th>
+                        <th class="py-3 px-3 text-center">Status</th>
+                        <th class="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium">
+                    {% for ms in mentoring_sessions %}
+                    <tr class="hover:bg-slate-50/50 transition">
+                        <td class="py-3 px-4">
+                            <div class="font-bold text-slate-900">{{ ms.student_name }}</div>
+                            <div class="text-[11px] text-slate-500 font-mono">{{ ms.student_user_id }} &bull; {{ ms.student_email }}</div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="font-bold text-indigo-900">{{ ms.topic }}</div>
+                            <div class="text-[11px] text-slate-500">{{ ms.course_title or 'General Mentorship' }}</div>
+                            {% if ms.description %}
+                            <div class="text-[11px] text-slate-400 italic line-clamp-1 mt-0.5">"{{ ms.description }}"</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-slate-700">
+                            <div><i class="fa-regular fa-calendar mr-1 text-slate-400"></i>{{ ms.scheduled_date or ms.preferred_date or 'To be scheduled' }}</div>
+                            <div class="text-[11px] text-slate-500"><i class="fa-regular fa-clock mr-1 text-slate-400"></i>{{ ms.scheduled_time or ms.preferred_time or '' }}</div>
+                        </td>
+                        <td class="py-3 px-3 text-center">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold {% if ms.initiator_role == 'teacher' %}bg-purple-50 text-purple-700{% else %}bg-blue-50 text-blue-700{% endif %}">
+                                {{ ms.initiator_role|upper }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 text-center">
+                            {% if ms.status == 'scheduled' %}
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Scheduled
+                            </span>
+                            {% elif ms.status == 'pending_student_schedule' %}
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Awaiting Student Timing
+                            </span>
+                            {% elif ms.status == 'completed' %}
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                Completed
+                            </span>
+                            {% else %}
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                {{ ms.status|title }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-right space-x-1.5">
+                            {% if ms.meeting_link %}
+                            <a href="{{ ms.meeting_link }}" target="_blank" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition">
+                                <i class="fa-solid fa-video text-[10px]"></i>
+                                <span>Join Meet</span>
+                            </a>
+                            {% endif %}
+                            {% if ms.status != 'completed' %}
+                            <button type="button" onclick="openCompleteMentoringModal({{ ms.id }}, '{{ ms.student_name }}', '{{ ms.topic|replace('\'', '\\\'') }}')"
+                                class="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-lg text-xs font-semibold transition">
+                                Mark Completed
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-6 border border-slate-100 rounded-2xl text-center text-slate-400 text-xs">
+            <i class="fa-solid fa-comments text-2xl text-slate-300 mb-1 block"></i>
+            No 1-on-1 mentoring sessions scheduled yet. Click "Initiate Session with Student" to connect with a learner.
+        </div>
+        {% endif %}
     </div>
 
     <!-- Live Classes Quick Summary (if any) -->
@@ -364,6 +548,157 @@
     </div>
 </div>
 
+<!-- Modal: Evaluate UPSC Mains Answer Copy -->
+<div id="evaluateModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-feather-pointed text-emerald-600 mr-2"></i> Evaluate UPSC Answer Copy
+            </h3>
+            <button onclick="closeEvaluateModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-1">
+            <div><strong>Student:</strong> <span id="evalStudentName"></span></div>
+            <div><strong>Course:</strong> <span id="evalCourseTitle"></span></div>
+            <div class="pt-1">
+                <strong>Answer Copy:</strong>
+                <a id="evalPdfLink" href="#" target="_blank" class="text-indigo-600 font-bold hover:underline inline-flex items-center gap-1 ml-1">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                    <span id="evalFilename"></span>
+                </a>
+            </div>
+        </div>
+
+        <form id="evaluateForm" onsubmit="submitEvaluation(event)" class="space-y-4">
+            <input type="hidden" id="evalSubmissionId" name="submission_id">
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Marks Awarded *</label>
+                    <input type="number" step="0.5" min="0" max="20" id="evalMarks" name="marks_awarded" required placeholder="e.g. 14.5"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Maximum Marks</label>
+                    <input type="number" id="evalMaxMarks" name="max_marks" value="20.0" readonly
+                        class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Faculty Critique & Feedback Comments *</label>
+                <textarea id="evalFeedback" name="feedback" rows="4" required placeholder="Write constructive feedback: structure of answer, presentation of points, analytical depth, conclusion, and scope for improvement..."
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeEvaluateModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" id="btnSubmitEval" class="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Complete & Send Feedback</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Teacher Initiate 1-on-1 Mentoring -->
+<div id="initiateMentoringModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-comments text-indigo-600 mr-2"></i> Initiate 1-on-1 Mentoring
+            </h3>
+            <button onclick="closeInitiateMentoringModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <p class="text-xs text-slate-500">
+            Invite an enrolled student for dedicated 1-on-1 subject coaching. The student will receive a notification and can confirm or suggest convenient dates & times.
+        </p>
+
+        <form id="initiateMentoringForm" onsubmit="submitInitiateMentoring(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Select Student *</label>
+                <select id="mentorStudentSelect" name="student_id" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="">-- Choose Enrolled Student --</option>
+                    {% for s in enrolled_students %}
+                    <option value="{{ s.id }}">{{ s.full_name }} ({{ s.user_id }}) &bull; {{ s.course_title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Topic / Focus Area *</label>
+                <input type="text" id="mentorTopicInput" name="topic" required placeholder="e.g. UPSC Answer Writing Strategy / Constitutional Law Doubts"
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Proposed Date *</label>
+                    <input type="date" id="mentorProposedDate" name="scheduled_date" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Proposed Time *</label>
+                    <input type="time" id="mentorProposedTime" name="scheduled_time" required value="16:00" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Guidance Agenda / Notes</label>
+                <textarea id="mentorNotesInput" name="description" rows="2" placeholder="Brief outline of topics to cover or areas where student needs extra practice..."
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeInitiateMentoringModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" id="btnSubmitInitiateMentoring" class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Send Invitation</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Complete Mentoring Session -->
+<div id="completeMentoringModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <i class="fa-solid fa-circle-check text-emerald-600 mr-2"></i> Conclude Mentoring Session
+            </h3>
+            <button onclick="closeCompleteMentoringModal()" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="text-xs text-slate-600">
+            <div><strong>Student:</strong> <span id="completeStudentName"></span></div>
+            <div><strong>Topic:</strong> <span id="completeTopic"></span></div>
+        </div>
+
+        <form id="completeMentoringForm" onsubmit="submitCompleteMentoring(event)" class="space-y-3">
+            <input type="hidden" id="completeSessionId">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Session Guidance Notes & Next Steps</label>
+                <textarea id="completeTeacherNotes" rows="3" placeholder="Summary of guidance provided, student strengths, and recommended practice tasks..."
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeCompleteMentoringModal()" class="px-3.5 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition">Mark Completed</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 function previewThumbnailFile(input, previewId) {
     if (input.files && input.files[0]) {
@@ -405,6 +740,146 @@ async function submitFacultyReply(e, ticketId) {
         } else {
             const data = await res.json();
             alert(data.detail || 'Error posting reply.');
+        }
+    } catch(err) {
+        alert('Connection error.');
+    }
+}
+
+// Evaluation Modal Handlers
+function openEvaluateModal(submissionId, studentName, courseTitle, filePath, filename) {
+    document.getElementById('evalSubmissionId').value = submissionId;
+    document.getElementById('evalStudentName').innerText = studentName;
+    document.getElementById('evalCourseTitle').innerText = courseTitle;
+    document.getElementById('evalPdfLink').href = filePath;
+    document.getElementById('evalFilename').innerText = filename;
+    document.getElementById('evalMarks').value = '';
+    document.getElementById('evalFeedback').value = '';
+    document.getElementById('evaluateModal').classList.remove('hidden');
+}
+
+function closeEvaluateModal() {
+    document.getElementById('evaluateModal').classList.add('hidden');
+}
+
+async function submitEvaluation(e) {
+    e.preventDefault();
+    const subId = document.getElementById('evalSubmissionId').value;
+    const marks = document.getElementById('evalMarks').value;
+    const maxMarks = document.getElementById('evalMaxMarks').value;
+    const feedback = document.getElementById('evalFeedback').value;
+    const btn = document.getElementById('btnSubmitEval');
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Saving Evaluation...`;
+
+    try {
+        const fd = new FormData();
+        fd.append('marks_awarded', marks);
+        fd.append('max_marks', maxMarks);
+        fd.append('feedback', feedback);
+
+        const res = await fetch(`/api/answer-sheet/${subId}/evaluate`, {
+            method: 'POST',
+            body: fd
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`Evaluation completed! Student has been notified with score (${marks}/${maxMarks}) and constructive feedback.`);
+            location.reload();
+        } else {
+            alert(data.detail || 'Evaluation failed to submit.');
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-check-double"></i> Complete & Send Feedback`;
+        }
+    } catch(err) {
+        alert('Server communication error.');
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check-double"></i> Complete & Send Feedback`;
+    }
+}
+
+// 1-on-1 Mentoring Handlers
+function openInitiateMentoringModal() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('mentorProposedDate').value = today;
+    document.getElementById('mentorProposedTime').value = '16:00';
+    document.getElementById('initiateMentoringModal').classList.remove('hidden');
+}
+
+function closeInitiateMentoringModal() {
+    document.getElementById('initiateMentoringModal').classList.add('hidden');
+}
+
+async function submitInitiateMentoring(e) {
+    e.preventDefault();
+    const studentId = document.getElementById('mentorStudentSelect').value;
+    const topic = document.getElementById('mentorTopicInput').value;
+    const scheduledDate = document.getElementById('mentorProposedDate').value;
+    const scheduledTime = document.getElementById('mentorProposedTime').value;
+    const desc = document.getElementById('mentorNotesInput').value;
+    const btn = document.getElementById('btnSubmitInitiateMentoring');
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Sending Invite...`;
+
+    try {
+        const fd = new FormData();
+        fd.append('student_id', studentId);
+        fd.append('topic', topic);
+        fd.append('scheduled_date', scheduledDate);
+        fd.append('scheduled_time', scheduledTime);
+        fd.append('description', desc);
+
+        const res = await fetch('/api/mentoring/teacher-request', {
+            method: 'POST',
+            body: fd
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert('Mentoring invitation dispatched to student! They can confirm timing or suggest alternatives.');
+            location.reload();
+        } else {
+            alert(data.detail || 'Failed to dispatch mentoring request.');
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Send Invitation`;
+        }
+    } catch(err) {
+        alert('Server connection error.');
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Send Invitation`;
+    }
+}
+
+function openCompleteMentoringModal(sessionId, studentName, topic) {
+    document.getElementById('completeSessionId').value = sessionId;
+    document.getElementById('completeStudentName').innerText = studentName;
+    document.getElementById('completeTopic').innerText = topic;
+    document.getElementById('completeTeacherNotes').value = '';
+    document.getElementById('completeMentoringModal').classList.remove('hidden');
+}
+
+function closeCompleteMentoringModal() {
+    document.getElementById('completeMentoringModal').classList.add('hidden');
+}
+
+async function submitCompleteMentoring(e) {
+    e.preventDefault();
+    const sessionId = document.getElementById('completeSessionId').value;
+    const notes = document.getElementById('completeTeacherNotes').value;
+
+    try {
+        const fd = new FormData();
+        fd.append('teacher_notes', notes);
+        const res = await fetch(`/api/mentoring/${sessionId}/complete`, {
+            method: 'POST',
+            body: fd
+        });
+        if (res.ok) {
+            alert('Mentoring session concluded. Student notified with guidance notes.');
+            location.reload();
+        } else {
+            alert('Could not conclude session.');
         }
     } catch(err) {
         alert('Connection error.');
