@@ -1731,12 +1731,23 @@ async def handle_create_department(
 @router.post("/department/users/assign-department")
 async def handle_assign_user_department(
     request: Request,
-    user_id: int = Form(...),
+    user_id: str = Form(...),
     department_name: str = Form(...)
 ):
     """Admin-only: Moves or reassigns a teacher or student to a department bucket."""
     user = require_dept_admin(request)
-    success = assign_user_to_department(user_id=user_id, department_name=department_name, admin_user_id=user["id"])
+    try:
+        uid_int = int(user_id)
+    except Exception:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT id FROM users WHERE user_id = ? OR id = ?", (user_id, user_id))
+            r = c.fetchone()
+            if not r:
+                raise HTTPException(status_code=400, detail=f"User {user_id} not found")
+            uid_int = r["id"]
+
+    success = assign_user_to_department(user_id=uid_int, department_name=department_name.strip(), admin_user_id=user["id"])
     if not success:
         raise HTTPException(status_code=400, detail="Could not assign user to department")
     return RedirectResponse(url="/department?tab=departments&user_assigned=1", status_code=303)
