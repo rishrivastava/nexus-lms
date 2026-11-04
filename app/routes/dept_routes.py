@@ -30,6 +30,10 @@ def require_dept_admin_or_teacher(request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=303, headers={"Location": "/login"})
+    if user["must_change_password"]:
+        raise HTTPException(status_code=303, headers={"Location": "/setup-account"})
+    if user["role"] == "student":
+        raise HTTPException(status_code=303, headers={"Location": "/student"})
     if user["role"] not in ["department_admin", "teacher", "dashboard_viewer"]:
         raise HTTPException(status_code=403, detail="Access reserved for Department Admins, Faculty, and Dashboard Viewers.")
     return user
@@ -38,6 +42,12 @@ def require_dept_admin(request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=303, headers={"Location": "/login"})
+    if user["must_change_password"]:
+        raise HTTPException(status_code=303, headers={"Location": "/setup-account"})
+    if user["role"] == "student":
+        raise HTTPException(status_code=303, headers={"Location": "/student"})
+    if user["role"] == "teacher":
+        raise HTTPException(status_code=303, headers={"Location": "/teacher"})
     if user["role"] != "department_admin":
         raise HTTPException(status_code=403, detail="Access reserved exclusively for Department Head / Administrator.")
     return user

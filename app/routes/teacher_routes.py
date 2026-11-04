@@ -26,6 +26,10 @@ def require_teacher_or_admin(request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=303, headers={"Location": "/login"})
+    if user["must_change_password"]:
+        raise HTTPException(status_code=303, headers={"Location": "/setup-account"})
+    if user["role"] == "student":
+        raise HTTPException(status_code=303, headers={"Location": "/student"})
     if user["role"] not in ["teacher", "department_admin"]:
         raise HTTPException(status_code=403, detail="Only teachers or administrators can access this area.")
     return user

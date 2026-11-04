@@ -31,6 +31,12 @@ def get_student_user(request: Request):
         raise HTTPException(status_code=303, headers={"Location": "/login"})
     if user["must_change_password"]:
         raise HTTPException(status_code=303, headers={"Location": "/setup-account"})
+    if user["role"] == "teacher":
+        raise HTTPException(status_code=303, headers={"Location": "/teacher"})
+    if user["role"] in ["department_admin", "dashboard_viewer"]:
+        raise HTTPException(status_code=303, headers={"Location": "/department"})
+    if user["role"] != "student":
+        raise HTTPException(status_code=303, headers={"Location": "/login"})
     return user
 
 @router.get("/student", response_class=HTMLResponse)
@@ -40,6 +46,13 @@ async def student_dashboard(request: Request):
         return RedirectResponse(url="/login", status_code=303)
     if user["must_change_password"]:
         return RedirectResponse(url="/setup-account", status_code=303)
+    # Role Enforcement: Strictly isolate student portal from faculty and admin roles
+    if user["role"] == "teacher":
+        return RedirectResponse(url="/teacher", status_code=303)
+    if user["role"] in ["department_admin", "dashboard_viewer"]:
+        return RedirectResponse(url="/department", status_code=303)
+    if user["role"] != "student":
+        return RedirectResponse(url="/login", status_code=303)
 
     dept_name = user.get("department") or "Foreign Language"
     department_info = get_department_by_name(dept_name)
