@@ -1,0 +1,1317 @@
+{
+  "info": {
+    "name": "Nexus LMS - Complete API & Feature Collection",
+    "description": "Production-grade Postman collection for Nexus Learning Management System (LMS).\n\nIncludes complete request definitions for:\n1. Authentication & Session Management\n2. Department Administration & Faculty Governance (Multi-Department Assignment Flow)\n3. Subjective Ans Sheet Upload & Evaluation Surveillance\n4. Teacher Studio, Course Authoring & Analytics (Class Isolation)\n5. Student Learning Portal & 360\u00b0 Profile Portfolio\n6. Live Interactive Classes & In-Stream Doubt Engine\n7. 1-on-1 Faculty Mentorship Booking Engine\n8. Mylo AI (Google Gemini) Quiz Generation & Insights\n9. Enterprise PowerBI & Tabular Reporting APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://boats-revisions-released-strap.trycloudflare.com",
+      "type": "string"
+    },
+    {
+      "key": "localUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "admin_username",
+      "value": "admin@nexus.edu",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "admin123",
+      "type": "string"
+    },
+    {
+      "key": "teacher_username",
+      "value": "alan@nexus.edu",
+      "type": "string"
+    },
+    {
+      "key": "teacher_password",
+      "value": "teacher123",
+      "type": "string"
+    },
+    {
+      "key": "student_username",
+      "value": "CS2026-002",
+      "type": "string"
+    },
+    {
+      "key": "student_password",
+      "value": "student123",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "teacher_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "student_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication & User Profile",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "user_id",
+                  "value": "{{admin_username}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{admin_password}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Authenticates department admin and returns session cookie (lms_token)."
+          }
+        },
+        {
+          "name": "Teacher Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "user_id",
+                  "value": "{{teacher_username}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{teacher_password}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Authenticates teacher and returns teacher session cookie."
+          }
+        },
+        {
+          "name": "Student Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "user_id",
+                  "value": "{{student_username}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{student_password}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Authenticates student by Unique Student ID (e.g. CS2026-002)."
+          }
+        },
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "Fetches profile page. For teachers, shows read-only assigned departments and enrolled student answer sheet PDFs. Welcomes user cleanly by name (Welcome First Last!)."
+          }
+        },
+        {
+          "name": "Update Profile Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "full_name",
+                  "value": "Prof. Rameez Updated",
+                  "type": "text"
+                },
+                {
+                  "key": "school_name",
+                  "value": "Lead Group High School",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "+91 9876543210",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/profile/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile",
+                "update"
+              ]
+            },
+            "description": "Updates non-department profile attributes. Server blocks non-admins from changing department."
+          }
+        },
+        {
+          "name": "Logout Session",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logout"
+              ]
+            },
+            "description": "Clears authentication cookies and terminates session."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Department Administration & Faculty Governance",
+      "item": [
+        {
+          "name": "Get Department Governance Dashboard",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/department?tab=teachers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department"
+              ],
+              "query": [
+                {
+                  "key": "tab",
+                  "value": "teachers"
+                }
+              ]
+            },
+            "description": "Admin governance view displaying all faculty cards, assigned departments, and quick action buttons."
+          }
+        },
+        {
+          "name": "Assign Teacher to Department(s)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teacher_id\": 2,\n  \"department_ids\": [\n    1,\n    2\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/department/teachers/assign-departments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department",
+                "teachers",
+                "assign-departments"
+              ]
+            },
+            "description": "STEP 1 of Faculty Flow: Maps teacher to one or more departments in teacher_departments table."
+          }
+        },
+        {
+          "name": "Get Teacher Assignable Courses (Dept Filtered)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/teachers/2/assignable-courses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teachers",
+                "2",
+                "assignable-courses"
+              ]
+            },
+            "description": "STEP 2 of Faculty Flow: Returns ONLY courses belonging to the departments that teacher is currently assigned to."
+          }
+        },
+        {
+          "name": "Assign Course to Teacher",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teacher_id\": 2,\n  \"course_id\": 8895\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/department/teachers/assign-course",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department",
+                "teachers",
+                "assign-course"
+              ]
+            },
+            "description": "STEP 3 of Faculty Flow: Assigns course to teacher. Server strictly checks that teacher is in the course's department first."
+          }
+        },
+        {
+          "name": "Create New Department / Bucket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "name",
+                  "value": "Advanced Robotics & AI",
+                  "type": "text"
+                },
+                {
+                  "key": "code",
+                  "value": "ROBOTICS_AI",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Hands-on robotics, microcontrollers, and neural programming.",
+                  "type": "text"
+                },
+                {
+                  "key": "ans_writing_enabled",
+                  "value": "1",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/department/departments/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department",
+                "departments",
+                "create"
+              ]
+            },
+            "description": "Creates a new organizational department bucket."
+          }
+        },
+        {
+          "name": "Toggle Ans Sheet Upload Feature for Department",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/department/departments/1/toggle-ans-writing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department",
+                "departments",
+                "1",
+                "toggle-ans-writing"
+              ]
+            },
+            "description": "Toggles Ans Sheet upload feature at the department level."
+          }
+        },
+        {
+          "name": "Register Single Student (National Schema)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "full_name",
+                  "value": "Arnav Sen",
+                  "type": "text"
+                },
+                {
+                  "key": "department",
+                  "value": "Foreign Language",
+                  "type": "text"
+                },
+                {
+                  "key": "school_name",
+                  "value": "Delhi Public School",
+                  "type": "text"
+                },
+                {
+                  "key": "udise_code",
+                  "value": "07010100101",
+                  "type": "text"
+                },
+                {
+                  "key": "district",
+                  "value": "Central Delhi",
+                  "type": "text"
+                },
+                {
+                  "key": "guardian_name",
+                  "value": "Rajesh Sen",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "arnav.sen@nexus.edu",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/department/students/register-single",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department",
+                "students",
+                "register-single"
+              ]
+            },
+            "description": "Registers a student with comprehensive national institutional metadata."
+          }
+        },
+        {
+          "name": "Export Student Records (CSV)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/department/export-csv",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department",
+                "export-csv"
+              ]
+            },
+            "description": "Exports entire student directory and enrollment records as CSV."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Ans Sheet Upload & Evaluation Surveillance",
+      "item": [
+        {
+          "name": "Admin Answer Sheets Surveillance Monitor",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/department?tab=answer-sheets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department"
+              ],
+              "query": [
+                {
+                  "key": "tab",
+                  "value": "answer-sheets"
+                }
+              ]
+            },
+            "description": "Admin surveillance dashboard showing 4 live KPIs (Total Received, Evaluated Copies, Pending Evaluation, Evaluation Rate) and full submissions table."
+          }
+        },
+        {
+          "name": "Upload Handwritten Answer Sheet (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "answer_pdf",
+                  "type": "file",
+                  "src": "sample_answer_sheet.pdf"
+                },
+                {
+                  "key": "student_comment",
+                  "value": "Completed Section A and Section B subjective solutions.",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/course/8895/upload-answer-sheet",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course",
+                "8895",
+                "upload-answer-sheet"
+              ]
+            },
+            "description": "Student uploads handwritten PDF answer sheet for a given course."
+          }
+        },
+        {
+          "name": "Get Course Answer Sheets Submissions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/course/8895/answer-sheets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course",
+                "8895",
+                "answer-sheets"
+              ]
+            },
+            "description": "Retrieves all submitted answer sheets and evaluation statuses for a course."
+          }
+        },
+        {
+          "name": "Evaluate Answer Sheet (Teacher Grading)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "marks_obtained",
+                  "value": "88",
+                  "type": "text"
+                },
+                {
+                  "key": "max_marks",
+                  "value": "100",
+                  "type": "text"
+                },
+                {
+                  "key": "evaluator_comments",
+                  "value": "Good conceptual clarity. Improve diagram labeling in Question 3.",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/answer-sheet/1/evaluate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "answer-sheet",
+                "1",
+                "evaluate"
+              ]
+            },
+            "description": "Faculty evaluates student handwritten PDF, awards marks, and provides pedagogical remarks."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Teacher Studio, Course Authoring & Analytics",
+      "item": [
+        {
+          "name": "Teacher Studio (Assigned Classes)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/teacher",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher"
+              ]
+            },
+            "description": "Teacher Studio view. Strictly displays only classes explicitly assigned to this teacher."
+          }
+        },
+        {
+          "name": "Teacher Analytics Dashboard",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/teacher/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher",
+                "dashboard"
+              ]
+            },
+            "description": "Comprehensive teacher analytics: multi-course comparison, top/at-risk students, completion velocity, and drill-down metrics."
+          }
+        },
+        {
+          "name": "Inspect Student 360\u00b0 Profile Modal",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/students/2485/profile-modal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "2485",
+                "profile-modal"
+              ]
+            },
+            "description": "Enables teachers and admins to inspect a student's full portfolio, course completion %, quiz history, and submitted answer sheets."
+          }
+        },
+        {
+          "name": "Create Course (Admin / Teacher)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "title",
+                  "value": "Applied Machine Learning & Deep Neural Networks",
+                  "type": "text"
+                },
+                {
+                  "key": "code",
+                  "value": "AI-2026",
+                  "type": "text"
+                },
+                {
+                  "key": "department",
+                  "value": "Foreign Language",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Hands-on PyTorch and transformer architectures.",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/teacher/course/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher",
+                "course",
+                "create"
+              ]
+            },
+            "description": "Creates a new course."
+          }
+        },
+        {
+          "name": "Edit Course & Assign Faculty",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "title",
+                  "value": "IITJEE foundation 1",
+                  "type": "text"
+                },
+                {
+                  "key": "code",
+                  "value": "IITJEE_UK1_2026",
+                  "type": "text"
+                },
+                {
+                  "key": "department",
+                  "value": "Test Prep",
+                  "type": "text"
+                },
+                {
+                  "key": "teacher_id",
+                  "value": "2489",
+                  "type": "text"
+                },
+                {
+                  "key": "status_val",
+                  "value": "published",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/teacher/course/8893/edit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher",
+                "course",
+                "8893",
+                "edit"
+              ]
+            },
+            "description": "Updates course details and validates faculty department affiliation."
+          }
+        },
+        {
+          "name": "Add Module to Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "title",
+                  "value": "Module 1: Foundations & Core Concepts",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Essential architectural principles and prerequisite drills.",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "1",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/teacher/course/8895/module",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher",
+                "course",
+                "8895",
+                "module"
+              ]
+            },
+            "description": "Adds a structured learning module to a course."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Student Learning Portal & Execution",
+      "item": [
+        {
+          "name": "Get Student Dashboard",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/student",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "student"
+              ]
+            },
+            "description": "Student homepage displaying enrolled courses, overall completion velocity, and live classes."
+          }
+        },
+        {
+          "name": "Access Course Player",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/course/8895",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "course",
+                "8895"
+              ]
+            },
+            "description": "Opens interactive course learning view with video player, PDF viewer, quiz modules, and doubt pane."
+          }
+        },
+        {
+          "name": "Mark Lesson Completed",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/lesson/1/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "lesson",
+                "1",
+                "complete"
+              ]
+            },
+            "description": "Records completion progress for a video, reading material, or quiz lesson."
+          }
+        },
+        {
+          "name": "Submit Quiz Assessment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": {\n    \"1\": \"B\",\n    \"2\": \"A\",\n    \"3\": \"C\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/1/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "1",
+                "submit"
+              ]
+            },
+            "description": "Submits quiz attempt, autogrades responses, and calculates score percentage."
+          }
+        },
+        {
+          "name": "Verify Issued Certificate",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/verify/LBPL-2026-000007",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "verify",
+                "LBPL-2026-000007"
+              ]
+            },
+            "description": "Public verification endpoint for digitally signed tamper-proof course completion certificate."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Live Interactive Classes & In-Stream Doubt Engine",
+      "item": [
+        {
+          "name": "Create Live Class Schedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": 8895,\n  \"title\": \"Interactive Problem Solving & Doubt Clearing\",\n  \"scheduled_at\": \"2026-11-10T18:00:00\",\n  \"meeting_url\": \"https://meet.google.com/xyz-abcd-efg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/live-classes/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "live-classes",
+                "create"
+              ]
+            },
+            "description": "Schedules a live interactive class for enrolled students."
+          }
+        },
+        {
+          "name": "Update Live Class Status (Go Live / End)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"live\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/live-classes/1/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "live-classes",
+                "1",
+                "status"
+              ]
+            },
+            "description": "Teacher marks live stream status ('scheduled', 'live', or 'completed')."
+          }
+        },
+        {
+          "name": "Submit Question During Live Class",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question_text\": \"Could you please explain step 2 of the derivation once more?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/live-classes/1/questions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "live-classes",
+                "1",
+                "questions"
+              ]
+            },
+            "description": "Student submits real-time question into teacher's live moderation queue."
+          }
+        },
+        {
+          "name": "Teacher Answer Live Class Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answer_text\": \"Answered verbally on stream. Key point: apply the chain rule first.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/live-classes/questions/1/answer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "live-classes",
+                "questions",
+                "1",
+                "answer"
+              ]
+            },
+            "description": "Teacher resolves question in moderation queue."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. 1-on-1 Faculty Mentorship Booking Engine",
+      "item": [
+        {
+          "name": "Request 1-on-1 Mentorship Session (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teacher_id\": 2,\n  \"topic\": \"Strategy Review for Prelims & Subjective Writing\",\n  \"preferred_date\": \"2026-11-12\",\n  \"preferred_time\": \"17:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mentoring/student-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mentoring",
+                "student-request"
+              ]
+            },
+            "description": "Student books 1-on-1 counseling or doubt resolution session with faculty."
+          }
+        },
+        {
+          "name": "Get My Mentorship Sessions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/mentoring/my-sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mentoring",
+                "my-sessions"
+              ]
+            },
+            "description": "Lists all pending, scheduled, and completed mentoring appointments."
+          }
+        },
+        {
+          "name": "Complete Mentorship Session (Teacher Notes)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_notes\": \"Reviewed test errors. Suggested 2 daily practice questions for GS Paper 2.\",\n  \"status\": \"completed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mentoring/1/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mentoring",
+                "1",
+                "complete"
+              ]
+            },
+            "description": "Teacher marks mentoring session completed and logs counseling summary."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Mylo AI (Google Gemini) Engine",
+      "item": [
+        {
+          "name": "Generate AI Quiz with Gemini",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "topic",
+                  "value": "World War II Geopolitics & League of Nations",
+                  "type": "text"
+                },
+                {
+                  "key": "difficulty",
+                  "value": "medium",
+                  "type": "text"
+                },
+                {
+                  "key": "num_questions",
+                  "value": "5",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/teacher/course/8895/quiz/ai-generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher",
+                "course",
+                "8895",
+                "quiz",
+                "ai-generate"
+              ]
+            },
+            "description": "Leverages Google Gemini to automatically synthesize pedagogical multiple-choice questions with answer keys and rationale."
+          }
+        },
+        {
+          "name": "Test Gemini AI Connection",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/mylo/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mylo",
+                "test"
+              ]
+            },
+            "description": "Tests connectivity and API key validity with Google Gemini LLM API."
+          }
+        },
+        {
+          "name": "Get AI Usage Metrics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/mylo/usage-metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mylo",
+                "usage-metrics"
+              ]
+            },
+            "description": "Fetches analytics on generated quizzes, token consumption, and model response latency."
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. PowerBI & Enterprise Tabular Reporting APIs",
+      "item": [
+        {
+          "name": "Reporting: Students Master Feed",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reporting/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reporting",
+                "students"
+              ]
+            },
+            "description": "High-throughput tabular endpoint for BI dashboards (PowerBI, Tableau, Looker) with student profiles."
+          }
+        },
+        {
+          "name": "Reporting: Course Catalog & Enrollments",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reporting/courses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reporting",
+                "courses"
+              ]
+            },
+            "description": "Course-level metadata, department alignments, teacher assignments, and active enrollments."
+          }
+        },
+        {
+          "name": "Reporting: Quiz Attempts & Cognitive Scores",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reporting/quiz-attempts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reporting",
+                "quiz-attempts"
+              ]
+            },
+            "description": "Granular assessment results with pass/fail ratios and completion durations."
+          }
+        },
+        {
+          "name": "Reporting: Engagement & Study Velocity",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reporting/engagement",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reporting",
+                "engagement"
+              ]
+            },
+            "description": "Aggregated daily active users (DAU), time spent, lesson progress, and retention metrics."
+          }
+        }
+      ]
+    }
+  ]
+}
