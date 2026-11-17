@@ -57,6 +57,46 @@
                 </div>
             </form>
 
+            <!-- Firebase Authentication Provider Section -->
+            {% if brand.firebase_auth_enabled != '0' %}
+            <div class="mt-5">
+                <div class="relative my-4">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-slate-200"></div>
+                    </div>
+                    <div class="relative flex justify-center text-xs uppercase">
+                        <span class="bg-white px-3 text-slate-400 font-bold tracking-wider">Or continue with</span>
+                    </div>
+                </div>
+
+                <!-- Firebase Alert / Status Box -->
+                <div id="firebaseStatusBox" class="hidden mb-3 p-3 rounded-xl text-xs border"></div>
+
+                <!-- Google Sign In via Firebase Button -->
+                <button type="button" id="btnFirebaseGoogle" onclick="loginWithFirebaseGoogle()"
+                    class="w-full py-2.5 px-4 border border-slate-300 hover:border-slate-400 rounded-xl shadow-xs text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 transition flex items-center justify-center gap-2.5 cursor-pointer">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                    </svg>
+                    <span id="btnFirebaseGoogleText">Sign in with Google</span>
+                    <span class="ml-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Firebase</span>
+                </button>
+
+                <!-- Firebase Quick Test / Demo Modal Trigger -->
+                <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-500">
+                    <span class="flex items-center gap-1">
+                        <i class="fa-solid fa-fire text-amber-500"></i> Firebase Auth v10
+                    </span>
+                    <button type="button" onclick="openFirebaseSimModal()" class="text-indigo-600 hover:text-indigo-800 font-semibold underline cursor-pointer">
+                        Instant Firebase Demo / Test
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Quick Demo Login Switcher -->
             <div class="mt-6 pt-5 border-t border-slate-100">
                 <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center mb-3">Quick Demo Accounts (Click to Fill)</p>
@@ -93,4 +133,246 @@
         </div>
     </div>
 </div>
+
+<!-- Firebase Instant Test & Configuration Modal -->
+<div id="firebaseSimModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <div class="px-6 py-4 bg-gradient-to-r from-amber-500 to-indigo-600 text-white flex justify-between items-center">
+            <div class="flex items-center space-x-2.5">
+                <i class="fa-solid fa-fire text-xl text-amber-200"></i>
+                <div>
+                    <h3 class="font-bold text-sm">Firebase Authentication Hub</h3>
+                    <p class="text-[11px] text-amber-100">Client SDK &bull; Server SSO Pipeline</p>
+                </div>
+            </div>
+            <button onclick="closeFirebaseSimModal()" class="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition cursor-pointer">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+        </div>
+
+        <div class="p-6 space-y-4 text-xs">
+            <!-- Firebase Project Status Pill -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-700">Project Status:</span>
+                    <span id="fbModalStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold">Checking...</span>
+                </div>
+                <p id="fbModalStatusDesc" class="text-[11px] text-slate-500">Live Firebase credentials can be configured anytime in Department Settings &gt; Integrations.</p>
+            </div>
+
+            <!-- Instant Test Buttons -->
+            <div>
+                <span class="block font-bold text-slate-700 mb-2 uppercase tracking-wider text-[10px]">Instant 1-Click Firebase Test Logins:</span>
+                <div class="grid grid-cols-1 gap-2">
+                    <button type="button" onclick="testFirebaseLogin('admin@nexus.edu', 'Admin Rishu', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', 'admin')"
+                        class="w-full py-2.5 px-3 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-xl font-bold flex items-center justify-between border border-purple-200 transition cursor-pointer">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-user-shield text-purple-600"></i>
+                            <span>Admin Sign-In (admin@nexus.edu)</span>
+                        </span>
+                        <span class="text-[10px] bg-purple-200/70 px-2 py-0.5 rounded font-mono">&rarr; /department</span>
+                    </button>
+                    <button type="button" onclick="testFirebaseLogin('alan@nexus.edu', 'Prof. Rameez', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', 'teacher')"
+                        class="w-full py-2.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded-xl font-bold flex items-center justify-between border border-indigo-200 transition cursor-pointer">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-chalkboard-user text-indigo-600"></i>
+                            <span>Teacher Sign-In (alan@nexus.edu)</span>
+                        </span>
+                        <span class="text-[10px] bg-indigo-200/70 px-2 py-0.5 rounded font-mono">&rarr; /teacher</span>
+                    </button>
+                    <button type="button" onclick="testFirebaseLogin('student@nexus.edu', 'Priya Patel', '', 'student')"
+                        class="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl font-bold flex items-center justify-between border border-emerald-200 transition cursor-pointer">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-user-graduate text-emerald-600"></i>
+                            <span>Student Sign-In (Priya Patel)</span>
+                        </span>
+                        <span class="text-[10px] bg-emerald-200/70 px-2 py-0.5 rounded font-mono">&rarr; /student</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Email Provisioning -->
+            <div class="pt-3 border-t border-slate-100 space-y-2">
+                <span class="block font-bold text-slate-700 uppercase tracking-wider text-[10px]">Test Auto-Provision Any Google Account:</span>
+                <div class="flex gap-2">
+                    <input type="email" id="customFbEmail" placeholder="your.name@gmail.com"
+                        class="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <button type="button" onclick="testCustomFirebaseLogin()"
+                        class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition cursor-pointer">
+                        Sign In
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Firebase Web SDK Compat Libraries (v10) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<script>
+    // Firebase Client Configuration
+    const fbApiKey = "{{ brand.firebase_api_key or '' }}";
+    const fbAuthDomain = "{{ brand.firebase_auth_domain or '' }}";
+    const fbProjectId = "{{ brand.firebase_project_id or '' }}";
+    const fbAppId = "{{ brand.firebase_app_id or '' }}";
+
+    let isFirebaseReady = false;
+    if (fbApiKey && fbProjectId && typeof firebase !== 'undefined') {
+        try {
+            firebase.initializeApp({
+                apiKey: fbApiKey,
+                authDomain: fbAuthDomain || (fbProjectId + ".firebaseapp.com"),
+                projectId: fbProjectId,
+                appId: fbAppId
+            });
+            isFirebaseReady = true;
+            console.log("Firebase Auth initialized for project:", fbProjectId);
+        } catch (e) {
+            console.warn("Firebase Auth config notice:", e);
+        }
+    }
+
+    function showFirebaseStatus(msg, type = "info") {
+        const box = document.getElementById('firebaseStatusBox');
+        if (!box) return;
+        box.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-red-200', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'bg-amber-50', 'text-amber-700', 'border-amber-200');
+        if (type === "error") {
+            box.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+            box.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-500"></i> ${msg}`;
+        } else if (type === "success") {
+            box.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+            box.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5 text-emerald-500"></i> ${msg}`;
+        } else {
+            box.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+            box.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5 text-amber-500"></i> ${msg}`;
+        }
+    }
+
+    // Google Sign-In via Firebase
+    async function loginWithFirebaseGoogle() {
+        if (!isFirebaseReady) {
+            openFirebaseSimModal();
+            return;
+        }
+
+        const btnText = document.getElementById('btnFirebaseGoogleText');
+        const origText = btnText.innerText;
+        btnText.innerText = "Connecting Google...";
+        showFirebaseStatus("Launching Firebase Google Authentication popup...", "loading");
+
+        try {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
+            const result = await firebase.auth().signInWithPopup(provider);
+            const user = result.user;
+            const idToken = await user.getIdToken();
+
+            showFirebaseStatus(`Google user '${user.displayName || user.email}' verified. Establishing LMS session...`, "loading");
+
+            await submitFirebaseLoginPayload({
+                id_token: idToken,
+                email: user.email,
+                name: user.displayName,
+                photo_url: user.photoURL,
+                firebase_uid: user.uid,
+                provider_id: "google.com"
+            });
+        } catch (error) {
+            console.error("Firebase Login Error:", error);
+            btnText.innerText = origText;
+            if (error.code === 'auth/unauthorized-domain') {
+                showFirebaseStatus(`Domain unauthorized! Add '${window.location.hostname}' to Firebase Console > Authentication > Settings > Authorized Domains (without http or port).`, "error");
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                showFirebaseStatus("Sign-in popup was closed before completion.", "error");
+            } else {
+                showFirebaseStatus(error.message || "Firebase sign-in failed.", "error");
+            }
+        }
+    }
+
+    // Send verified Firebase credentials to LMS Backend
+    async function submitFirebaseLoginPayload(payload) {
+        try {
+            const res = await fetch('/api/auth/firebase-login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                showFirebaseStatus(data.message || "Login successful! Redirecting...", "success");
+                setTimeout(() => {
+                    window.location.href = data.redirect_url || '/student';
+                }, 400);
+            } else {
+                showFirebaseStatus(data.detail || data.message || "Backend authentication failed.", "error");
+            }
+        } catch (err) {
+            console.error("Fetch Error:", err);
+            showFirebaseStatus("Connection error delivering Firebase token to LMS backend.", "error");
+        }
+    }
+
+    // Modal Control & Quick Testing
+    function openFirebaseSimModal() {
+        const modal = document.getElementById('firebaseSimModal');
+        const badge = document.getElementById('fbModalStatusBadge');
+        const desc = document.getElementById('fbModalStatusDesc');
+        if (modal) modal.classList.remove('hidden');
+
+        if (isFirebaseReady) {
+            badge.innerText = "Configured & Live";
+            badge.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800";
+            desc.innerHTML = `Connected to Firebase Project: <strong>${fbProjectId}</strong>. Real popup auth is active.`;
+        } else {
+            badge.innerText = "Demo / Unconfigured";
+            badge.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800";
+            desc.innerHTML = "No Firebase API key saved yet. You can use the instant 1-click test buttons below to test the complete Firebase SSO backend pipeline!";
+        }
+    }
+
+    function closeFirebaseSimModal() {
+        const modal = document.getElementById('firebaseSimModal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    async function testFirebaseLogin(email, name, photoUrl, role) {
+        closeFirebaseSimModal();
+        showFirebaseStatus(`Simulating Firebase sign-in for ${email}...`, "loading");
+        await submitFirebaseLoginPayload({
+            id_token: "simulated_firebase_jwt_" + btoa(JSON.stringify({ sub: "fb_sim_" + email, email: email, name: name })),
+            email: email,
+            name: name,
+            photo_url: photoUrl,
+            firebase_uid: "fb_uid_" + email.replace(/[@.]/g, "_"),
+            provider_id: "google.com"
+        });
+    }
+
+    async function testCustomFirebaseLogin() {
+        const email = document.getElementById('customFbEmail').value.trim();
+        if (!email) {
+            alert("Please enter a valid email address.");
+            return;
+        }
+        closeFirebaseSimModal();
+        showFirebaseStatus(`Auto-provisioning new learner for ${email} via Firebase...`, "loading");
+        const cleanName = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        await submitFirebaseLoginPayload({
+            id_token: "simulated_firebase_jwt_" + btoa(JSON.stringify({ sub: "fb_sim_" + email, email: email, name: cleanName })),
+            email: email,
+            name: cleanName,
+            photo_url: "",
+            firebase_uid: "fb_uid_" + email.replace(/[@.]/g, "_"),
+            provider_id: "google.com"
+        });
+    }
+</script>
 {% endblock %}

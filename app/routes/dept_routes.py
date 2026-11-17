@@ -1172,6 +1172,36 @@ async def generate_powerbi_key(request: Request):
     
     return RedirectResponse(url="/department?tab=integrations&key_generated=1", status_code=303)
 
+@router.post("/department/firebase/settings")
+async def update_firebase_settings(request: Request):
+    """Updates Firebase Authentication configuration (API Key, Project ID, App ID, Auth Domain)."""
+    user = require_dept_admin(request)
+    form = await request.form()
+    
+    auth_enabled = "1" if form.get("firebase_auth_enabled") else "0"
+    api_key = form.get("firebase_api_key", "").strip()
+    auth_domain = form.get("firebase_auth_domain", "").strip()
+    project_id = form.get("firebase_project_id", "").strip()
+    app_id = form.get("firebase_app_id", "").strip()
+    
+    update_system_settings({
+        "firebase_auth_enabled": auth_enabled,
+        "firebase_api_key": api_key,
+        "firebase_auth_domain": auth_domain,
+        "firebase_project_id": project_id,
+        "firebase_app_id": app_id
+    })
+    
+    log_audit(
+        user["id"],
+        "UPDATE_FIREBASE_SETTINGS",
+        "system_settings",
+        "firebase_auth",
+        f"Admin updated Firebase Auth settings: Enabled={auth_enabled}, Project='{project_id}'"
+    )
+    
+    return RedirectResponse(url="/department?tab=integrations&firebase_saved=1", status_code=303)
+
 @router.post("/department/notifications/settings")
 async def update_notifications_settings_route(request: Request):
     """Updates notification delivery triggers and administrator preferences."""

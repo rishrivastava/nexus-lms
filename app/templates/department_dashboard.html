@@ -1247,6 +1247,88 @@ in
                     </div>
                 </form>
             </div>
+
+            <!-- Firebase Authentication Integration Manager -->
+            <div class="pt-6 border-t border-slate-100 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-semibold mb-1">
+                            <i class="fa-solid fa-fire text-amber-500"></i>
+                            <span>Identity &amp; Single Sign-On (SSO)</span>
+                        </div>
+                        <h4 class="font-bold text-slate-900 text-sm">Firebase Authentication Configuration</h4>
+                        <p class="text-xs text-slate-500 mt-0.5">Allow students, teachers, and administrators to sign in using Google OAuth or Firebase accounts.</p>
+                    </div>
+                    {% if branding.firebase_api_key and branding.firebase_project_id %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                        Active &amp; Connected
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        Setup Required
+                    </span>
+                    {% endif %}
+                </div>
+
+                <form action="/department/firebase/settings" method="POST" class="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-200/80">
+                        <div>
+                            <span class="text-xs font-bold text-slate-800 block">Enable Firebase Sign-In</span>
+                            <span class="text-[11px] text-slate-500">Display "Sign in with Google (Firebase)" button on the portal login page.</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="firebase_auth_enabled" value="1" {% if branding.firebase_auth_enabled != '0' %}checked{% endif %} class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Firebase Project ID</label>
+                            <input type="text" name="firebase_project_id" value="{{ branding.firebase_project_id or '' }}" placeholder="e.g. nexus-lms-production"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">From Firebase Project Settings &gt; General</span>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Web API Key</label>
+                            <input type="text" name="firebase_api_key" value="{{ branding.firebase_api_key or '' }}" placeholder="AIzaSy..."
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">Web API Key from Firebase General Settings</span>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Auth Domain</label>
+                            <input type="text" name="firebase_auth_domain" value="{{ branding.firebase_auth_domain or '' }}" placeholder="e.g. nexus-lms-production.firebaseapp.com"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">Defaults to &lt;project-id&gt;.firebaseapp.com</span>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">App ID</label>
+                            <input type="text" name="firebase_app_id" value="{{ branding.firebase_app_id or '' }}" placeholder="e.g. 1:123456789:web:abcdef"
+                                class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">Web App ID from Firebase SDK snippet</span>
+                        </div>
+                    </div>
+
+                    <!-- Instructions / Setup Callout -->
+                    <div class="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 space-y-1">
+                        <div class="font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-info text-amber-600"></i>
+                            <span>Firebase Console Setup Checklist:</span>
+                        </div>
+                        <ul class="list-disc list-inside space-y-0.5 text-amber-800 ml-1">
+                            <li>Go to <a href="https://console.firebase.google.com" target="_blank" class="underline font-bold text-amber-900">console.firebase.google.com</a> &gt; <strong>Authentication &gt; Sign-in method</strong> and enable <strong>Google</strong> (and Email/Password).</li>
+                            <li>Go to <strong>Authentication &gt; Settings &gt; Authorized Domains</strong> and ensure <code>localhost</code> is in the list. (Critical: do NOT include <code>http://</code> or port numbers).</li>
+                        </ul>
+                    </div>
+
+                    <div class="flex justify-end pt-1">
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-sm">
+                            Save Firebase Configuration
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
     {% endif %}

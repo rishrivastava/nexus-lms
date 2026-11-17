@@ -68,6 +68,8 @@ def init_db():
             "avatar_url": "TEXT",
             "phone": "TEXT",
             "bio": "TEXT",
+            "firebase_uid": "TEXT",
+            "firebase_provider": "TEXT",
             "last_active_at": "TIMESTAMP"
         }
         for col, col_type in new_cols.items():
@@ -77,6 +79,7 @@ def init_db():
 
         # Create index on normalized names for fast duplicate detection
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_normalized ON users(normalized_name, normalized_guardian);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_firebase ON users(firebase_uid);")
         
         # 2. Courses Table
         cursor.execute("""
@@ -609,7 +612,12 @@ def init_db():
             "mylo_ai_disabled_courses": "",
             "mylo_ai_disabled_subjects": "",
             "mylo_ai_disabled_students": "",
-            "mylo_ai_quiz_explanations_disabled_courses": ""
+            "mylo_ai_quiz_explanations_disabled_courses": "",
+            "firebase_auth_enabled": "1",
+            "firebase_api_key": "",
+            "firebase_auth_domain": "",
+            "firebase_project_id": "",
+            "firebase_app_id": ""
         }
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (k, v))

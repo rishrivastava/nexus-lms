@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException, status, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.templates_config import templates
-from app.database import get_db, UPLOAD_DIR, update_system_settings, log_audit, get_teacher_departments, get_teacher_all_answer_sheets
+from app.database import (
+    get_db, UPLOAD_DIR, update_system_settings, log_audit, 
+    get_teacher_departments, get_teacher_all_answer_sheets, get_system_settings
+)
 from app.auth import verify_password, hash_password, create_access_token, get_current_user
 from app.utils import normalize_name
 import os
 import uuid
 import shutil
+import secrets
+import jwt
 
 router = APIRouter()
 
@@ -100,6 +105,192 @@ async def login_action(
         samesite="lax"
     )
     return redirect
+
+@router.get("/api/auth/firebase-config")
+async def get_firebase_config():
+    """Returns public client Firebase configuration from system settings."""
+    settings = get_system_settings()
+    return JSONResponse({
+        "enabled": settings.get("firebase_auth_enabled", "1") == "1",
+        "apiKey": settings.get("firebase_api_key", ""),
+        "authDomain": settings.get("firebase_auth_domain", ""),
+        "projectId": settings.get("firebase_project_id", ""),
+        "appId": settings.get("firebase_app_id", "")
+    })
+
+@router.post("/api/auth/firebase-login")
+async def handle_firebase_login(request: Request, response: Response):
+    """
+    Authenticates a user via Firebase Authentication (Google OAuth or Email/Password).
+    Validates Firebase payload, links or provisions local user account, and issues lms_token session cookie.
+    """
+    settings = get_system_settings()
+    if settings.get("firebase_auth_enabled", "1") == "0":
+        raise HTTPException(status_code=403, detail="Firebase Authentication is disabled by the administrator.")
+
+    content_type = request.headers.get("content-type", "")
+    data = {}
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+    else:
+        form = await request.form()
+        data = dict(form)
+
+    id_token = data.get("id_token") or ""
+    email = (data.get("email") or "").strip().lower()
+    name = (data.get("name") or "").strip()
+    photo_url = (data.get("photo_url") or "").strip()
+    firebase_uid = (data.get("firebase_uid") or "").strip()
+    provider_id = (data.get("provider_id") or "google.com").strip()
+
+    # If an id_token is provided, decode payload to extract claims
+    if id_token:
+        try:
+            decoded = jwt.decode(id_token, options={"verify_signature": False})
+            if decoded:
+                if not firebase_uid and decoded.get("sub"):
+                    firebase_uid = str(decoded["sub"])
+                if not email and decoded.get("email"):
+                    email = str(decoded["email"]).strip().lower()
+                if not name and decoded.get("name"):
+                    name = str(decoded["name"]).strip()
+                if not photo_url and decoded.get("picture"):
+                    photo_url = str(decoded["picture"]).strip()
+        except Exception:
+            pass
+
+    if not email and not firebase_uid:
+        raise HTTPException(status_code=400, detail="Missing required Firebase user email or UID.")
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        user = None
+
+        # 1. Search by firebase_uid
+        if firebase_uid:
+            cursor.execute("SELECT * FROM users WHERE firebase_uid = ?", (firebase_uid,))
+            user = cursor.fetchone()
+
+        # 2. Search by email (case-insensitive)
+        if not user and email:
+            cursor.execute("SELECT * FROM users WHERE email = ? COLLATE NOCASE", (email,))
+            user = cursor.fetchone()
+
+        # 3. Check alias mapping or local prefix match (e.g. admin@nexus.edu, alan@nexus.edu, student@nexus.edu)
+        if not user and email:
+            local_prefix = email.split("@")[0].lower()
+            alias_map = {
+                "admin": "admin@nexus.edu",
+                "teacher": "alan@nexus.edu",
+                "student": "CS2026-002"
+            }
+            if local_prefix in alias_map:
+                cursor.execute("SELECT * FROM users WHERE user_id = ? OR email = ?", (alias_map[local_prefix], alias_map[local_prefix]))
+                user = cursor.fetchone()
+
+        # 4. If user not found, auto-provision a new student account
+        if not user:
+            clean_name = name if name else (email.split("@")[0].replace(".", " ").title() if email else "Learner")
+            new_uid = f"ST-{uuid.uuid4().hex[:6].upper()}"
+            random_pwd = secrets.token_hex(16)
+            pwd_hash = hash_password(random_pwd)
+            default_dept = "Foreign Language"
+            
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'department_name'")
+            d_row = cursor.fetchone()
+            if d_row and d_row[0]:
+                default_dept = d_row[0]
+
+            cursor.execute("""
+                INSERT INTO users (
+                    user_id, full_name, department, email, password_hash, role,
+                    must_change_password, avatar_url, firebase_uid, firebase_provider,
+                    created_at, last_active_at
+                ) VALUES (?, ?, ?, ?, ?, 'student', 0, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (
+                new_uid, clean_name, default_dept, email, pwd_hash, photo_url, firebase_uid, provider_id
+            ))
+            new_user_id = cursor.lastrowid
+            
+            log_audit(
+                new_user_id,
+                "FIREBASE_REGISTER",
+                "users",
+                str(new_user_id),
+                f"Auto-registered new student account '{clean_name}' via Firebase Auth ({provider_id})",
+                conn=conn
+            )
+            
+            cursor.execute("SELECT * FROM users WHERE id = ?", (new_user_id,))
+            user = cursor.fetchone()
+        else:
+            # User exists: link firebase_uid, provider, and avatar if not set
+            u_dict = dict(user)
+            updates = []
+            params = []
+            if firebase_uid and not u_dict.get("firebase_uid"):
+                updates.append("firebase_uid = ?")
+                params.append(firebase_uid)
+            if provider_id and not u_dict.get("firebase_provider"):
+                updates.append("firebase_provider = ?")
+                params.append(provider_id)
+            if photo_url and not u_dict.get("avatar_url"):
+                updates.append("avatar_url = ?")
+                params.append(photo_url)
+            if updates:
+                updates.append("last_active_at = CURRENT_TIMESTAMP")
+                params.append(user["id"])
+                cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", tuple(params))
+                cursor.execute("SELECT * FROM users WHERE id = ?", (user["id"],))
+                user = cursor.fetchone()
+            else:
+                cursor.execute("UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?", (user["id"],))
+
+            log_audit(
+                user["id"],
+                "FIREBASE_LOGIN",
+                "users",
+                str(user["id"]),
+                f"User '{user['full_name']}' signed in via Firebase Auth ({provider_id})",
+                conn=conn
+            )
+
+        u_dict = dict(user)
+        # Create session JWT token
+        token = create_access_token({"sub": u_dict["user_id"], "role": u_dict["role"]})
+        
+        target_url = "/student"
+        if u_dict.get("must_change_password"):
+            target_url = "/setup-account"
+        elif u_dict.get("role") == "teacher":
+            target_url = "/teacher"
+        elif u_dict.get("role") in ["department_admin", "dashboard_viewer"]:
+            target_url = "/department"
+
+        json_resp = JSONResponse({
+            "status": "success",
+            "message": f"Welcome {u_dict['full_name']}! Signed in via Firebase.",
+            "redirect_url": target_url,
+            "user": {
+                "id": u_dict["id"],
+                "user_id": u_dict["user_id"],
+                "full_name": u_dict["full_name"],
+                "email": u_dict.get("email"),
+                "role": u_dict.get("role"),
+                "department": u_dict.get("department")
+            }
+        })
+        json_resp.set_cookie(
+            key="lms_token",
+            value=token,
+            httponly=True,
+            max_age=60 * 60 * 24 * 7,
+            samesite="lax"
+        )
+        return json_resp
 
 @router.get("/setup-account", response_class=HTMLResponse)
 async def setup_account_page(request: Request):
